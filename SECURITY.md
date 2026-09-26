@@ -1,0 +1,28 @@
+# Security policy
+
+Epoch is **pre-alpha software and has not been audited.** Mainnet deployments during the hackathon run with strict per-validator and total-pool caps and a pause switch held by a multisig.
+
+## Reporting a vulnerability
+
+Please **do not open a public issue** for security problems.
+
+Report privately through [GitHub Security Advisories](https://github.com/Sushant6095/epoch-protocol/security/advisories/new) with:
+
+- a description of the issue and its impact
+- steps to reproduce, or a proof of concept
+- affected program address, commit or version
+
+We aim to acknowledge reports within 72 hours.
+
+## Scope
+
+- `programs/epoch` (on-chain program)
+- `services/*` (indexer, cranks, publisher)
+- `app/` (web app)
+
+## Known trust assumptions
+
+- In v1 the fee index is signed by a single publisher key, bounded per epoch and mirrored to Switchboard.
+- The program upgrade authority is held by a Squads multisig.
+
+See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).

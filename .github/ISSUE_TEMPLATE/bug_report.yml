@@ -1,0 +1,30 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [program, sdk, indexer, cranks, publisher, panta-bot, api, app, docs]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include the cluster (localnet, devnet, mainnet) and any transaction signatures.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      render: shell
+  - type: markdown
+    attributes:
+      value: "**Security issue?** Do not file it here. See SECURITY.md."
