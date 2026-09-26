@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "description": "Epoch: the revenue desk for Solana validators",
   "license": "MIT",
+  "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=22"
   },
