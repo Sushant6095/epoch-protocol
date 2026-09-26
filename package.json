@@ -1,0 +1,19 @@
+{
+  "name": "epoch",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Epoch: the revenue desk for Solana validators",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "dev:app": "pnpm --filter app dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}
