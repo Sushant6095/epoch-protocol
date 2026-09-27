@@ -70,4 +70,53 @@ pub mod epoch {
     pub fn accrue(ctx: Context<Accrue>) -> Result<()> {
         instructions::accrue(ctx)
     }
+
+    // ── Credit ──
+    pub fn onboard_validator(ctx: Context<OnboardValidator>) -> Result<()> {
+        instructions::onboard_validator(ctx)
+    }
+
+    pub fn set_collectors(ctx: Context<SetCollectors>) -> Result<()> {
+        instructions::set_collectors(ctx)
+    }
+
+    pub fn update_score(ctx: Context<UpdateScore>, update: ScoreUpdate) -> Result<()> {
+        instructions::update_score(ctx, update)
+    }
+
+    pub fn post_bond(ctx: Context<Bond>, lamports: u64) -> Result<()> {
+        instructions::post_bond(ctx, lamports)
+    }
+
+    pub fn withdraw_bond(ctx: Context<Bond>, lamports: u64) -> Result<()> {
+        instructions::withdraw_bond(ctx, lamports)
+    }
+
+    pub fn request_advance(ctx: Context<RequestAdvance>, amount: u64) -> Result<()> {
+        instructions::request_advance(ctx, amount)
+    }
+
+    pub fn sweep(ctx: Context<Sweep>) -> Result<()> {
+        instructions::sweep(ctx)
+    }
+
+    pub fn mark_default(ctx: Context<MarkDefault>) -> Result<()> {
+        instructions::mark_default(ctx)
+    }
+
+    pub fn release_validator(ctx: Context<ReleaseValidator>) -> Result<()> {
+        instructions::release_validator(ctx)
+    }
+
+    pub fn update_commission(
+        ctx: Context<UpdateCommission>,
+        kind: u8,
+        commission_bps: u16,
+    ) -> Result<()> {
+        instructions::update_commission(ctx, kind, commission_bps)
+    }
+
+    pub fn update_identity(ctx: Context<UpdateIdentity>) -> Result<()> {
+        instructions::update_identity(ctx)
+    }
 }
