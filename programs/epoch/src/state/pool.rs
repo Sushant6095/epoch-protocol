@@ -179,4 +179,110 @@ impl Pool {
             super::Tranche::Junior => (self.junior_assets, self.junior_shares),
         }
     }
+
+    /// Lamports the queued withdrawals would take at today's share prices.
+    pub fn pending_withdrawal_value(&self) -> Result<u64> {
+        let senior = crate::math::shares_to_assets(
+            self.senior_pending_shares,
+            self.senior_assets,
+            self.senior_shares,
+        )
+        .ok_or_else(|| error!(EpochError::MathOverflow))?;
+        let junior = crate::math::shares_to_assets(
+            self.junior_pending_shares,
+            self.junior_assets,
+            self.junior_shares,
+        )
+        .ok_or_else(|| error!(EpochError::MathOverflow))?;
+        senior
+            .checked_add(junior)
+            .ok_or_else(|| error!(EpochError::MathOverflow))
+    }
+
+    /// Cash not earmarked for queued withdrawals: what new advances may draw.
+    pub fn free_cash(&self) -> Result<u64> {
+        Ok(self.cash.saturating_sub(self.pending_withdrawal_value()?))
+    }
+
+    /// The junior floor: junior assets must be at least `min_junior_bps` of
+    /// total tranche assets whenever senior holds anything. Checked on senior
+    /// deposits and junior withdrawals; disabled when the parameter is zero.
+    pub fn junior_floor_holds(&self, senior_assets: u64, junior_assets: u64) -> Result<bool> {
+        if self.params.min_junior_bps == 0 || senior_assets == 0 {
+            return Ok(true);
+        }
+        let ratio = crate::math::junior_ratio_bps(senior_assets, junior_assets)
+            .ok_or_else(|| error!(EpochError::MathOverflow))?;
+        Ok(ratio >= u64::from(self.params.min_junior_bps))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pool() -> Pool {
+        Pool {
+            admin: Pubkey::default(),
+            treasury: Pubkey::default(),
+            scorer: Pubkey::default(),
+            params: PoolParams {
+                min_junior_bps: 1_000,
+                ..PoolParams::default()
+            },
+            bump: 0,
+            vault_bump: 0,
+            paused: false,
+            cash: 1_000_000,
+            outstanding_principal: 500_000,
+            expected_fees: 0,
+            income_unallocated: 0,
+            bond_total: 0,
+            senior_assets: 1_200_000,
+            senior_shares: 1_200_000,
+            junior_assets: 300_000,
+            junior_shares: 300_000,
+            senior_pending_shares: 0,
+            junior_pending_shares: 0,
+            withdraw_head: 0,
+            withdraw_tail: 0,
+            last_accrued_epoch: 0,
+            validators: 0,
+            open_advances: 0,
+            total_advanced: 0,
+            total_repaid: 0,
+            total_defaulted: 0,
+            _reserved: [0; 64],
+        }
+    }
+
+    #[test]
+    fn ledger_identity_holds_and_breaks() {
+        let mut p = pool();
+        assert!(p.assert_ledger().is_ok());
+        p.cash -= 1;
+        assert!(p.assert_ledger().is_err());
+    }
+
+    #[test]
+    fn free_cash_excludes_queued_withdrawals() {
+        let mut p = pool();
+        assert_eq!(p.free_cash().unwrap(), 1_000_000);
+        p.senior_pending_shares = 600_000;
+        let free = p.free_cash().unwrap();
+        // 600,000 shares at just under 1.0 (virtual offset) → ~599,500
+        // lamports reserved, so a little over 400,000 stays free.
+        assert!((400_000..=401_000).contains(&free), "free={free}");
+    }
+
+    #[test]
+    fn junior_floor() {
+        let p = pool();
+        assert!(p.junior_floor_holds(900_000, 100_000).unwrap());
+        assert!(!p.junior_floor_holds(950_000, 50_000).unwrap());
+        assert!(p.junior_floor_holds(0, 0).unwrap());
+        let mut off = pool();
+        off.params.min_junior_bps = 0;
+        assert!(off.junior_floor_holds(1, 0).unwrap());
+    }
 }

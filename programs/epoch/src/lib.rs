@@ -49,4 +49,25 @@ pub mod epoch {
     pub fn set_roles(ctx: Context<SetRoles>) -> Result<()> {
         instructions::set_roles(ctx)
     }
+
+    // ── Pool: lenders ──
+    pub fn deposit(ctx: Context<Deposit>, tranche: Tranche, assets: u64) -> Result<()> {
+        instructions::deposit(ctx, tranche, assets)
+    }
+
+    pub fn request_withdraw(ctx: Context<RequestWithdraw>, shares: u64) -> Result<()> {
+        instructions::request_withdraw(ctx, shares)
+    }
+
+    pub fn cancel_withdraw(ctx: Context<CancelWithdraw>) -> Result<()> {
+        instructions::cancel_withdraw(ctx)
+    }
+
+    pub fn process_withdrawal(ctx: Context<ProcessWithdrawal>) -> Result<()> {
+        instructions::process_withdrawal(ctx)
+    }
+
+    pub fn accrue(ctx: Context<Accrue>) -> Result<()> {
+        instructions::accrue(ctx)
+    }
 }

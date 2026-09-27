@@ -23,8 +23,8 @@ Index and settles fee swaps against it.
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Foundation: state, math, vote reader, CPI encoders, admin instructions, 35 unit tests | done |
-| 2 | Pool: deposit, FIFO withdrawal queue, epoch accrual, bonds | next |
-| 3 | Credit: onboard, collectors, score, advance, sweep, default, release, gated commission and identity changes | |
+| 2 | Pool: deposit, FIFO withdrawal queue (request, cancel, process), epoch accrual with senior→junior waterfall | done |
+| 3 | Credit: onboard, collectors, score, bonds, advance, sweep, default, release, gated commission and identity changes | next |
 | 4 | Fee Index (self-published, bounded, disputable) and fee swaps | |
 | 5 | LiteSVM epoch-warp tests, fuzzing, invariants, program keys, IDL to `epoch-sdk`, devnet | |
 

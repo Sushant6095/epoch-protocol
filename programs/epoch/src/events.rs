@@ -45,11 +45,14 @@ pub struct WithdrawRequested {
     pub seq: u64,
 }
 
+/// `reason`: 0 = cancelled by the owner, 1 = bounced by the junior floor
+/// when it reached the head of the queue (shares returned to the owner).
 #[event]
 pub struct WithdrawCancelled {
     pub pool: Pubkey,
     pub owner: Pubkey,
     pub seq: u64,
+    pub reason: u8,
 }
 
 #[event]
