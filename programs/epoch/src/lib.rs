@@ -119,4 +119,69 @@ pub mod epoch {
     pub fn update_identity(ctx: Context<UpdateIdentity>) -> Result<()> {
         instructions::update_identity(ctx)
     }
+
+    // ── Fee Index ──
+    pub fn initialize_index(
+        ctx: Context<InitializeIndex>,
+        dispute_window_slots: u64,
+        max_move_bps: u16,
+    ) -> Result<()> {
+        instructions::initialize_index(ctx, dispute_window_slots, max_move_bps)
+    }
+
+    pub fn configure_index(
+        ctx: Context<ConfigureIndex>,
+        dispute_window_slots: u64,
+        max_move_bps: u16,
+    ) -> Result<()> {
+        instructions::configure_index(ctx, dispute_window_slots, max_move_bps)
+    }
+
+    pub fn post_index(
+        ctx: Context<PostIndex>,
+        epoch: u64,
+        value: u64,
+        inputs_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::post_index(ctx, epoch, value, inputs_hash)
+    }
+
+    pub fn finalize_index(ctx: Context<FinalizeIndex>) -> Result<()> {
+        instructions::finalize_index(ctx)
+    }
+
+    pub fn veto_index(ctx: Context<VetoIndex>) -> Result<()> {
+        instructions::veto_index(ctx)
+    }
+
+    // ── Fee Market ──
+    pub fn post_quote(
+        ctx: Context<PostQuote>,
+        epoch: u64,
+        fixed_rate: u64,
+        max_notional: u64,
+        max_move_bps: u16,
+        expiry_slot: u64,
+    ) -> Result<()> {
+        instructions::post_quote(
+            ctx,
+            epoch,
+            fixed_rate,
+            max_notional,
+            max_move_bps,
+            expiry_slot,
+        )
+    }
+
+    pub fn withdraw_quote(ctx: Context<WithdrawQuote>) -> Result<()> {
+        instructions::withdraw_quote(ctx)
+    }
+
+    pub fn open_swap(ctx: Context<OpenSwap>, notional: u64, side: Side) -> Result<()> {
+        instructions::open_swap(ctx, notional, side)
+    }
+
+    pub fn settle_swap(ctx: Context<SettleSwap>) -> Result<()> {
+        instructions::settle_swap(ctx)
+    }
 }
