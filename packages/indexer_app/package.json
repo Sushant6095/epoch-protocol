@@ -1,0 +1,32 @@
+{
+  "name": "@epoch/indexer_app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Yellowstone gRPC \u2192 slot fees, Solana Fee Index, validator revenue and program events",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "lint": "eslint src",
+    "lint:fix": "eslint --fix src",
+    "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests",
+    "start": "node dist/index.js",
+    "watch": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@epoch/common": "workspace:*",
+    "@epoch/config-sdk": "workspace:*",
+    "@epoch/logger": "workspace:*",
+    "@epoch/pg_models": "workspace:*",
+    "@epoch/solana": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0"
+  }
+}

@@ -12,12 +12,12 @@ This plan has five parts: where the repo is today, the target structure, the two
 | --- | --- | --- |
 | `programs/epoch` | Compiles on Anchor 1.2. One instruction (`initialize_pool`). Account structs for Pool, ValidatorPosition, Advance, FeeIndex, SwapPosition | No instructions beyond init; no vote-program CPI; no events; no math module; placeholder program ID |
 | Tests | `tests/README.md` only | No unit, LiteSVM or integration tests; `Anchor.toml` test script points at a runner that isn't installed |
-| `packages/sdk` | Seed constants only | No IDL, PDAs, instruction builders or account decoders |
-| `services/*` | Five stubs with correct dependencies | No shared config, logging, DB access or retry logic |
+| `packages/epoch-sdk` | Seed constants and PDA helpers | No IDL, instruction builders or account decoders |
+| `packages/*_app` | Five apps on shared libraries (`common`, `logger`, `exceptions`, `config-sdk`, `common_http_server`, `pg_models`, `solana`). `api_app` serves `/health` and `/v1/index` from Postgres | Indexer stream, crank jobs, publisher and Panta bot are typed stubs |
 | `app` | Next.js 16 page with a heading | No wallet provider, design system, routes or data hooks |
-| Database | None | No schema or migrations |
+| Database | drizzle schema for six tables, `0000_init.sql` migration | No revenue or validator backfill yet |
 | Scripts / infra | None | No deploy, key-sync, pool-init, CP1 or seed scripts; no Fly/Vercel config |
-| CI | cargo check + TS typecheck (fix committed locally, not pushed) | No `anchor build`/tests in CI yet |
+| CI | cargo check; TS build, lint, jest, circular-dependency check | No `anchor build`/tests in CI yet |
 | Docs | README, architecture, threat model, plan, side tracks, community files | This plan, repo-structure guide and ADRs (added now) |
 
 **Verified protocol facts the design relies on** (from `solana-vote-interface` 7.1.0, the crate Anchor 1.2 resolves):
@@ -36,8 +36,8 @@ This plan has five parts: where the repo is today, the target structure, the two
 See [`REPO_STRUCTURE.md`](REPO_STRUCTURE.md) for the full tree and the rule for where new code goes. The headline changes:
 
 - The program splits into `state/`, `instructions/{pool,credit,market}/`, `math/` (pure, unit-tested), `cpi/vote.rs` and `events.rs`.
-- Two new shared packages: `packages/common` (env config, logger, RPC connection, retry) and `packages/db` (SQL migrations + typed queries).
-- New `scripts/` (deploy, pool init, CP1 testnet proof, seeding) and `infra/` (Fly.io, Vercel, Supabase).
+- Done: every TypeScript package sits flat in `packages/`: libraries (`common`, `logger`, `exceptions`, `config-sdk`, `common_http_server`, `pg_models`, `solana`, `epoch-sdk`) and deployables (`*_app`). See [ADR 0005](adr/0005-backend-package-conventions.md).
+- New `scripts/` (deploy, pool init, CP1 testnet proof, seeding). Deploy config lives in `deployments/` and `pm2.config.js`.
 - The app moves to feature folders: `app/src/features/{terminal,validator,vault,market}`.
 
 ---
@@ -51,7 +51,7 @@ Two tracks run in parallel from day 1 and meet at the SDK.
 | **A: on-chain** | Program, math, CPI, LiteSVM tests, deploys, SDK generation, CP1 script, security review | Rust-leaning teammate |
 | **B: off-chain + product** | Indexer, DB, API, cranks, publisher, Panta bot, app, videos | TypeScript-leaning teammate |
 
-**Contract between tracks:** the IDL. Track A publishes a new IDL to `packages/sdk/src/idl/` on every program change; Track B only calls the program through `@epoch/sdk`.
+**Contract between tracks:** the IDL. Track A publishes a new IDL to `packages/epoch-sdk/src/idl/` on every program change; Track B only calls the program through `@epoch/epoch-sdk`.
 
 **Shared by both:** the pitch, daily commits, the two weekly-update videos, and the submission forms.
 
@@ -65,7 +65,7 @@ Each feature lists files, logic, tests and a done-when. IDs match GitHub issues/
 
 - `anchor keys sync` to generate the real program ID; commit `Anchor.toml` + `lib.rs` change (keypair stays in `target/deploy/`, gitignored).
 - Add `scripts/` with `deploy.ts`, `init-pool.ts`, `seed-devnet.ts`.
-- CI: keep `cargo check` + typecheck now; add `anchor build` + LiteSVM tests once they exist (F2).
+- CI: `cargo check` + TS build, lint, jest and circular check (done); add `anchor build` + LiteSVM tests once they exist (F2).
 - Branch protection on `main` after the collaborator is added: require CI to pass; no force-push.
 
 **Done when:** CI green on `main`; `anchor build` produces an IDL locally.
@@ -148,13 +148,13 @@ let to_identity = withdrawable - to_pool;
 
 ### F4 · Indexer and database (Track B, 27 Sep – 1 Oct)
 
-- `packages/db/migrations/*.sql` tables: `slot_fees(slot, leader, p50_cu_price, tx_count)`, `epoch_index(epoch, value, posted_sig)`, `validators(vote, identity, name, onboarded_at)`, `validator_epochs(vote, epoch, revenue, credits, commission_bps)`, `program_events(sig, slot, kind, payload jsonb)`.
-- `services/indexer`: Yellowstone gRPC subscription (Solami primary, RPC Fast failover), saves `last_slot` to resume; per-slot median priority fee excluding leader-paid transactions; epoch rollup = stake-weighted median across leaders; decodes Epoch program events.
+- `packages/pg_models` tables (drizzle schema, generated SQL): `slot_fees(slot, epoch, leader, median_cu_price, tx_count)`, `epoch_index(epoch, value, posted_signature)`, `validators(vote, identity, name, onboarded_at)`, `validator_epochs(vote, epoch, revenue, credits, commission_bps)`, `program_events(sig, slot, kind, payload jsonb)`.
+- `packages/indexer_app`: Yellowstone gRPC subscription (Solami primary, RPC Fast failover), saves `last_slot` to resume; per-slot median priority fee excluding leader-paid transactions; epoch rollup = stake-weighted median across leaders; decodes Epoch program events.
 - **Done when:** running on mainnet since 1 Oct with < 150 slots of lag; `epoch_index` has a value for the last finished epoch.
 
 ### F5 · API and Terminal (Track B, 30 Sep – 3 Oct)
 
-- `services/api`: `GET /index?from&to`, `GET /validators`, `GET /validators/:vote`, `GET /book`, `GET /events?cursor`; websocket `/live` pushes new events and slot fees.
+- `packages/api_app`: `GET /v1/index?from&to` (live), `GET /v1/validators`, `GET /v1/validators/:vote`, `GET /v1/book`, `GET /v1/events?cursor`; websocket `/live` pushes new events and slot fees.
 - `app/src/features/terminal`: epoch progress (from RPC `getEpochInfo`), KPI tiles, fee-index chart, live feed, validator table. Mobile layout.
 - **Done when:** public Terminal URL loads in < 2 s and updates live (this is the Solami demo).
 
@@ -175,7 +175,7 @@ To ship in time, v1 uses **quote-based swaps against a seeded market-maker vault
 
 ### F8 · Cranks (Track B, 2–5 Oct)
 
-`services/cranks` listens for epoch changes and runs, in order: claim MEV (Jito tip distributor claim for each vote account), wait for epoch rewards to finish, `update_score` → `sweep` for each position → `settle_epoch` → `accrue`. Idempotent; retries through RPC Fast; alerts after 60 minutes without a sweep.
+`packages/cranks_app` listens for epoch changes and runs, in order: claim MEV (Jito tip distributor claim for each vote account), wait for epoch rewards to finish, `update_score` → `sweep` for each position → `settle_epoch` → `accrue`. Idempotent; retries through RPC Fast; alerts after 60 minutes without a sweep.
 
 ### F9 · Publisher + Switchboard (Track B, 6–8 Oct)
 

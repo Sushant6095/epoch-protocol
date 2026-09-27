@@ -88,16 +88,20 @@ All funds live in program-owned accounts. Every off-chain component is read-only
 ## Repository layout
 
 ```text
-programs/epoch/      Anchor program (Rust)
-packages/sdk/        TypeScript client generated from the IDL
-services/indexer/    Yellowstone gRPC → Solana Fee Index + revenue → Postgres
-services/cranks/     Epoch-boundary jobs: claim, score, sweep, settle, accrue
-services/publisher/  Posts the fee index on-chain + Switchboard
-services/panta-bot/  Parimutuel markets on the fee index
-services/api/        REST + websocket for the Terminal
-app/                 Next.js: Terminal, Validator Console, Vault, Fee Market
-tests/               Anchor + LiteSVM epoch-boundary tests
-docs/                Architecture, threat model, plan, side tracks
+programs/epoch/               Anchor program (Rust)
+packages/
+  epoch-sdk/                  TypeScript client generated from the IDL
+  indexer_app/                Yellowstone gRPC → Solana Fee Index + revenue → Postgres
+  cranks_app/                 Epoch-boundary jobs: claim, score, sweep, settle, accrue
+  publisher_app/              Posts the fee index on-chain + Switchboard
+  panta_bot_app/              Parimutuel markets on the fee index
+  api_app/                    REST API for the Terminal
+  common/ logger/ exceptions/ config-sdk/ common_http_server/ pg_models/ solana/
+                              Shared libraries every app is built from
+app/                          Next.js: Terminal, Validator Console, Vault, Fee Market
+deployments/  pm2.config.js   Containers and single-box process config
+tests/                        Anchor + LiteSVM epoch-boundary tests
+docs/                         Architecture, threat model, plan, ADRs
 ```
 
 ## Getting started
@@ -109,11 +113,17 @@ git clone https://github.com/Sushant6095/epoch-protocol.git
 cd epoch-protocol
 cp .env.example .env
 pnpm install
+pnpm build            # every TypeScript package, in dependency order
+pnpm db:up && pnpm db:migrate
+pnpm dev:api          # http://localhost:4000/health
+pnpm dev:app          # http://localhost:3000
+
 anchor keys sync      # generates the program ID
 anchor build
 anchor test
-pnpm dev:app          # http://localhost:3000
 ```
+
+Before a PR: `pnpm lint && pnpm test && pnpm ccd`. Conventions: [`docs/REPO_STRUCTURE.md`](docs/REPO_STRUCTURE.md).
 
 ## Roadmap
 

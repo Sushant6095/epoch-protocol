@@ -17,7 +17,7 @@ We aim to acknowledge reports within 72 hours.
 ## Scope
 
 - `programs/epoch` (on-chain program)
-- `services/*` (indexer, cranks, publisher)
+- `packages/*_app` (indexer, cranks, publisher, API) and the shared libraries in `packages/`
 - `app/` (web app)
 
 ## Known trust assumptions

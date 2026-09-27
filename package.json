@@ -1,7 +1,7 @@
 {
-  "name": "epoch",
+  "name": "@epoch/root",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Epoch: the revenue desk for Solana validators",
   "license": "MIT",
   "packageManager": "pnpm@10.28.0",
@@ -9,12 +9,43 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm -r --if-present build",
-    "typecheck": "pnpm -r --if-present typecheck",
-    "lint": "pnpm -r --if-present lint",
-    "dev:app": "pnpm --filter app dev"
+    "preinstall": "npx only-allow pnpm",
+    "prepare": "husky",
+    "build": "pnpm -r --filter \"./packages/**\" build",
+    "build:watch": "pnpm -r --parallel --filter \"./packages/**\" build:watch",
+    "lint": "pnpm -r --filter \"./packages/**\" lint",
+    "lint:fix": "pnpm -r --filter \"./packages/**\" lint:fix",
+    "test": "jest",
+    "format": "prettier --write \"packages/**/*.ts\"",
+    "format:check": "prettier --check \"packages/**/*.ts\"",
+    "ccd": "madge --circular --extensions ts --exclude \"/dist/\" ./packages",
+    "dev:app": "pnpm --filter app dev",
+    "dev:api": "pnpm --filter @epoch/api_app watch",
+    "db:generate": "pnpm --filter @epoch/pg_models db:generate",
+    "db:migrate": "pnpm --filter @epoch/pg_models db:migrate",
+    "db:up": "docker compose -f packages/pg_models/testing-setup/docker-compose.yml up -d"
   },
   "devDependencies": {
-    "typescript": "^5.9.0"
+    "@eslint/js": "^9.39.5",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.20.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "husky": "^9.1.7",
+    "jest": "^29.7.0",
+    "lint-staged": "^15.5.2",
+    "madge": "^8.0.0",
+    "prettier": "^3.9.9",
+    "ts-jest": "^29.4.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.70.1"
+  },
+  "lint-staged": {
+    "packages/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

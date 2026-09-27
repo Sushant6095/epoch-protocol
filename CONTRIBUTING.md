@@ -21,19 +21,22 @@ test(credit): fuzz rounding in waterfall
 chore(ci): cache cargo registry
 ```
 
-Scopes: `program`, `credit`, `market`, `pool`, `sdk`, `indexer`, `cranks`, `publisher`, `panta-bot`, `api`, `app`, `ci`, `docs`.
+Scopes: `program`, `credit`, `market`, `pool`, `epoch-sdk`, `indexer`, `cranks`, `publisher`, `panta-bot`, `api`, `common`, `pg_models`, `solana`, `app`, `ci`, `docs`.
 
 ## Local checks
 
 ```bash
 anchor build && anchor test
 cargo fmt --all && cargo clippy --workspace -- -D warnings
-pnpm typecheck
+pnpm build && pnpm lint && pnpm test && pnpm ccd
 ```
+
+`pnpm install` sets up a husky pre-commit hook that runs ESLint and Prettier on staged TypeScript. New packages follow the template in [`docs/REPO_STRUCTURE.md`](docs/REPO_STRUCTURE.md#package-anatomy).
 
 ## Rules
 
 - **Never commit keypairs, seed phrases or `.env` files.** Keypairs live outside the repo.
 - Every instruction that moves funds needs a test, including the failure path.
+- Use `Logger.create()` instead of `console.*`, and throw `EpochException` subclasses instead of bare `Error`s in app code.
 - Program changes that touch accounting must keep the invariants in `docs/THREAT_MODEL.md`.
 - Any code reused from before the hackathon window must be disclosed in the PR description.

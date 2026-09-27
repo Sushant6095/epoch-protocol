@@ -1,0 +1,24 @@
+{
+  "name": "@epoch/exceptions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed exception hierarchy shared by every package",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "lint": "eslint src",
+    "lint:fix": "eslint --fix src",
+    "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.20.0"
+  }
+}

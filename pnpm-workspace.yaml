@@ -1,4 +1,6 @@
 packages:
-  - app
   - packages/*
-  - services/*
+  - app
+
+onlyBuiltDependencies:
+  - esbuild

@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: epoch
+      POSTGRES_PASSWORD: epoch
+      POSTGRES_DB: epoch
+    ports:
+      - '5432:5432'
