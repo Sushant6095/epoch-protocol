@@ -49,7 +49,7 @@ Two tracks run in parallel from day 1 and meet at the SDK.
 | Track | Scope | Suggested owner |
 | --- | --- | --- |
 | **A: on-chain** | Program, math, CPI, LiteSVM tests, deploys, SDK generation, CP1 script, security review | Rust-leaning teammate |
-| **B: off-chain + product** | Indexer, DB, API, cranks, publisher, Panta bot, app, videos | TypeScript-leaning teammate |
+| **B: off-chain + product** | Indexer, DB, API, cranks, publisher, Meteora launch, Panta bot, app, videos | TypeScript-leaning teammate |
 
 **Contract between tracks:** the IDL. Track A publishes a new IDL to `packages/epoch-sdk/src/idl/` on every program change; Track B only calls the program through `@epoch/epoch-sdk`.
 
@@ -193,6 +193,28 @@ Written threat review of `sweep`, `withdraw`, `onboard_validator`; property/fuzz
 
 Deploy (4 Oct) → partner onboarding and first advance (5 Oct) → record boundary sweep (7 Oct) → feature freeze (9 Oct) → videos (10 Oct) → dry-run submission (11 Oct) → submit (12 Oct) → side tracks (13 Oct 12:29 IST).
 
+### F13 · Revenue tokens on Meteora (Track A 2 + 7 Oct; Track B 6–8 Oct)
+
+A validator can sell a fixed share of its commission for a fixed term as a token, instead of or alongside borrowing. Same enforcement as credit: the program holds the vote account's withdraw authority. Side track: Meteora "Best use of DBC" (20k USDC). Decision record: [ADR 0006](adr/0006-revenue-tokens-on-meteora.md).
+
+**M1 · Launch on DBC.** `packages/meteora` wraps `@meteora-ag/dynamic-bonding-curve-sdk` and the DAMM v2 SDK. Epoch is the DBC *partner* and builds one config per launch with `buildCurveWithCustomSqrtPrices`, from indexer data:
+
+- **Revenue-anchored curve:** the price band runs from 60% to 95% of the present value of the share's expected revenue (10-epoch average × share × term). Price discovery happens inside a band tied to real cashflow, not a meme curve.
+- **Graduation:** `migrationQuoteThreshold` = the raise target (2–5 SOL for the demo). Migration fee 70% with creator share 100%, so at graduation the validator receives 70% of the raise as upfront SOL; the other 30% seeds a DAMM v2 pool with 100% permanently locked LP, so holders always have an exit.
+- **Fees to lenders:** `fee_claimer` is an Epoch treasury PDA, so partner trading fees flow to the senior tranche.
+- **Token:** SPL, fixed supply, immutable mint and metadata authority.
+- **Program:** `register_revenue_token(share_bps, term_epochs, mint, dbc_pool)` on the `ValidatorPosition`. Share and term are immutable; `release` is blocked until `term_end_epoch`.
+
+**M2 · Buyback at source on DAMM v2.**
+
+- `sweep` waterfall becomes: revenue share (off the top) → advance repayment → validator. The credit limit is computed on revenue after the share.
+- The share accrues in a buyback escrow PDA. Permissionless `execute_buyback(slice)` CPIs a SOL → token swap on the DAMM v2 pool (DBC `swap2` before graduation) and burns what it buys.
+- `cranks_app` `BuybackJob` runs 12 slices across the first hour of each epoch, each with a min-out from the pool price, so a known-time buy can't be sandwiched.
+- Terminal: a Launch tab (curve progress, raise, implied yield = share revenue per epoch ÷ market cap) and a live buyback feed.
+- **Fallback** if the DAMM v2 CPI isn't ready by 7 Oct: `redeem` lets holders burn tokens for a pro-rata share of the escrow. Same guarantee, less Meteora volume.
+
+**Done when:** the design-partner validator's revenue token has graduated on mainnet and at least one epoch's buyback has executed on DAMM v2.
+
 ---
 
 ## 5. Day-by-day schedule (IST)
@@ -204,20 +226,20 @@ Deploy (4 Oct) → partner onboarding and first advance (5 Oct) → record bound
 | 3 | Mon 29 Sep | F2 pool deposit/withdraw + shares | F4 indexer on mainnet; score calibration data | **CP2** design partner |
 | 4 | Tue 30 Sep | F3 `update_score`, `request_advance` | F5 API endpoints | |
 | 5 | Wed 1 Oct | F3 `sweep` + waterfall; LiteSVM full cycle | F5 Terminal live on mainnet | **Gate 1** |
-| 6 | Thu 2 Oct | F3 `mark_default`; events | F8 cranks | |
+| 6 | Thu 2 Oct | F3 `mark_default`; events; revenue-share slot in `sweep` (F13) | F8 cranks | |
 | 7 | Fri 3 Oct | F11 security review, fuzzing, caps, Squads | F6 Validator Console; weekly update #1 | **CP3** |
 | 8 | Sat 4 Oct | Mainnet deploy; `init-pool` | F6 Vault | |
 | 9 | Sun 5 Oct | Partner onboarding; first advance | Terminal shows the live advance | **Gate 2** |
-| 10 | Mon 6 Oct | F7 quotes + swaps | F9 publisher | |
-| 11 | Tue 7 Oct | F7 `post_index`, `settle_epoch`, hedged flag | Record boundary sweep | **CP4** |
-| 12 | Wed 8 Oct | Bug fixes | F7 Market UI; F10 Panta bot; 20-second pitch test | **CP5** |
+| 10 | Mon 6 Oct | F7 quotes + swaps | F9 publisher; F13 DBC preset + devnet launch | |
+| 11 | Tue 7 Oct | F7 `post_index`, `settle_epoch`, hedged flag; F13 `execute_buyback` | Record boundary sweep; F13 mainnet launch (partner validator) | **CP4** |
+| 12 | Wed 8 Oct | Bug fixes | F7 Market UI; F13 Launch UI + buyback feed; 20-second pitch test | **CP5** |
 | 13 | Thu 9 Oct | Freeze | Freeze; polish | **Gate 3** |
 | 14 | Fri 10 Oct | Demo script | Record pitch + demo; weekly update #2 | |
 | 15 | Sat 11 Oct | README, docs | Submission dry run | **CP6** |
 | 16 | Sun 12 Oct | Submit Colosseum | | |
 | — | Mon 13 Oct | | Side tracks by 12:29 IST | |
 
-**Cut order if behind:** Panta (F10) → Switchboard (F9) → Fee Market (F7). Credit + Terminal alone is a complete entry.
+**Cut order if behind:** Panta (F10) → Switchboard (F9) → Fee Market swaps (F7; keep the index) → F13 buyback CPI (fall back to `redeem`). Credit + Terminal alone is a complete entry.
 
 ---
 

@@ -16,9 +16,10 @@ epoch-protocol/
 │     ├─ instructions/
 │     │  ├─ pool/                  initialize, deposit, request_withdraw, process_withdrawals, accrue, admin
 │     │  ├─ credit/                onboard, update_score, request_advance, sweep, mark_default, release
-│     │  └─ market/                post_quote, open_swap, post_index, settle_epoch
+│     │  ├─ market/                post_quote, open_swap, post_index, settle_epoch
+│     │  └─ launch/                register_revenue_token, execute_buyback, redeem (Meteora DBC / DAMM v2)
 │     ├─ math/                     Pure functions, unit-tested: shares, waterfall, credit_limit, score
-│     └─ cpi/vote.rs               Vote-program CPI: authorize, withdraw, update_commission_collector
+│     └─ cpi/                      vote.rs (authorize, withdraw, update_commission_collector), damm_v2.rs, dbc.rs (swaps)
 │
 ├─ packages/                       Every TypeScript package, flat. Libraries have plain names, deployables end in _app
 │  ├─ common/                      @epoch/common: FirstModule env loader, constants, GracefulShutdown, helpers, pkg/ re-exports
@@ -29,6 +30,7 @@ epoch-protocol/
 │  ├─ pg_models/                   @epoch/pg_models: drizzle schema, PostgresConnectionManager, migrations/
 │  ├─ solana/                      @epoch/solana: RPC failover, EpochClock, TransactionSender, GrpcStream, keypairs
 │  ├─ epoch-sdk/                   @epoch/epoch-sdk: IDL, PDAs, account decoders, instruction builders, math mirror
+│  ├─ meteora/                     @epoch/meteora: revenue-anchored DBC config presets, launch + DAMM v2 helpers
 │  ├─ indexer_app/                 Yellowstone gRPC → slot fees, epoch index, validator revenue, program events
 │  ├─ cranks_app/                  Epoch-boundary jobs (claim, score, sweep, settle, accrue)
 │  ├─ publisher_app/               post_index / post_quote + Switchboard feed
@@ -37,8 +39,8 @@ epoch-protocol/
 │
 ├─ app/                            Next.js 16 (deployed to Vercel)
 │  └─ src/
-│     ├─ app/                      Routes: / (Terminal), /validators, /validators/[vote], /vault, /market
-│     ├─ features/                 terminal/ validator/ vault/ market/  (components + hooks per feature)
+│     ├─ app/                      Routes: / (Terminal), /validators, /validators/[vote], /vault, /market, /launch
+│     ├─ features/                 terminal/ validator/ vault/ market/ launch/  (components + hooks per feature)
 │     ├─ components/               ui/ (shadcn), charts/, layout/
 │     └─ lib/                      solana.ts, wallet-provider.tsx, api-client.ts, format.ts
 │
