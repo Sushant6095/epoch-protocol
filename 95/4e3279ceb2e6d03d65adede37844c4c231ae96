@@ -1,0 +1,25 @@
+docs/IMPLEMENTATION_PLAN.md
+  s_3f7bc98df550b6::t_5c04c4a0799924 52,196-217,229,233-235,242
+docs/REPO_STRUCTURE.md
+  s_3f7bc98df550b6::t_375b2fd49c2e4b 19-20,22,33,42-43
+docs/SIDE_TRACKS.md
+  s_3f7bc98df550b6::t_496c706d7b84f3 8,11-22
+docs/adr/0006-revenue-tokens-on-meteora.md
+  s_3f7bc98df550b6::t_2deba4f03dfc4a 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "954e3279ceb2e6d03d65adede37844c4c231ae96",
+  "prompts": {},
+  "sessions": {
+    "s_3f7bc98df550b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e32533c-e59a-46e6-90a9-a5c265265931",
+        "model": "unknown"
+      },
+      "human_author": "Sushant6095 <Sushant6095@users.noreply.github.com>"
+    }
+  }
+}
