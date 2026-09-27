@@ -1,0 +1,26 @@
+README.md
+  h_7554bcd9539748 129
+docs/IMPLEMENTATION_PLAN.md
+  h_7554bcd9539748 1-229
+docs/REPO_STRUCTURE.md
+  h_7554bcd9539748 1-71
+docs/adr/0001-monorepo.md
+  h_7554bcd9539748 1-9
+docs/adr/0002-vote-authority-pda.md
+  h_7554bcd9539748 1-9
+docs/adr/0003-share-accounting.md
+  h_7554bcd9539748 1-9
+docs/adr/0004-fee-market-v1-quotes.md
+  h_7554bcd9539748 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e5e04b77a6c7c92dfac8e86ad63249ed42114abd",
+  "prompts": {},
+  "humans": {
+    "h_7554bcd9539748": {
+      "author": "Sushant6095 <Sushant6095@users.noreply.github.com>"
+    }
+  }
+}
