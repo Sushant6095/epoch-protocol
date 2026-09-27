@@ -126,7 +126,7 @@ pnpm dev:app          # http://localhost:3000
 - [ ] Fee Market: swaps, settlement, Switchboard feed, Panta markets
 - [ ] Colosseum Crypto World's Fair submission (12 Oct 2026)
 
-Full plan with checkpoints: [`docs/PLAN.md`](docs/PLAN.md)
+Full plan with checkpoints: [`docs/PLAN.md`](docs/PLAN.md) · Implementation plan and feature specs: [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) · Repo guide: [`docs/REPO_STRUCTURE.md`](docs/REPO_STRUCTURE.md) · Decisions: [`docs/adr/`](docs/adr/)
 
 ## Side-track integrations
 
