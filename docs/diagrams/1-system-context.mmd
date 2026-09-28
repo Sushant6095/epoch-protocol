@@ -1,0 +1,77 @@
+flowchart LR
+  subgraph PEOPLE["People"]
+    OP["Validator operator<br/>vote account + identity"]
+    LEN["Lenders<br/>senior / junior tranche"]
+    MM["Fee-market makers<br/>post fixed-rate quotes"]
+    TK["Fee-market takers<br/>hedge fee exposure"]
+    ANY["Anyone<br/>runs permissionless cranks"]
+    ADM["Admin<br/>Squads multisig"]
+  end
+
+  subgraph APP["Next.js 16 app · wallet signs every transaction"]
+    UI_T["Terminal<br/>epoch bar · Fee Index · validators"]
+    UI_C["Validator Console<br/>onboard · advance · sweeps"]
+    UI_V["Vault + Lender portfolio<br/>deposit · withdraw queue"]
+    UI_F["Fee Index + Fee Market<br/>quotes · swaps"]
+    UI_L["Launch<br/>validator revenue tokens"]
+  end
+
+  subgraph BE["Epoch backend · TypeScript monorepo"]
+    API["api_app<br/>REST + live updates"]
+    IDX["indexer_app<br/>SlotStream → FeeProcessor"]
+    PG[("Postgres<br/>pg_models · drizzle")]
+    CR["cranks_app<br/>ClaimMev · Sweep · UpdateScore<br/>Accrue · SettleEpoch"]
+    PUB["publisher_app<br/>IndexPublisher"]
+    PBOT["panta_bot_app<br/>market lifecycle"]
+  end
+
+  subgraph SOL["Solana mainnet"]
+    EP["Epoch program · Anchor 1.2<br/>Pool · Credit · Fee Index · Fee Market"]
+    VOTE["Vote program<br/>validator vote accounts"]
+    SYS["System program<br/>Clock · EpochRewards · Rent"]
+  end
+
+  subgraph EXT["External"]
+    JTD["Jito Tip Distribution<br/>MEV commission → vote account"]
+    JVH["Jito Validator History<br/>512 epochs per validator"]
+    MET["Meteora DBC<br/>revenue tokens"]
+    PANTA["Panta<br/>prediction markets"]
+    RPC["Solami gRPC primary<br/>RPC Fast failover"]
+    KOBE["Jito Kobe API<br/>validator history · MEV"]
+  end
+
+  OP --> UI_C
+  LEN --> UI_V
+  MM --> UI_F
+  TK --> UI_F
+  OP --> UI_L
+  UI_C -->|"signed tx"| EP
+  UI_V -->|"signed tx"| EP
+  UI_F -->|"signed tx"| EP
+  UI_T -.->|"reads"| API
+  API -.-> PG
+  IDX -.->|"writes"| PG
+  RPC -.->|"slots · blocks · accounts"| IDX
+  KOBE -.->|"history · tips"| IDX
+  ANY --> CR
+  CR -->|"cranks every epoch"| EP
+  PG -.-> PUB
+  PUB -->|"post_index"| EP
+  EP -.->|"CPI: authorize · withdraw · collectors"| VOTE
+  EP -.->|"transfers"| SYS
+  JTD ==>|"tips at epoch end"| VOTE
+  EP -.->|"score inputs · planned"| JVH
+  UI_L -.-> MET
+  PBOT -.-> PANTA
+  ADM -->|"upgrade · params · veto"| EP
+
+  classDef people fill:#b2f2bb,stroke:#2f9e44,color:#1b1b1b
+  classDef offchain fill:#a5d8ff,stroke:#1971c2,color:#1b1b1b
+  classDef onchain fill:#d0bfff,stroke:#6741d9,color:#1b1b1b
+  classDef native fill:#e9ecef,stroke:#495057,color:#1b1b1b
+  classDef external fill:#ffd8a8,stroke:#e8590c,color:#1b1b1b
+  class OP,LEN,MM,TK,ANY,ADM people
+  class UI_T,UI_C,UI_V,UI_F,UI_L,API,IDX,PG,CR,PUB,PBOT offchain
+  class EP onchain
+  class VOTE,SYS native
+  class JTD,JVH,MET,PANTA,RPC,KOBE external

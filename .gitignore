@@ -28,3 +28,8 @@ out/
 .vscode/
 .idea/
 coverage/
+
+# Internal strategy/research notes and raw discussion logs — not for the
+# public repo. The full archive lives outside git; see docs/diagrams/ for
+# what's public.
+docs/private/

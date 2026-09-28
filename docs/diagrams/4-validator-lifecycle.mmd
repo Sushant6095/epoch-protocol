@@ -1,0 +1,21 @@
+flowchart LR
+  START(("Validator")) -->|"onboard_validator + set_collectors + post_bond<br/>sent as one transaction"| ONB["Onboarded<br/>withdraw authority → VoteAuth PDA<br/>collectors → Escrow · bond posted"]
+  ONB -->|"request_advance<br/>score ≥ minimum · within credit limit · utilisation OK"| OPEN["Advance open"]
+  OPEN -->|"sweeps repay in full"| REPAID["Repaid"]
+  REPAID -->|"can borrow again"| ONB
+  OPEN -->|"epoch swept with zero revenue"| LATE["Late"]
+  LATE -->|"revenue resumes"| OPEN
+  LATE -->|"mark_default<br/>3 late epochs or past max term"| DEF["Defaulted<br/>loss: bond → junior → senior"]
+  DEF -->|"later sweeps are 100% recoveries"| REC["Recoveries to the pool"]
+  ONB -->|"release_validator"| REL["Released<br/>authority · collectors · bond · escrow returned"]
+  GRD["While an advance is open<br/>no commission cut · no identity change · no release"]
+  LIM["Credit limit = min of<br/>share of trailing 10-epoch revenue<br/>bond × multiplier · per-validator cap<br/>zero until 3 epochs of history"]
+
+  classDef onchain fill:#d0bfff,stroke:#6741d9,color:#1b1b1b
+  classDef people fill:#b2f2bb,stroke:#2f9e44,color:#1b1b1b
+  classDef risk fill:#ffc9c9,stroke:#e03131,color:#1b1b1b
+  classDef note fill:#fff3bf,stroke:#f08c00,color:#1b1b1b
+  class ONB,OPEN,REPAID,REL,REC onchain
+  class START people
+  class LATE,DEF,GRD risk
+  class LIM note

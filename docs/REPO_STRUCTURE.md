@@ -15,11 +15,11 @@ epoch-protocol/
 │     │  └─ fee_index.rs  fee_quote.rs  swap_position.rs  withdraw_request.rs
 │     ├─ instructions/
 │     │  ├─ pool/                  initialize, deposit, request_withdraw, process_withdrawals, accrue, admin
-│     │  ├─ credit/                onboard, update_score, request_advance, sweep, mark_default, release
-│     │  ├─ market/                post_quote, open_swap, post_index, settle_epoch
-│     │  └─ launch/                register_revenue_token, execute_buyback, redeem (Meteora DBC / DAMM v2)
+│     │  ├─ credit/                onboard, set_collectors, bond, update_score, request_advance, sweep, mark_default, release, update_commission, update_identity
+│     │  ├─ market/                index (post, finalize, veto), quote (post, withdraw), swap (open_swap, settle_swap)
+│     │  └─ launch/                planned (F13): register_revenue_token, execute_buyback, redeem (Meteora DBC / DAMM v2)
 │     ├─ math/                     Pure functions, unit-tested: shares, waterfall, credit_limit, score
-│     └─ cpi/                      vote.rs (authorize, withdraw, update_commission_collector), damm_v2.rs, dbc.rs (swaps)
+│     └─ cpi/                      vote.rs (authorize, withdraw, collectors, commission, identity), system.rs; damm_v2.rs, dbc.rs planned (F13)
 │
 ├─ packages/                       Every TypeScript package, flat. Libraries have plain names, deployables end in _app
 │  ├─ common/                      @epoch/common: FirstModule env loader, constants, GracefulShutdown, helpers, pkg/ re-exports
@@ -33,7 +33,7 @@ epoch-protocol/
 │  ├─ meteora/                     @epoch/meteora: revenue-anchored DBC config presets, launch + DAMM v2 helpers
 │  ├─ indexer_app/                 Yellowstone gRPC → slot fees, epoch index, validator revenue, program events
 │  ├─ cranks_app/                  Epoch-boundary jobs (claim, score, sweep, settle, accrue)
-│  ├─ publisher_app/               post_index / post_quote + Switchboard feed
+│  ├─ publisher_app/               post_index (self-published Fee Index) / post_quote
 │  ├─ panta_bot_app/               Panta market lifecycle
 │  └─ api_app/                     REST API for the Terminal and app
 │

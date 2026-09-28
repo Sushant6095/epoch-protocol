@@ -1,0 +1,45 @@
+flowchart LR
+  subgraph DATA["Off-chain data"]
+    BLK["Solana blocks<br/>priority fees per slot"] -.-> RPC["Solami gRPC · RPC Fast"]
+    RPC -.-> SS["indexer_app · SlotStream"]
+    SS -.-> FP["FeeProcessor<br/>stake-weighted median per epoch"]
+    FP -.-> PG[("Postgres")]
+    PG -.-> PUB["publisher_app"]
+  end
+
+  subgraph INDEX["On-chain Fee Index"]
+    PROP["Proposal<br/>epoch · value · inputs hash"]
+    WIN{"Dispute window<br/>N slots"}
+    FIN["finalize_index · anyone"]
+    VAL["FeeIndex value<br/>16-epoch history"]
+  end
+
+  subgraph MARKET["Fee Market"]
+    MK["Maker"] -->|"post_quote<br/>epoch · fixed rate · max notional"| Q["FeeQuote<br/>collateral = notional × max move"]
+    TK["Taker"] -->|"open_swap<br/>pay-fixed or receive-fixed"| SW["SwapPosition<br/>taker collateral"]
+    SET["settle_swap · anyone<br/>payoff = notional × (index − fixed) ÷ fixed<br/>clipped to ± max loss"]
+  end
+
+  PUB -->|"post_index"| PROP
+  PROP --> WIN
+  WIN --> FIN
+  FIN --> VAL
+  ADM["Admin multisig"] -->|"veto_index until final"| PROP
+  VAL -.->|"final value"| SET
+  Q --> SET
+  SW --> SET
+  SET ==>|"lamports move between quote and swap"| PAYOUT["Taker paid · maker withdraws after expiry"]
+  RULE["Rejected if it moves more than max_move_bps<br/>from the last final value<br/>trading closes when the quoted epoch starts"]
+
+  classDef offchain fill:#a5d8ff,stroke:#1971c2,color:#1b1b1b
+  classDef onchain fill:#d0bfff,stroke:#6741d9,color:#1b1b1b
+  classDef people fill:#b2f2bb,stroke:#2f9e44,color:#1b1b1b
+  classDef native fill:#e9ecef,stroke:#495057,color:#1b1b1b
+  classDef external fill:#ffd8a8,stroke:#e8590c,color:#1b1b1b
+  classDef risk fill:#ffc9c9,stroke:#e03131,color:#1b1b1b
+  class SS,FP,PG,PUB offchain
+  class PROP,WIN,FIN,VAL,Q,SW,SET onchain
+  class MK,TK,ADM,PAYOUT people
+  class BLK native
+  class RPC external
+  class RULE risk

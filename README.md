@@ -59,7 +59,7 @@ flowchart LR
 | **Epoch Score** | On-chain credit score from uptime, commission history, age and revenue. Sets advance size and price. |
 | **Epoch Terminal** | Public live dashboard of the fee index, validator health and every loan. |
 
-**Credit limit (v1):** `min(a × revenue over last 10 epochs, 2 × bond, cap)` where `a` is 25% unhedged or 40% hedged; 2% flat fee; 50% of each epoch's revenue swept.
+**Credit limit (v1):** `min(a × revenue over last 10 epochs, 2 × bond, cap)` where `a` is 25% unhedged or 40% hedged; 2% flat fee; 50% of each epoch's revenue goes to repayment.
 
 ## Architecture
 
@@ -74,16 +74,15 @@ flowchart TB
       PUB[Index publisher] ~~~ PB[Panta bot]
     end
     subgraph Solana
-      PRG[Epoch program<br/>Credit + Fee Market] --> VOTE[Vote accounts<br/>withdrawer = PDA]
-      SB[Switchboard feed] --> PRG
+      PRG[Epoch program<br/>Pool · Credit · Fee Index · Fee Market] --> VOTE[Vote accounts<br/>withdrawer = PDA]
     end
     Users --> APP --> PRG
     IDX --> API --> APP
     CR --> PRG
-    PUB --> SB
+    PUB -->|post_index| PRG
 ```
 
-All funds live in program-owned accounts. Every off-chain component is read-only or permissionless, except the v1 index publisher, which is bounded and mirrored to Switchboard. Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · Threats: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+All funds live in program-owned accounts. Every off-chain component is read-only or permissionless, except the v1 Fee Index publisher, whose values are bounded per epoch, held for a dispute window and can be vetoed before they are final. Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · Diagrams: [`docs/diagrams/`](docs/diagrams/) · Threats: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 
 ## Repository layout
 
@@ -93,7 +92,7 @@ packages/
   epoch-sdk/                  TypeScript client generated from the IDL
   indexer_app/                Yellowstone gRPC → Solana Fee Index + revenue → Postgres
   cranks_app/                 Epoch-boundary jobs: claim, score, sweep, settle, accrue
-  publisher_app/              Posts the fee index on-chain + Switchboard
+  publisher_app/              Posts the Solana Fee Index on-chain (self-published oracle)
   panta_bot_app/              Parimutuel markets on the fee index
   api_app/                    REST API for the Terminal
   common/ logger/ exceptions/ config-sdk/ common_http_server/ pg_models/ solana/
@@ -128,12 +127,13 @@ Before a PR: `pnpm lint && pnpm test && pnpm ccd`. Conventions: [`docs/REPO_STRU
 ## Roadmap
 
 - [x] Monorepo scaffold, program skeleton, CI
+- [x] Program phases 1–4: pool, credit, Fee Index, fee swaps (29 instructions, 41 unit tests)
 - [ ] Mechanism proof on testnet: PDA as vote-account withdrawer
 - [ ] Credit: onboard → advance → sweep → release on devnet
 - [ ] Indexer + Terminal live on mainnet (Solami gRPC)
 - [ ] Security review; caps and pause; Squads multisig upgrade authority
 - [ ] First real advance on mainnet
-- [ ] Fee Market: swaps, settlement, Switchboard feed, Panta markets
+- [ ] Fee Market live: first swap epoch settled, Panta markets
 - [ ] Colosseum Crypto World's Fair submission (12 Oct 2026)
 
 Full plan with checkpoints: [`docs/PLAN.md`](docs/PLAN.md) · Implementation plan and feature specs: [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) · Repo guide: [`docs/REPO_STRUCTURE.md`](docs/REPO_STRUCTURE.md) · Decisions: [`docs/adr/`](docs/adr/)

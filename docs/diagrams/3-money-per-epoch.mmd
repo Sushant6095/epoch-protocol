@@ -1,0 +1,29 @@
+flowchart LR
+  INF["Inflation commission<br/>via SIMD-0232 collector"] ==> ESC["Escrow PDA"]
+  MEV["Jito MEV commission<br/>claimed at epoch end"] ==> VA["Validator vote account"]
+  VA ==>|"1 sweep: only above floor<br/>rent + pending delegator rewards + reserve"| ESC
+  ESC ==>|"2 remit share<br/>all of it while defaulted"| VAULT["Vault PDA"]
+  ESC ==>|"3 the rest"| PAY["Validator payout wallet"]
+  VAULT -->|"repayment split pro rata<br/>principal + fee"| ADV["Advance"]
+  LEN["Lenders"] ==>|"4 deposit SOL"| VAULT
+  VAULT ==>|"5 advance principal"| PAY
+  VAULT -->|"accrue"| WF{"Income waterfall"}
+  WF -->|"a · protocol fee"| TRE["Treasury"]
+  WF -->|"b · fixed coupon"| SEN["Senior tranche<br/>share price"]
+  WF -->|"c · residual"| JUN["Junior tranche<br/>share price"]
+  LOSS["Default loss"] -.->|"first"| BOND["Validator bond"]
+  LOSS -.->|"second"| JUN
+  LOSS -.->|"third"| SEN
+  VAULT ==>|"6 FIFO withdrawals<br/>junior floor enforced"| LEN
+  BLK["Block fees go to the identity account<br/>SIMD-0123 not live: covenant, not collateral"]
+
+  classDef people fill:#b2f2bb,stroke:#2f9e44,color:#1b1b1b
+  classDef onchain fill:#d0bfff,stroke:#6741d9,color:#1b1b1b
+  classDef native fill:#e9ecef,stroke:#495057,color:#1b1b1b
+  classDef external fill:#ffd8a8,stroke:#e8590c,color:#1b1b1b
+  classDef risk fill:#ffc9c9,stroke:#e03131,color:#1b1b1b
+  class LEN,PAY,TRE people
+  class ESC,VAULT,ADV,WF,SEN,JUN,BOND onchain
+  class VA,INF native
+  class MEV external
+  class LOSS,BLK risk

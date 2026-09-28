@@ -1,0 +1,49 @@
+flowchart LR
+  subgraph EPOCH["Epoch program · Anchor 1.2 · 29 instructions"]
+    subgraph POOL["Pool"]
+      P1["Pool · seed pool<br/>params · ledger · FIFO queue"]
+      P2["Vault · seed vault + pool<br/>cash + bonds + rent"]
+      P3["LenderShares · seed lender + pool + owner + tranche<br/>senior / junior shares"]
+      P4["WithdrawRequest · seed withdraw + pool + seq"]
+      PI["initialize_pool · update_params · set_paused · set_roles<br/>deposit · request_withdraw · cancel_withdraw<br/>process_withdrawal · accrue"]
+    end
+    subgraph CREDIT["Credit"]
+      C1["ValidatorPosition · seed position + vote<br/>score · 10-epoch revenue · bond · status"]
+      C2["VoteAuth PDA · seed vote_auth + vote<br/>the vote account's withdraw authority"]
+      C3["Escrow PDA · seed escrow + vote<br/>commission collector + sweep landing"]
+      C4["Advance · seed advance + vote + seq<br/>principal · fee · total due · repaid"]
+      CI["onboard_validator · set_collectors · update_score<br/>post_bond · withdraw_bond · request_advance · sweep<br/>mark_default · release_validator<br/>update_commission · update_identity"]
+    end
+    subgraph FIDX["Fee Index"]
+      I1["FeeIndex · seed fee_index + pool<br/>value · inputs hash · proposal<br/>dispute window · max move · 16-epoch history"]
+      II["initialize_index · configure_index<br/>post_index · finalize_index · veto_index"]
+    end
+    subgraph MKT["Fee Market"]
+      M1["FeeQuote · seed quote + maker + epoch<br/>fixed rate · max notional · collateral"]
+      M2["SwapPosition · seed swap + quote + taker<br/>side · notional · collateral"]
+      MI["post_quote · withdraw_quote<br/>open_swap · settle_swap"]
+    end
+  end
+
+  VOTE["Vote program"]
+  SYS["System program"]
+  SV["Sysvars<br/>Clock · EpochRewards · Rent"]
+  INV["Invariants after every instruction<br/>1 senior + junior + unallocated income = cash + outstanding principal<br/>2 vault = cash + bonds + rent<br/>3 sweep keeps rent + pending delegator rewards + reserve<br/>4 rounding favours the pool"]
+  GRD["Guards<br/>no commission cut or identity change while an advance is open<br/>release only with no open advance · pause · pool cap<br/>utilisation cap · junior floor"]
+
+  CREDIT -.->|"CPI Authorize · Withdraw · UpdateCommissionCollector<br/>UpdateCommissionBps · UpdateValidatorIdentity"| VOTE
+  POOL -.->|"PDA-signed transfers"| SYS
+  CREDIT -.-> SYS
+  MKT -.-> SYS
+  CREDIT -.->|"sweep waits for EpochRewards to finish"| SV
+  MKT -.->|"settles on the final value"| FIDX
+  CREDIT <==>|"principal out · repayments in"| POOL
+
+  classDef onchain fill:#d0bfff,stroke:#6741d9,color:#1b1b1b
+  classDef ix fill:#f3f0ff,stroke:#6741d9,color:#1b1b1b
+  classDef native fill:#e9ecef,stroke:#495057,color:#1b1b1b
+  classDef risk fill:#ffc9c9,stroke:#e03131,color:#1b1b1b
+  class P1,P2,P3,P4,C1,C2,C3,C4,I1,M1,M2 onchain
+  class PI,CI,II,MI ix
+  class VOTE,SYS,SV native
+  class INV,GRD risk
