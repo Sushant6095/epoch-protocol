@@ -26,6 +26,7 @@
     "@epoch/exceptions": "workspace:*",
     "@epoch/logger": "workspace:*",
     "@epoch/pg_models": "workspace:*",
+    "@epoch/solana": "workspace:*",
     "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {

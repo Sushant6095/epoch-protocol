@@ -105,6 +105,9 @@ importers:
       '@epoch/pg_models':
         specifier: workspace:*
         version: link:../pg_models
+      '@epoch/solana':
+        specifier: workspace:*
+        version: link:../solana
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
