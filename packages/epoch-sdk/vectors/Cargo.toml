@@ -1,0 +1,14 @@
+[package]
+name = "epoch-sdk-vectors"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Writes src/__fixtures__/rust-vectors.json: byte-exact test vectors for @epoch/epoch-sdk, produced by the real program crate"
+
+# Own workspace so the repository's root workspace (programs/*) ignores this crate
+# and its target/ stays inside packages/epoch-sdk/vectors/.
+[workspace]
+
+[dependencies]
+anchor-lang = "1.2.0"
+epoch = { path = "../../../programs/epoch", features = ["no-entrypoint"] }

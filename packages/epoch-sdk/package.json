@@ -2,10 +2,11 @@
   "name": "@epoch/epoch-sdk",
   "version": "0.1.0",
   "private": true,
-  "description": "TypeScript client for the Epoch program: IDL, PDAs, instruction builders",
+  "description": "Browser-safe TypeScript client for the Epoch program: PDAs, account and event decoders, instruction builders, errors, math mirror",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "sideEffects": false,
   "files": [
     "dist"
   ],
@@ -13,13 +14,12 @@
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "lint": "eslint src",
+    "lint": "eslint src --max-warnings=0",
     "lint:fix": "eslint --fix src",
-    "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests"
+    "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests",
+    "vectors": "cargo run --offline --release --manifest-path vectors/Cargo.toml"
   },
   "dependencies": {
-    "@anchor-lang/core": "^1.2.0",
-    "@epoch/common": "workspace:*",
     "@solana/web3.js": "^1.98.0"
   },
   "devDependencies": {

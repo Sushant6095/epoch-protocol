@@ -8,13 +8,17 @@ export const ADMISSION_FEE_RESERVE_LAMPORTS = 1_600_000_000;
 /** Epochs of revenue history used for the credit limit. */
 export const REVENUE_WINDOW_EPOCHS = 10;
 
+/** PDA seeds, as in programs/epoch/src/constants.rs. The PDA helpers live in @epoch/epoch-sdk. */
 export const SEEDS = {
   pool: 'pool',
   vault: 'vault',
-  validator: 'validator',
+  lender: 'lender',
+  withdraw: 'withdraw',
+  position: 'position',
   voteAuthority: 'vote_auth',
+  escrow: 'escrow',
   advance: 'advance',
-  feeIndex: 'index',
+  feeIndex: 'fee_index',
   feeQuote: 'quote',
-  swapPosition: 'pos',
+  swap: 'swap',
 } as const;
