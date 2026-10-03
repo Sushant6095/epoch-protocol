@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    // The DBC SDK is "type": "module" and its exports map gives every resolver its ESM types, which Node16 resolution
+    // refuses to import from CommonJS (TS1479). This package loads the SDK's CommonJS build at runtime, so it
+    // type-checks with classic resolution; the emitted CommonJS is the same.
+    "module": "commonjs",
+    "moduleResolution": "node10"
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
+}

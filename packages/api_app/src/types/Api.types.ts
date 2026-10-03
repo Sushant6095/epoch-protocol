@@ -116,6 +116,10 @@ export interface ValidatorRow {
   /** Server-side health, same rules as the app's lib/health.ts, so tabs filter on the server. */
   health: HealthStatus;
   healthReasons: string[];
+  /** Inflation commission for the last 10 epochs, oldest first (validator history; absent without Postgres). */
+  commissionHistory?: { epoch: number; commissionPct: number }[];
+  /** Active stake for up to 64 epochs, oldest first (validator history; absent without Postgres). */
+  stakeHistorySol?: number[];
 }
 
 export interface ValidatorList extends Meta {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+export * from './Cookies';
 export * from './ExpressAppServer';
 export * from './RequestHandler';
 export * from './RequestValidator';

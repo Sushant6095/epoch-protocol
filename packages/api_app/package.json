@@ -23,13 +23,20 @@
     "@epoch/common": "workspace:*",
     "@epoch/common_http_server": "workspace:*",
     "@epoch/config-sdk": "workspace:*",
+    "@epoch/epoch-sdk": "workspace:*",
     "@epoch/exceptions": "workspace:*",
     "@epoch/logger": "workspace:*",
+    "@epoch/meteora": "workspace:*",
     "@epoch/pg_models": "workspace:*",
     "@epoch/solana": "workspace:*",
-    "drizzle-orm": "^0.45.3"
+    "@solana/web3.js": "^1.99.0",
+    "drizzle-orm": "^0.45.3",
+    "nodemailer": "^7.0.13",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
-    "@types/node": "^22.20.0"
+    "@types/node": "^22.20.0",
+    "@types/nodemailer": "^7.0.12",
+    "@types/ws": "^8.18.1"
   }
 }

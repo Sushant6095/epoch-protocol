@@ -12,8 +12,11 @@ import { type ApiError } from './ResponseType';
 export interface ExpressAppServerProps {
   appName: string;
   port: number;
+  /** Comma-separated origins, or `*` (any origin, reflected). Credentials (cookies) are always allowed. */
   corsOrigins?: string;
   requestBodyLimit?: string;
+  /** Set behind a proxy (Fly, Vercel, nginx) so `req.ip` and `req.secure` come from X-Forwarded-*. */
+  trustProxy?: boolean;
 }
 
 /** Shared HTTP server: CORS, JSON body, trace IDs, access logs, 404 and error mapping. */
@@ -26,8 +29,17 @@ export class ExpressAppServer {
     this.logger = Logger.create(props.appName);
     this.app = express();
     this.app.disable('x-powered-by');
+    if (props.trustProxy) this.app.set('trust proxy', true);
+    // Browsers send the session cookie only to a CORS response that names the origin and allows credentials,
+    // so `*` reflects the caller's origin instead of answering with a literal `*`.
     this.app.use(
-      cors({ origin: props.corsOrigins === '*' || !props.corsOrigins ? true : props.corsOrigins.split(',') }),
+      cors({
+        origin:
+          props.corsOrigins === '*' || !props.corsOrigins
+            ? true
+            : props.corsOrigins.split(',').map((origin) => origin.trim()),
+        credentials: true,
+      }),
     );
     this.app.use(express.json({ limit: props.requestBodyLimit ?? '1mb' }));
     this.app.use((req: Request, res: Response, next: NextFunction) => {
@@ -44,6 +56,17 @@ export class ExpressAppServer {
   route(path: string, router: Router): this {
     this.app.use(path, router);
     return this;
+  }
+
+  /** Middleware for every route registered after it (e.g. the session reader). */
+  use(handler: (req: Request, res: Response, next: NextFunction) => void): this {
+    this.app.use(handler);
+    return this;
+  }
+
+  /** The Node HTTP server once `start()` has resolved, for websocket upgrades. */
+  get httpServer(): Server | undefined {
+    return this.server;
   }
 
   start(): Promise<void> {

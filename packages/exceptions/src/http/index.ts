@@ -29,3 +29,22 @@ export class InternalServerException extends EpochException {
     super(message, 'INTERNAL', 500, details);
   }
 }
+
+export class ForbiddenException extends EpochException {
+  constructor(message = 'Forbidden', details: ExceptionDetails = {}) {
+    super(message, 'FORBIDDEN', 403, details);
+  }
+}
+
+export class TooManyRequestsException extends EpochException {
+  constructor(message = 'Too many requests', details: ExceptionDetails = {}) {
+    super(message, 'TOO_MANY_REQUESTS', 429, details);
+  }
+}
+
+/** A dependency is missing or not ready (no database, program not deployed, scan running). `code` says which. */
+export class ServiceUnavailableException extends EpochException {
+  constructor(message: string, code = 'UNAVAILABLE', details: ExceptionDetails = {}) {
+    super(message, code, 503, details);
+  }
+}

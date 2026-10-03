@@ -1,0 +1,14 @@
+{
+  "validator": { "name": "Kestrel Nodes", "vote": null },
+  "symbol": "rKEST",
+  "name": "Kestrel Nodes revenue token",
+  "uri": "https://example.invalid/rkest.json",
+  "shareBps": 500,
+  "termEpochs": 100,
+  "avgRevenueSol": 20.8,
+  "supply": 100000,
+  "decimals": 6,
+  "raiseTargetSol": 5,
+  "tradingFeeBps": 100,
+  "dammFeeBps": 100
+}

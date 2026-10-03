@@ -1,26 +1,69 @@
 import '@epoch/common/first-module';
 
 import { ExpressAppServer } from '@epoch/common_http_server';
-import { ApiConfigSchema, loadConfig } from '@epoch/config-sdk';
+import { ApiConfigSchema, AuthConfigSchema, loadConfig } from '@epoch/config-sdk';
 import { Logger } from '@epoch/logger';
 
+import { dbAvailable } from './Lib/Db';
+import { authRouter, meRouter, predictRouter, sessionMiddleware } from './Routes/AccountRouters';
+import { activityRouter } from './Routes/ActivityRouters';
 import { feeIndexRouter } from './Routes/FeeIndexRouter';
 import { healthRouter } from './Routes/HealthRouter';
+import { launchRouter } from './Routes/LaunchRouters';
 import { delegatorsRouter, networkRouter, validatorsRouter } from './Routes/MarketRouters';
+import { lenderRouter, marketRouter, validatorPositionRouter, vaultRouter } from './Routes/ProgramRouters';
+import { walletStakeRouter } from './Routes/WalletRouters';
 import { getServices } from './Services';
+import { startAccountJobs } from './Services/Account';
+import { startLaunchPriceSampler } from './Services/Launch';
+import { getProgramEventServices } from './Services/Program/ProgramEventServices';
+import { getProgramServices } from './Services/Program/ProgramServices';
 
 const logger = Logger.create('api_app');
 
 async function main(): Promise<void> {
   const config = loadConfig(ApiConfigSchema);
+  const auth = loadConfig(AuthConfigSchema);
   const services = getServices();
-  await new ExpressAppServer({ appName: 'api_app', port: config.API_PORT, corsOrigins: config.API_CORS_ORIGINS })
+  const server = new ExpressAppServer({
+    appName: 'api_app',
+    port: config.API_PORT,
+    corsOrigins: config.API_CORS_ORIGINS,
+    trustProxy: auth.API_TRUST_PROXY,
+  })
+    // Sign-in session from the cookie, for every route below (requests #7, #11, #14, #15).
+    .use(sessionMiddleware)
     .route('/health', healthRouter)
+    // Mainnet data: network, validators and their profiles, delegators, a wallet's stake (requests #1–#6, #10).
     .route('/v1/index', feeIndexRouter)
     .route('/v1/network', networkRouter)
     .route('/v1/validators', validatorsRouter)
     .route('/v1/delegators', delegatorsRouter)
-    .start();
+    .route('/v1/wallets', walletStakeRouter)
+    // The Epoch program (devnet): activity, Vault, Manage tab, lender position, Fee Market (requests #4, #8, #19).
+    .route('/v1/activity', activityRouter)
+    .route('/v1/vault', vaultRouter)
+    .route('/v1/validators', validatorPositionRouter)
+    .route('/v1/wallets', lenderRouter)
+    .route('/v1/market', marketRouter)
+    // Revenue-token launches on Meteora (request #22).
+    .route('/v1/launches', launchRouter)
+    // Sign-in, watchlist, alerts and Predict (requests #7, #11, #14, #15).
+    .route('/v1/auth', authRouter)
+    .route('/v1/me', meRouter)
+    .route('/v1/predict', predictRouter);
+  await server.start();
+
+  // ── Program events, Fee Index status and WS /v1/stream (requests #3, #4) ──
+  // The recorder listens before the ingester announces its backfill; the hub serves upgrades on the same port.
+  const events = getProgramEventServices();
+  if (services.program.configured) {
+    const vault = getProgramServices().vault;
+    events.stream.setProvider('vault', () => vault.snapshot());
+  }
+  events.recorder.start();
+  events.ingester.start();
+  if (server.httpServer) events.stream.attach(server.httpServer);
 
   // Warm the caches and name the stake pools, then start the stake-account scan (several minutes).
   services.labels
@@ -30,6 +73,18 @@ async function main(): Promise<void> {
     .get()
     .catch((error: unknown) => logger.warn('validator table warm-up failed', { error: String(error) }));
   services.scan.start();
+
+  // Validator profiles: every validator's inflation rewards for 10 epochs, then commission and stake per validator per
+  // epoch in Postgres (request #5b).
+  services.voteRewards.start();
+  if (dbAvailable()) services.history.start();
+
+  // Alert sender, Telegram linker, Predict market maker and resolver: they need Postgres.
+  if (dbAvailable()) startAccountJobs();
+  else logger.info('DATABASE_URL unset: sign-in, watchlist, alerts and Predict answer 503 DATABASE_NOT_CONFIGURED');
+
+  // Revenue-token launches (request #22): sample their prices every minute (needs LAUNCHES_PATH and DATABASE_URL).
+  startLaunchPriceSampler();
 }
 
 void main();

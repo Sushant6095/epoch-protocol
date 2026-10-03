@@ -6,6 +6,7 @@ import { type EpochInfo, type VoteAccount } from '../Sources/SolanaDataSource';
 import { type HealthStatus, type ValidatorRow } from '../types/Api.types';
 import { type ScanSnapshot } from './DelegatorScanService';
 import { type MarketData, optional } from './MarketData';
+import { lastCommissionRaise, type ValidatorHistorySnapshot } from './Validator/ValidatorHistory';
 
 /** Fee per vote transaction; one vote per slot. */
 const VOTE_FEE_LAMPORTS = 5_000;
@@ -35,6 +36,8 @@ export interface ValidatorTableData {
   sources: string[];
   /** `asOf` of the delegator scan the rows were built with; null before the first scan. */
   scanAsOf: string | null;
+  /** `version` of the validator history the rows were built with; 0 without history. */
+  historyVersion: number;
 }
 
 export const clientFamily = (clientId: string | undefined): ValidatorRow['client'] => {
@@ -50,7 +53,10 @@ const creditsIn = (account: VoteAccount, epoch: number): number => {
 
 /** Health rules, the same as the app's lib/health.ts (01-PRODUCT-AND-USERS.md). */
 export function healthOf(
-  row: Pick<ValidatorRow, 'delinquent' | 'healthPerEpochSol' | 'biggestDelegatorSharePct' | 'uptimePct'>,
+  row: Pick<
+    ValidatorRow,
+    'delinquent' | 'healthPerEpochSol' | 'biggestDelegatorSharePct' | 'uptimePct' | 'commissionHistory'
+  >,
 ): {
   health: HealthStatus;
   healthReasons: string[];
@@ -62,7 +68,9 @@ export function healthOf(
     reasons.push(`${Math.round(row.biggestDelegatorSharePct)}% one delegator`);
   }
   if (row.uptimePct !== null && row.uptimePct < 99) reasons.push(`uptime ${row.uptimePct}%`);
-  // "Commission raised in the last 10 epochs" needs commission history from the indexer; not applied yet.
+  // "Commission raised in the last 10 epochs": applied when the validator history (Postgres) has the commissions.
+  const raise = row.commissionHistory ? lastCommissionRaise(row.commissionHistory) : null;
+  if (raise) reasons.push(`commission raised ${raise.fromPct}% → ${raise.toPct}%`);
   return { health: reasons.length > 0 ? 'watch' : 'healthy', healthReasons: reasons };
 }
 
@@ -76,6 +84,7 @@ export class ValidatorTable {
   constructor(
     private readonly market: MarketData,
     private readonly scan: () => ScanSnapshot | undefined,
+    private readonly history: () => ValidatorHistorySnapshot | undefined = () => undefined,
   ) {
     this.cache = new SnapshotCache('validatorTable', 60_000, () => this.build());
   }
@@ -85,6 +94,8 @@ export class ValidatorTable {
     // A delegator scan finished after these rows were built: rebuild now, so delegator fields on the rows and the
     // network counts derived from them match the scan.
     if ((this.scan()?.asOf ?? null) !== data.scanAsOf) return this.cache.refresh();
+    // Likewise when the validator history recorder wrote new epochs.
+    if ((this.history()?.version ?? 0) !== data.historyVersion) return this.cache.refresh();
     return data;
   }
 
@@ -105,6 +116,7 @@ export class ValidatorTable {
       optional(m.kobe, new Map()),
     ]);
     const scan = this.scan();
+    const history = this.history();
 
     const delinquentSet = new Set(voteAccounts.delinquent.map((v) => v.votePubkey));
     const all = [...voteAccounts.current, ...voteAccounts.delinquent]
@@ -161,12 +173,15 @@ export class ValidatorTable {
       });
       const stats = scan?.perVote.get(v.votePubkey);
       const uptimePct = sw?.uptime ?? null;
+      const commissionHistory = history?.commission.get(v.votePubkey);
+      const stakeHistory = history?.stake.get(v.votePubkey);
 
       const base = {
         delinquent,
         healthPerEpochSol,
         biggestDelegatorSharePct: stats?.biggestDelegatorSharePct ?? null,
         uptimePct,
+        commissionHistory,
       };
       return {
         name: sw?.name?.trim() || shortKey(v.votePubkey),
@@ -193,6 +208,8 @@ export class ValidatorTable {
         delinquent,
         foundationSharePct: stats?.foundationSharePct ?? null,
         ...healthOf(base),
+        ...(commissionHistory ? { commissionHistory } : {}),
+        ...(stakeHistory ? { stakeHistorySol: stakeHistory.map((point) => point.sol) } : {}),
       };
     });
 
@@ -208,6 +225,7 @@ export class ValidatorTable {
     if (stakewiz.size) sources.push('Stakewiz');
     if (kobe.size) sources.push('Jito Kobe');
     if (scan) sources.push('stake-account scan');
+    if (history) sources.push('validator history');
 
     return {
       asOf: isoIst(),
@@ -236,6 +254,7 @@ export class ValidatorTable {
       },
       sources,
       scanAsOf: scan?.asOf ?? null,
+      historyVersion: history?.version ?? 0,
     };
   }
 }

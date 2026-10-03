@@ -40,6 +40,12 @@ export class SnapshotCache<T> {
     return this.loadedAt;
   }
 
+  /** Drops the value so the next `get()` waits for a fresh load (e.g. after a program event changed the account). */
+  invalidate(): void {
+    this.value = undefined;
+    this.loadedAt = 0;
+  }
+
   set(value: T): void {
     this.value = value;
     this.loadedAt = this.now();

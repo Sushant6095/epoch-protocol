@@ -1,25 +1,18 @@
-import { epochIndex, PostgresConnectionManager } from '@epoch/pg_models';
-import { and, desc, gte, lte } from 'drizzle-orm';
 import type { Request, Response } from '@epoch/common_http_server';
 
 import type { FeeIndexQuery } from '../dto/FeeIndexQuery.dto';
-import type { FeeIndexPoint } from '../types/Api.types';
+import { getProgramEventServices } from '../Services/Program/ProgramEventServices';
+import type { FeeIndexPoint } from '../types/Activity.types';
 
 export class FeeIndexController {
-  /** GET /v1/index?from=&to=&limit= — settled Solana Fee Index values, newest first. */
+  /**
+   * GET /v1/index?from=&to=&limit= — the Solana Fee Index per epoch, newest first, with the program's `status`
+   * (final, proposed, vetoed; request #3). Epochs only the indexer computed carry no status.
+   */
   static async list(_req: Request, res: Response): Promise<FeeIndexPoint[]> {
-    const { from, to, limit } = res.locals.query as FeeIndexQuery;
-    const db = PostgresConnectionManager.getDb();
-    const conditions = [
-      from !== undefined ? gte(epochIndex.epoch, from) : undefined,
-      to !== undefined ? lte(epochIndex.epoch, to) : undefined,
-    ].filter((c) => c !== undefined);
-    const rows = await db
-      .select()
-      .from(epochIndex)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(epochIndex.epoch))
-      .limit(limit);
-    return rows.map((row) => ({ epoch: row.epoch, value: row.value }));
+    const query = res.locals.query as FeeIndexQuery;
+    const points = await getProgramEventServices().feeIndex.points(query);
+    res.setHeader('cache-control', 'public, max-age=15');
+    return points;
   }
 }

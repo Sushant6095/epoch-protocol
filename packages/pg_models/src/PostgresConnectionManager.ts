@@ -15,6 +15,11 @@ export class PostgresConnectionManager {
   private static pool?: Pool;
   private static db?: EpochDb;
 
+  /** True when DATABASE_URL is set; features that need Postgres check this and answer 503 otherwise. */
+  static isConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env.DATABASE_URL;
+  }
+
   static getDb(): EpochDb {
     if (!this.db) {
       const config = loadConfig(DatabaseConfigSchema);

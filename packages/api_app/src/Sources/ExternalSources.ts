@@ -22,6 +22,16 @@ export interface StakewizValidator {
   staking_apy: number | null;
   jito_apy: number | null;
   total_apy: number | null;
+  /** IP geolocation city and hosting organisation (validator profile tags, My Stake suggestions). */
+  ip_city?: string | null;
+  ip_org?: string | null;
+}
+
+/** One entry of Stakewiz's commission change log; `commission` in bps, newest first. */
+export interface StakewizCommissionChange {
+  commission: number;
+  /** `2026-02-22 01:24:11.135988+01` (see Lib/EpochTimes parseStakewizTime). */
+  observed_at: string;
 }
 
 export class StakewizSource {
@@ -31,6 +41,29 @@ export class StakewizSource {
     const rows = await getJson<StakewizValidator[]>(`${this.baseUrl.replace(/\/$/, '')}/validators`, 30_000);
     return new Map(rows.map((row) => [row.vote_identity, row]));
   }
+
+  /** Active stake per epoch for the last 30 epochs, newest first (`/validator_total_stakes/<vote>`), SOL. */
+  getTotalStakes(vote: string): Promise<{ epoch: number; stake: number }[]> {
+    return getJson(`${this.baseUrl.replace(/\/$/, '')}/validator_total_stakes/${vote}`, 20_000);
+  }
+
+  /** Every inflation-commission value Stakewiz has observed, newest first (`/commission_history/<vote>`). */
+  getCommissionHistory(vote: string): Promise<StakewizCommissionChange[]> {
+    return getJson(`${this.baseUrl.replace(/\/$/, '')}/commission_history/${vote}`, 20_000);
+  }
+
+  /** When every epoch started (`/all_epochs_history`, ~900 epochs, newest first; the current one's end is a guess). */
+  getEpochHistory(): Promise<{ epoch: number; start: string; end: string }[]> {
+    return getJson(`${this.baseUrl.replace(/\/$/, '')}/all_epochs_history`, 30_000);
+  }
+}
+
+/** One finished epoch of a validator's Jito history (`/api/v1/validators/<vote>`), lamports and bps. */
+export interface KobeEpochRewards {
+  epoch: number;
+  mev_commission_bps: number | null;
+  /** Tips earned by the validator's stake that epoch, before its commission. */
+  mev_rewards: number | null;
 }
 
 /** The Jito Kobe fields we use (https://kobe.mainnet.jito.network/api/v1/validators). */
@@ -49,6 +82,11 @@ export class JitoKobeSource {
       30_000,
     );
     return new Map(body.validators.map((row) => [row.vote_account, row]));
+  }
+
+  /** Tips and MEV commission per finished epoch, newest first (~165 epochs); empty for a validator Jito never saw. */
+  getValidatorHistory(vote: string): Promise<KobeEpochRewards[]> {
+    return getJson(`${this.baseUrl.replace(/\/$/, '')}/api/v1/validators/${vote}`, 20_000);
   }
 }
 

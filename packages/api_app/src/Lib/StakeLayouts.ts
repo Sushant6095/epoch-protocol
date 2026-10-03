@@ -61,3 +61,59 @@ export function parseStakeSlice(slice: Buffer): DelegatedStake | undefined {
 
 /** Delegated and not on its way out: counts toward a validator's delegators. */
 export const isDelegated = (stake: DelegatedStake): boolean => stake.deactivationEpoch === U64_MAX;
+
+/** Offsets in a 200-byte stake account (StakeStateV2): the staker and withdrawer authorities. */
+export const STAKER_OFFSET = 12;
+export const WITHDRAWER_OFFSET = 44;
+
+export type StakeAccountState = 'uninitialized' | 'initialized' | 'delegated' | 'rewardsPool';
+
+/** A whole stake account, as a wallet's My Stake view needs it. Lamports and epochs stay bigint. */
+export interface StakeAccountInfo {
+  pubkey: string;
+  lamports: bigint;
+  state: StakeAccountState;
+  rentExemptReserve: bigint;
+  staker: string;
+  withdrawer: string;
+  lockupUnixTimestamp: bigint;
+  lockupEpoch: bigint;
+  custodian: string;
+  /** Delegated accounts only. */
+  voter: string | null;
+  stakeLamports: bigint;
+  activationEpoch: bigint | null;
+  deactivationEpoch: bigint | null;
+  creditsObserved: bigint | null;
+}
+
+const STATE_BY_TAG: StakeAccountState[] = ['uninitialized', 'initialized', 'delegated', 'rewardsPool'];
+
+/** Parses a full stake account (`toBase58` turns 32 bytes into an address). */
+export function parseStakeAccount(
+  pubkey: string,
+  lamports: bigint,
+  data: Buffer,
+  toBase58: (bytes: Buffer) => string,
+): StakeAccountInfo | undefined {
+  if (data.length < STAKE_ACCOUNT_SIZE) return undefined;
+  const state = STATE_BY_TAG[data.readUInt32LE(0)];
+  if (!state || state === 'uninitialized' || state === 'rewardsPool') return undefined;
+  const delegated = state === 'delegated';
+  return {
+    pubkey,
+    lamports,
+    state,
+    rentExemptReserve: data.readBigUInt64LE(4),
+    staker: toBase58(data.subarray(STAKER_OFFSET, STAKER_OFFSET + 32)),
+    withdrawer: toBase58(data.subarray(WITHDRAWER_OFFSET, WITHDRAWER_OFFSET + 32)),
+    lockupUnixTimestamp: data.readBigInt64LE(76),
+    lockupEpoch: data.readBigUInt64LE(84),
+    custodian: toBase58(data.subarray(92, 124)),
+    voter: delegated ? toBase58(data.subarray(VOTER_OFFSET, VOTER_OFFSET + 32)) : null,
+    stakeLamports: delegated ? data.readBigUInt64LE(156) : 0n,
+    activationEpoch: delegated ? data.readBigUInt64LE(164) : null,
+    deactivationEpoch: delegated ? data.readBigUInt64LE(172) : null,
+    creditsObserved: delegated ? data.readBigUInt64LE(188) : null,
+  };
+}
