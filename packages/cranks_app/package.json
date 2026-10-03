@@ -2,7 +2,7 @@
   "name": "@epoch/cranks_app",
   "version": "0.1.0",
   "private": true,
-  "description": "Epoch-boundary jobs: claim MEV, update scores, sweep, settle, accrue",
+  "description": "Epoch-boundary jobs (score, sweep, mark default, accrue, withdrawals) and the Fee Index finalize / swap settle poller",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,7 @@
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "lint": "eslint src",
+    "lint": "eslint src --max-warnings=0",
     "lint:fix": "eslint --fix src",
     "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests",
     "start": "node dist/index.js",
@@ -22,8 +22,11 @@
   "dependencies": {
     "@epoch/common": "workspace:*",
     "@epoch/config-sdk": "workspace:*",
+    "@epoch/epoch-sdk": "workspace:*",
+    "@epoch/exceptions": "workspace:*",
     "@epoch/logger": "workspace:*",
-    "@epoch/solana": "workspace:*"
+    "@epoch/solana": "workspace:*",
+    "@solana/web3.js": "^1.98.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.0"

@@ -1,31 +1,177 @@
-import { Logger } from '@epoch/logger';
+import { sleep } from '@epoch/common';
+import { Logger, runWithTrace } from '@epoch/logger';
+import { type PublicKey } from '@solana/web3.js';
 
-import { AccrueJob, ClaimMevJob, type Job, SettleEpochJob, SweepJob, UpdateScoreJob } from './Jobs';
+import { type EpochChain } from './Chain/EpochChain';
+import { type ValidatorDataSource } from './Chain/MainnetData';
+import {
+  AccrueJob,
+  ClaimMevJob,
+  FinalizeIndexJob,
+  type Job,
+  type JobOutcome,
+  MarkDefaultJob,
+  ProcessWithdrawalsJob,
+  SettleSwapsJob,
+  SweepJob,
+  Throttled,
+  UpdateScoreJob,
+} from './Jobs';
 
 const logger = Logger.create('JobRunner');
 
-/** Runs the epoch-boundary jobs in the order the program enforces. */
-export class JobRunner {
-  constructor(
-    private readonly jobs: Job[] = [
-      new ClaimMevJob(),
-      new UpdateScoreJob(),
-      new SweepJob(),
-      new SettleEpochJob(),
-      new AccrueJob(),
-    ],
-  ) {}
+export const DEFAULT_RESCORE_MS = 30 * 60_000;
 
-  async runBoundary(epoch: number): Promise<void> {
-    logger.info('epoch boundary', { epoch });
-    for (const job of this.jobs) {
-      const started = Date.now();
-      try {
-        await job.run(epoch);
-        logger.info('job done', { job: job.name, ms: Date.now() - started });
-      } catch (error) {
-        logger.error('job failed; later jobs still run, the next boundary retries', error, { job: job.name });
+export interface BoundaryStep {
+  job: Job;
+  /** Later boundary steps (and the steady jobs) wait until this one is done for the epoch. */
+  gate: boolean;
+}
+
+export interface JobRunnerOptions {
+  /** Time between ticks. */
+  pollMs: number;
+  /** A gate step still unfinished this long after the runner first saw the epoch logs an error, once. */
+  alertAfterMs: number;
+  /** Between boundaries the scorer re-checks this often, so a new hedge counts without waiting for the next epoch. */
+  rescoreMs?: number;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Runs the cranks on one loop (a tick every `pollMs`, a minute by default):
+ *
+ * 1. **Boundary steps**, in the order the program needs, until each is done for the current program epoch:
+ *    claim MEV → update scores → sweep (gate: waits for epoch rewards) → mark defaults (gate) → accrue (gate).
+ *    A gate that is not done yet stops the steps after it; the next tick retries it. Claim and score never block.
+ * 2. **Steady jobs** once every gate is done, then on every tick: process withdrawals (the queue is paid as soon as
+ *    the cash is there, never before this epoch's sweep and accrual).
+ * 3. **Pollers** on every tick regardless: finalize the Fee Index after its dispute window, settle swaps; and every
+ *    `rescoreMs` (30 minutes) the scorer again, which posts only when a score or hedged flag changed.
+ *
+ * Every job is idempotent, so a restart mid-epoch simply re-checks the chain.
+ */
+export class JobRunner {
+  private epoch?: bigint;
+  private epochSeenAt = 0;
+  private readonly done = new Set<string>();
+  private readonly alerted = new Set<string>();
+  private stopped = false;
+  private running?: Promise<void>;
+  private readonly now: () => number;
+  private readonly sleep: (ms: number) => Promise<void>;
+
+  constructor(
+    private readonly currentEpoch: () => Promise<bigint>,
+    private readonly boundary: BoundaryStep[],
+    private readonly steady: Job[],
+    private readonly pollers: Job[],
+    private readonly options: JobRunnerOptions,
+  ) {
+    this.now = options.now ?? Date.now;
+    this.sleep = options.sleep ?? sleep;
+  }
+
+  /** The production wiring: every job on one chain client. */
+  static create(
+    chain: EpochChain,
+    data: ValidatorDataSource,
+    hedgeMakers: readonly PublicKey[],
+    options: JobRunnerOptions,
+  ): JobRunner {
+    const scores = new UpdateScoreJob(chain, data, hedgeMakers);
+    return new JobRunner(
+      async () => (await chain.clock()).epoch,
+      [
+        { job: new ClaimMevJob(), gate: false },
+        { job: scores, gate: false },
+        { job: new SweepJob(chain), gate: true },
+        { job: new MarkDefaultJob(chain), gate: true },
+        { job: new AccrueJob(chain), gate: true },
+      ],
+      [new ProcessWithdrawalsJob(chain)],
+      [
+        new FinalizeIndexJob(chain),
+        new SettleSwapsJob(chain),
+        new Throttled(scores, options.rescoreMs ?? DEFAULT_RESCORE_MS, options.now),
+      ],
+      options,
+    );
+  }
+
+  /** One pass. Never throws. */
+  async tick(): Promise<void> {
+    let epoch: bigint;
+    try {
+      epoch = await this.currentEpoch();
+    } catch (error) {
+      logger.error('could not read the program cluster epoch', error);
+      return;
+    }
+    if (epoch !== this.epoch) {
+      if (this.epoch !== undefined) logger.info('epoch boundary', { epoch: epoch.toString() });
+      this.epoch = epoch;
+      this.epochSeenAt = this.now();
+      this.done.clear();
+      this.alerted.clear();
+    }
+
+    let blocked = false;
+    for (const step of this.boundary) {
+      if (blocked) break;
+      if (this.done.has(step.job.name)) continue;
+      const outcome = await this.runJob(step.job, epoch);
+      if (outcome === 'done') this.done.add(step.job.name);
+      else if (step.gate) blocked = true;
+    }
+    if (this.boundary.every((step) => !step.gate || this.done.has(step.job.name))) {
+      for (const job of this.steady) await this.runJob(job, epoch);
+    }
+    for (const job of this.pollers) await this.runJob(job, epoch);
+    this.alertIfLate(epoch);
+  }
+
+  /** Ticks until stopped. Returns the stop function, which resolves once the tick in progress has finished. */
+  start(): () => Promise<void> {
+    const loop = async () => {
+      while (!this.stopped) {
+        await runWithTrace(() => this.tick());
+        if (!this.stopped) await this.sleep(this.options.pollMs);
       }
+    };
+    this.running = loop();
+    return async () => {
+      this.stopped = true;
+      await this.running;
+    };
+  }
+
+  /** Names of the boundary steps already done for the current epoch (for tests and logs). */
+  doneSteps(): string[] {
+    return this.boundary.map((s) => s.job.name).filter((name) => this.done.has(name));
+  }
+
+  private async runJob(job: Job, epoch: bigint): Promise<JobOutcome> {
+    try {
+      return await job.run(epoch);
+    } catch (error) {
+      logger.error('job threw; retrying next tick', error, { job: job.name, epoch: epoch.toString() });
+      return 'retry';
+    }
+  }
+
+  private alertIfLate(epoch: bigint): void {
+    const minutes = Math.floor((this.now() - this.epochSeenAt) / 60_000);
+    if (this.now() - this.epochSeenAt < this.options.alertAfterMs) return;
+    for (const step of this.boundary) {
+      if (!step.gate || this.done.has(step.job.name) || this.alerted.has(step.job.name)) continue;
+      this.alerted.add(step.job.name);
+      logger.error('ALERT: boundary job still not done', undefined, {
+        job: step.job.name,
+        epoch: epoch.toString(),
+        minutesSinceBoundary: minutes,
+      });
     }
   }
 }

@@ -1,21 +1,56 @@
 import '@epoch/common/first-module';
 
 import { GracefulShutdown } from '@epoch/common';
-import { loadConfig, SolanaConfigSchema } from '@epoch/config-sdk';
+import { CranksConfigSchema, loadConfig } from '@epoch/config-sdk';
 import { Logger } from '@epoch/logger';
-import { ConnectionManager, EpochClock } from '@epoch/solana';
+import { ConnectionManager, loadKeypair, TransactionSender } from '@epoch/solana';
+import { PublicKey } from '@solana/web3.js';
 
+import { MainnetData } from './Chain/MainnetData';
+import { ProgramClient } from './Chain/ProgramClient';
 import { JobRunner } from './JobRunner';
 
 const logger = Logger.create('cranks_app');
 
 async function main(): Promise<void> {
-  const config = loadConfig(SolanaConfigSchema);
-  const clock = new EpochClock(new ConnectionManager(config.RPC_URL, config.RPC_FALLBACK_URL));
-  const runner = new JobRunner();
-  const stop = clock.watch((epoch) => runner.runBoundary(epoch));
-  GracefulShutdown.register('epoch-clock', stop);
-  logger.info('watching for epoch boundaries', { epoch: (await clock.now()).epoch });
+  const config = loadConfig(CranksConfigSchema);
+  const programId = new PublicKey(config.EPOCH_PROGRAM_ID);
+  const connections = new ConnectionManager(config.EPOCH_RPC_URL, config.EPOCH_RPC_FALLBACK_URL);
+  const crank = loadKeypair(config.CRANK_KEYPAIR_PATH);
+  const scorer = config.SCORER_KEYPAIR_PATH ? loadKeypair(config.SCORER_KEYPAIR_PATH) : undefined;
+  const hedgeMakers = config.EPOCH_MARKET_MAKER ? [new PublicKey(config.EPOCH_MARKET_MAKER)] : [];
+
+  const chain = new ProgramClient({
+    programId,
+    connections,
+    sender: new TransactionSender(connections, crank),
+    scorer,
+    computeUnitPriceMicroLamports: config.CRANK_CU_PRICE_MICROLAMPORTS,
+    dryRun: config.DRY_RUN,
+  });
+  const data = new MainnetData(
+    new ConnectionManager(config.DATA_RPC_URL, config.DATA_RPC_FALLBACK_URL),
+    config.JITO_KOBE_API_URL,
+  );
+  const runner = JobRunner.create(chain, data, hedgeMakers, {
+    pollMs: config.CRANK_POLL_SECONDS * 1_000,
+    alertAfterMs: config.CRANK_ALERT_AFTER_MINUTES * 60_000,
+  });
+
+  const clock = await chain.clock();
+  logger.info('cranks starting', {
+    cluster: config.EPOCH_CLUSTER,
+    programId: programId.toBase58(),
+    crank: crank.publicKey.toBase58(),
+    scorer: scorer?.publicKey.toBase58() ?? null,
+    hedgeMakers: hedgeMakers.map((m) => m.toBase58()),
+    dryRun: config.DRY_RUN,
+    epoch: clock.epoch.toString(),
+  });
+  GracefulShutdown.register('job-runner', runner.start());
 }
 
-void main();
+main().catch((error: unknown) => {
+  logger.error('cranks_app failed to start', error);
+  process.exit(1);
+});

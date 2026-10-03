@@ -2,7 +2,7 @@
   "name": "@epoch/publisher_app",
   "version": "0.1.0",
   "private": true,
-  "description": "Posts the Solana Fee Index and fee quotes on-chain and to Switchboard",
+  "description": "Posts the Solana Fee Index on-chain (post_index) and runs Epoch's seeded market maker (post_quote, withdraw_quote)",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,7 @@
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "lint": "eslint src",
+    "lint": "eslint src --max-warnings=0",
     "lint:fix": "eslint --fix src",
     "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests",
     "start": "node dist/index.js",
@@ -22,8 +22,13 @@
   "dependencies": {
     "@epoch/common": "workspace:*",
     "@epoch/config-sdk": "workspace:*",
+    "@epoch/epoch-sdk": "workspace:*",
+    "@epoch/exceptions": "workspace:*",
     "@epoch/logger": "workspace:*",
-    "@epoch/solana": "workspace:*"
+    "@epoch/pg_models": "workspace:*",
+    "@epoch/solana": "workspace:*",
+    "@solana/web3.js": "^1.98.0",
+    "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.0"
