@@ -6,7 +6,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { EventBus, type PredictCallEvent, type StoredProgramEvent } from '../../Lib/EventBus';
 import { predictCallToActivityEvent, toActivityEvent } from '../Activity/ActivityMapper';
 import { EMPTY_NAMES, nameIndex } from '../Activity/ValidatorNames';
-import { type SlotSource, StreamHub, type StreamHubOptions } from './StreamHub';
+import { type SlotSource, StreamHub, type StreamHubOptions, VAULT_EVENTS } from './StreamHub';
 
 const IST = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:30$/;
 const VOTE = 'FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk';
@@ -336,6 +336,10 @@ describe('StreamHub', () => {
     expect(feeIndex).toHaveBeenCalledTimes(2);
     await sleep(80);
     expect(client.frames('vault')).toHaveLength(2);
+  });
+
+  it('counts a treasury claim as a pool change (it adds to cash and income)', () => {
+    expect(VAULT_EVENTS.has('TreasuryClaimed')).toBe(true);
   });
 
   it('reports a provider error to the subscriber', async () => {

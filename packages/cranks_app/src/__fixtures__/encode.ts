@@ -18,7 +18,7 @@ import {
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
 } from '@epoch/epoch-sdk';
-import { type PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 
 class Writer {
   readonly bytes: Uint8Array;
@@ -95,6 +95,7 @@ export function encodeValidatorPosition(p: ValidatorPositionAccount): Uint8Array
   if (p.openAdvance) w.u8(1).key(p.openAdvance);
   else w.u8(0);
   w.u64(p.advanceSeq).u8(p.lateEpochs).u16(p.inflationCommissionBps).u16(p.blockCommissionBps).u64(p.onboardedEpoch);
+  w.key(p.revenueToken ?? PublicKey.default);
   return w.bytes;
 }
 

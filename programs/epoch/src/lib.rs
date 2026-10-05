@@ -6,9 +6,17 @@
 //! junior tranches; the program publishes the Solana Fee Index and settles
 //! fee swaps against it.
 //!
+//! Validators can also sell a share of their revenue for a term as a token
+//! launched on a Meteora Dynamic Bonding Curve; every sweep takes the share
+//! off the top and permissionless slices buy the token back and burn it.
+//! Epoch is the curves' partner: permissionless cranks claim the partner
+//! treasury's Meteora fees into the pool as lender income and burn the token
+//! side.
+//!
 //! Layout: `state/` (accounts), `math/` (pure, tested arithmetic),
-//! `cpi/` (vote and system program calls), `instructions/` (one file each),
-//! `vote_account.rs` (vote state reader). `lib.rs` only dispatches.
+//! `cpi/` (vote, system, SPL Token and Meteora calls), `instructions/` (one
+//! file each), `vote_account.rs` (vote state reader), `meteora_account.rs`
+//! (Meteora pool and SPL account readers). `lib.rs` only dispatches.
 
 #![allow(clippy::result_large_err)]
 
@@ -20,7 +28,10 @@ pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod math;
+pub mod meteora_account;
 pub mod state;
+#[cfg(test)]
+mod test_fixtures;
 pub mod vote_account;
 
 use instructions::*;
@@ -183,5 +194,62 @@ pub mod epoch {
 
     pub fn settle_swap(ctx: Context<SettleSwap>) -> Result<()> {
         instructions::settle_swap(ctx)
+    }
+
+    // ── Revenue tokens (Meteora) ──
+    pub fn register_revenue_token(
+        ctx: Context<RegisterRevenueToken>,
+        share_bps: u16,
+        term_epochs: u16,
+    ) -> Result<()> {
+        instructions::register_revenue_token(ctx, share_bps, term_epochs)
+    }
+
+    pub fn sync_revenue_token_pool(ctx: Context<SyncRevenueTokenPool>) -> Result<()> {
+        instructions::sync_revenue_token_pool(ctx)
+    }
+
+    pub fn execute_buyback<'info>(
+        ctx: Context<'info, ExecuteBuyback<'info>>,
+        slice: u8,
+        min_amount_out: u64,
+    ) -> Result<()> {
+        instructions::execute_buyback(ctx, slice, min_amount_out)
+    }
+
+    pub fn redeem(ctx: Context<Redeem>, amount: u64) -> Result<()> {
+        instructions::redeem(ctx, amount)
+    }
+
+    pub fn configure_revenue_token(
+        ctx: Context<ConfigureRevenueToken>,
+        params: BuybackParams,
+    ) -> Result<()> {
+        instructions::configure_revenue_token(ctx, params)
+    }
+
+    pub fn close_revenue_token(ctx: Context<CloseRevenueToken>) -> Result<()> {
+        instructions::close_revenue_token(ctx)
+    }
+
+    // ── Partner treasury claims (Meteora) ──
+    pub fn claim_partner_trading_fee(ctx: Context<ClaimPartnerTradingFee>) -> Result<()> {
+        instructions::claim_partner_trading_fee(ctx)
+    }
+
+    pub fn claim_partner_surplus(ctx: Context<ClaimPartnerQuote>) -> Result<()> {
+        instructions::claim_partner_surplus(ctx)
+    }
+
+    pub fn claim_partner_migration_fee(ctx: Context<ClaimPartnerQuote>) -> Result<()> {
+        instructions::claim_partner_migration_fee(ctx)
+    }
+
+    pub fn burn_leftover(ctx: Context<BurnLeftover>) -> Result<()> {
+        instructions::burn_leftover(ctx)
+    }
+
+    pub fn claim_treasury_lp_fee(ctx: Context<ClaimTreasuryLpFee>) -> Result<()> {
+        instructions::claim_treasury_lp_fee(ctx)
     }
 }

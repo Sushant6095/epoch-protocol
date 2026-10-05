@@ -3,6 +3,7 @@ import {
   type EpochErrorInfo,
   type FeeIndexAccount,
   type PoolAccount,
+  type RevenueTokenAccount,
   type SwapPositionAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
@@ -19,6 +20,8 @@ export interface ProgramAccount<T> {
 export interface ChainClock {
   epoch: bigint;
   slot: bigint;
+  /** Slots since the epoch's first slot (buyback slices are scheduled on it). */
+  slotIndex: bigint;
 }
 
 /**
@@ -26,6 +29,11 @@ export interface ChainClock {
  * by the scorer key, so only the crank needs SOL.
  */
 export type SignerRole = 'crank' | 'scorer';
+
+/** Per-transaction options; the default compute budget fits every instruction but `execute_buyback`. */
+export interface ExecuteOptions {
+  computeUnitLimit?: number;
+}
 
 export type ExecuteResult =
   | { status: 'sent'; signature: string }
@@ -64,11 +72,27 @@ export interface EpochChain {
   withdrawRequest(seq: bigint): Promise<WithdrawRequestAccount | null>;
   /** Open swap positions (settled ones are closed by settle_swap), optionally only one taker's. */
   swaps(taker?: PublicKey): Promise<ProgramAccount<SwapPositionAccount>[]>;
+  /** Every validator revenue token (ADR 0006). */
+  revenueTokens(): Promise<ProgramAccount<RevenueTokenAccount>[]>;
+  /** An account's balance (0 when it does not exist). */
+  lamports(address: PublicKey): Promise<bigint>;
+  /** The rent-exempt minimum for `space` bytes. */
+  rentExempt(space: number): Promise<bigint>;
 
   /** Simulate without sending (always, DRY_RUN or not). */
-  simulate(label: string, instructions: TransactionInstruction[], role: SignerRole): Promise<ExecuteResult>;
+  simulate(
+    label: string,
+    instructions: TransactionInstruction[],
+    role: SignerRole,
+    options?: ExecuteOptions,
+  ): Promise<ExecuteResult>;
   /** Send and confirm (or only simulate under DRY_RUN). Never throws: failures come back as `status: 'failed'`. */
-  execute(label: string, instructions: TransactionInstruction[], role: SignerRole): Promise<ExecuteResult>;
+  execute(
+    label: string,
+    instructions: TransactionInstruction[],
+    role: SignerRole,
+    options?: ExecuteOptions,
+  ): Promise<ExecuteResult>;
 }
 
 /** One line for logs: the program error's name, else the message. */

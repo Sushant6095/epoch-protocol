@@ -1,15 +1,26 @@
 import { vectors } from './__fixtures__/vectors';
 import {
   ADVANCE_STATES,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  BUYBACK_VENUES,
   COMMISSION_KIND,
+  CP_AMM_POSITION_NFT_ACCOUNT_SEED,
+  INSTRUCTIONS_SYSVAR_ID,
+  METEORA,
+  NATIVE_MINT,
   POSITION_STATUSES,
   PROGRAM_CONSTANTS,
   RAW_SHARES_PER_UI_SHARE,
   rawSharesToUi,
+  REVENUE_TOKEN_FLAGS,
+  REVENUE_TOKEN_STATUSES,
   SEEDS,
   sharePriceE9ToSol,
   SIDES,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
   TRANCHES,
+  TREASURY_CLAIM_KINDS,
   VOTE_PROGRAM_ID,
 } from './constants';
 import { assetsToShares, sharePriceE9, sharesToAssets } from './math';
@@ -36,11 +47,75 @@ describe('constants mirror programs/epoch/src/constants.rs', () => {
     expect(VOTE_PROGRAM_ID.toBase58()).toBe(c.VOTE_PROGRAM_ID);
   });
 
+  it('has the revenue-token constants and the Meteora and SPL addresses', () => {
+    const c = vectors.constants;
+    for (const name of [
+      'MIN_SHARE_BPS',
+      'MAX_SHARE_BPS',
+      'MIN_TERM_EPOCHS',
+      'MAX_TERM_EPOCHS',
+      'DEFAULT_BUYBACK_SLICES',
+      'DEFAULT_BUYBACK_WINDOW_SLOTS',
+      'MAX_BUYBACK_SLICES',
+      'DEFAULT_MAX_SLIPPAGE_BPS',
+      'MIN_MAX_SLIPPAGE_BPS',
+      'MAX_MAX_SLIPPAGE_BPS',
+      'DEFAULT_MAX_IMPACT_BPS',
+      'MIN_MAX_IMPACT_BPS',
+      'MAX_MAX_IMPACT_BPS',
+    ] as const) {
+      expect({ name, value: PROGRAM_CONSTANTS[name] }).toEqual({ name, value: c[name] });
+    }
+    expect(PROGRAM_CONSTANTS.MAX_CLOSE_DUST_LAMPORTS).toBe(BigInt(c.MAX_CLOSE_DUST_LAMPORTS));
+    expect(REVENUE_TOKEN_FLAGS).toEqual({
+      buybacksPaused: c.FLAG_BUYBACKS_PAUSED,
+      redeemDuringTerm: c.FLAG_REDEEM_DURING_TERM,
+    });
+    const addresses = {
+      DBC_PROGRAM_ID: METEORA.DBC_PROGRAM_ID,
+      DBC_POOL_AUTHORITY: METEORA.DBC_POOL_AUTHORITY,
+      DBC_EVENT_AUTHORITY: METEORA.DBC_EVENT_AUTHORITY,
+      CP_AMM_PROGRAM_ID: METEORA.CP_AMM_PROGRAM_ID,
+      CP_AMM_POOL_AUTHORITY: METEORA.CP_AMM_POOL_AUTHORITY,
+      CP_AMM_EVENT_AUTHORITY: METEORA.CP_AMM_EVENT_AUTHORITY,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      NATIVE_MINT,
+      INSTRUCTIONS_SYSVAR_ID,
+      TOKEN_2022_PROGRAM_ID,
+    };
+    for (const [name, value] of Object.entries(addresses)) {
+      expect({ name, value: value.toBase58() }).toEqual({ name, value: c[name] });
+    }
+  });
+
+  it('has the treasury-claim constants', () => {
+    const c = vectors.constants;
+    for (const name of [
+      'DBC_MIGRATION_PROGRESS_CREATED_POOL',
+      'DBC_PARTNER_MIGRATION_FEE_MASK',
+      'DBC_PARTNER_AND_CREATOR_SURPLUS_SHARE',
+    ] as const) {
+      expect({ name, value: PROGRAM_CONSTANTS[name] }).toEqual({ name, value: c[name] });
+    }
+    expect(CP_AMM_POSITION_NFT_ACCOUNT_SEED).toBe(c.CP_AMM_POSITION_NFT_ACCOUNT_SEED);
+  });
+
   it('lists enum variants in Rust declaration order', () => {
     expect(TRANCHES).toEqual(['senior', 'junior']);
     expect(SIDES).toEqual(['payFixed', 'receiveFixed']);
     expect(POSITION_STATUSES).toEqual(['active', 'late', 'defaulted', 'released']);
     expect(ADVANCE_STATES).toEqual(['open', 'repaid', 'defaulted']);
+    expect(REVENUE_TOKEN_STATUSES).toEqual(['curve', 'graduated']);
+    expect(BUYBACK_VENUES).toEqual(['dbc', 'dammV2']);
+    expect(TREASURY_CLAIM_KINDS).toEqual(['tradingFee', 'surplus', 'migrationFee', 'leftover', 'lpFee']);
+    expect(vectors.events.filter((e) => e.name === 'TreasuryClaimed').map((e) => e.fields.kind as string)).toEqual([
+      'TradingFee',
+      'Surplus',
+      'MigrationFee',
+      'Leftover',
+      'LpFee',
+    ]);
     expect(COMMISSION_KIND).toEqual({ inflationRewards: 0, blockRevenue: 1 });
     expect(Object.isFrozen(TRANCHES)).toBe(true);
   });

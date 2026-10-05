@@ -39,20 +39,22 @@ const positions = accounts.map(({ account }) => decodeValidatorPosition(account.
   `solToLamports('0.1') === 100000000n` uses exact decimal arithmetic and throws on more than 9 decimals;
   `lamportsToSolString` is its exact inverse.
 - **Enums** use string unions: `Tranche` (`'senior' | 'junior'`), `Side` (`'payFixed' | 'receiveFixed'`, Rust
-  `PayFixed = 0`), `PositionStatus`, `AdvanceState`. `TRANCHES`, `SIDES`, `POSITION_STATUSES`, `ADVANCE_STATES` list
-  the variants in Borsh order.
+  `PayFixed = 0`), `PositionStatus`, `AdvanceState`, `RevenueTokenStatus` (`'curve' | 'graduated'`), `BuybackVenue`
+  (`'dbc' | 'dammV2'`), `TreasuryClaimKind` (`'tradingFee' | 'surplus' | 'migrationFee' | 'leftover' | 'lpFee'`).
+  `TRANCHES`, `SIDES`, `POSITION_STATUSES`, `ADVANCE_STATES`, `REVENUE_TOKEN_STATUSES`, `BUYBACK_VENUES`,
+  `TREASURY_CLAIM_KINDS` list the variants in Borsh order.
 
 ## What is exported
 
 | Area | Exports |
 | --- | --- |
-| Constants | `SEEDS`, `VOTE_PROGRAM_ID`, `PROGRAM_CONSTANTS`, `RAW_SHARES_PER_UI_SHARE`, `sharePriceE9ToSol`, `rawSharesToUi`, `COMMISSION_KIND`, enum types and variant lists |
-| PDAs | `findPoolPda`, `findVaultPda`, `findLenderPda`, `findWithdrawRequestPda`, `findPositionPda`, `findVoteAuthPda`, `findEscrowPda`, `findAdvancePda`, `findFeeIndexPda`, `findQuotePda`, `findSwapPda` — each returns `[PublicKey, bump]` |
-| Accounts | Types for all 8 accounts; `decodePool`, `decodeLenderShares`, `decodeWithdrawRequest`, `decodeValidatorPosition`, `decodeAdvance`, `decodeFeeIndex`, `decodeFeeQuote`, `decodeSwapPosition`, `decodeAccount`; `ACCOUNT_DISCRIMINATORS`, `ACCOUNT_SIZES`, `FIELD_OFFSETS`, `accountFilters`, `fieldFilter`; `feeIndexHistory`, `feeIndexValueFor`, `revenueHistory`, `trailingRevenue` |
-| Events | `EpochEvent` (union of all 26, discriminated by `name`), `EpochEventMap`, `EVENT_DISCRIMINATORS`, `decodeEvent`, `parseEventsFromLogs`, `eventToJson` |
-| Instructions | A builder per instruction (29) plus `onboardWithBond` and `openSwaps`; `INSTRUCTION_DISCRIMINATORS`; `solToLamports`, `lamportsToSolString`; input types (`DepositInput`, …) |
-| Errors | `EPOCH_ERRORS` (54, code 6000 + declaration index, `#[msg]` verbatim), `epochErrorFromCode`, `parseEpochError` |
-| Math | `bpsOf`, `bpsOfCeil`, `mulDiv`, `assetsToShares`, `sharesToAssets`, `sharePriceE9`, `creditLimit`, `splitSweep`, `attributeRepayment`, `distributeIncome`, `juniorRatioBps`, `absorbLoss`, `takerPnl`, `swapCollateral`, `computeScore`, `EpochMathError` |
+| Constants | `SEEDS`, `VOTE_PROGRAM_ID`, `PROGRAM_CONSTANTS`, `RAW_SHARES_PER_UI_SHARE`, `sharePriceE9ToSol`, `rawSharesToUi`, `COMMISSION_KIND`, `REVENUE_TOKEN_FLAGS`, `METEORA` (DBC and DAMM v2 program ids and fixed PDAs), `CP_AMM_POSITION_NFT_ACCOUNT_SEED`, `TOKEN_PROGRAM_ID`, `TOKEN_2022_PROGRAM_ID`, `ASSOCIATED_TOKEN_PROGRAM_ID`, `NATIVE_MINT`, `INSTRUCTIONS_SYSVAR_ID`, enum types and variant lists |
+| PDAs | `findPoolPda`, `findVaultPda`, `findLenderPda`, `findWithdrawRequestPda`, `findPositionPda`, `findVoteAuthPda`, `findEscrowPda`, `findAdvancePda`, `findFeeIndexPda`, `findQuotePda`, `findSwapPda`, `findRevenueTokenPda`, `findBuybackEscrowPda`, `findBuybackWsolPda`, `findBuybackTokensPda`, `findPartnerTreasuryPda`, `findTreasuryWsolPda` — each returns `[PublicKey, bump]`; `findMeteoraVaultPda` (a Meteora pool's token vault), `findAssociatedTokenAddress`, `findTreasuryTokensAddress` (the treasury's token account for a mint), `findDammPositionPda`, `findDammPositionNftAccount` |
+| Accounts | Types for all 9 accounts; `decodePool`, `decodeLenderShares`, `decodeWithdrawRequest`, `decodeValidatorPosition`, `decodeAdvance`, `decodeFeeIndex`, `decodeFeeQuote`, `decodeSwapPosition`, `decodeRevenueToken`, `decodeAccount`; `ACCOUNT_DISCRIMINATORS`, `ACCOUNT_SIZES`, `FIELD_OFFSETS`, `accountFilters`, `fieldFilter`; `feeIndexHistory`, `feeIndexValueFor`, `revenueHistory`, `trailingRevenue`; `revenueTokenInTerm`, `revenueTokenTermActive`, `revenueTokenRedeemOpen`, `revenueTokenBuybacksPaused` |
+| Events | `EpochEvent` (union of all 34, discriminated by `name`), `EpochEventMap`, `EVENT_DISCRIMINATORS`, `decodeEvent`, `parseEventsFromLogs`, `eventToJson` |
+| Instructions | A builder per instruction (40) plus `onboardWithBond`, `openSwaps` and `sweepPosition`; `INSTRUCTION_DISCRIMINATORS`; `solToLamports`, `lamportsToSolString`; input types (`DepositInput`, …) |
+| Errors | `EPOCH_ERRORS` (90, code 6000 + declaration index, `#[msg]` verbatim), `epochErrorFromCode`, `parseEpochError` |
+| Math | `bpsOf`, `bpsOfCeil`, `mulDiv`, `assetsToShares`, `sharesToAssets`, `sharePriceE9`, `creditLimit`, `splitSweep`, `attributeRepayment`, `distributeIncome`, `juniorRatioBps`, `absorbLoss`, `takerPnl`, `swapCollateral`, `computeScore`, `EpochMathError`; revenue tokens: `splitSweepWithShare`, `sliceDueSlot`, `sliceTiming`, `sliceBudget`, `redeemPayout`, `planBuybackSlice`; Meteora buy quotes: `deltaBase`, `deltaQuote`, `nextSqrtFromQuoteIn`, `dbcBuy`, `dbcMaxQuoteIn`, `dammConcentratedBuy`, `dammConcentratedMaxQuoteIn`, `dammCompoundingBuy`, `dammCompoundingMaxQuoteIn`, `impactTargetSqrtPrice`, `minOutFloor`; treasury claims: `dbcPartnerPart`, `dbcPartnerSurplus`, `dbcPartnerMigrationFee`, `dbcLeftover` |
 | Discriminator lookups | `accountNameOf`, `instructionNameOf`, `eventNameOf`, `ACCOUNT_NAMES`, `INSTRUCTION_NAMES`, `EVENT_NAMES` |
 | Encodings | `base58Encode`, `base58Decode`, `base64Encode`, `base64Decode`, `bytesToHex`, `hexToBytes` |
 
@@ -71,11 +73,55 @@ derived for you; pass the values the program uses as seeds when they are not der
 `None` when its key equals the executing program's id (`anchor-lang` `accounts/option.rs`), so `sweep({ openAdvance:
 null })` passes `programId` (read-only, non-signer) in that slot, and a present advance is passed writable. Note that
 Anchor's generated *Rust* client fills the slot with the compile-time `declare_id!` instead; the SDK uses the
-`programId` you pass, which is what the program compares against.
+`programId` you pass, which is what the program compares against. The same rule covers the revenue-token slots
+(`sweep`, `release_validator`, `update_commission`) and `redeem`'s graduated-pool and treasury accounts.
 
 `onboardWithBond` returns `[onboard_validator, set_collectors (cranker = operator), post_bond]` for one transaction
 (`bondLamports: 0n` omits `post_bond`; `setCollectors: false` omits `set_collectors` on clusters where SIMD-0232
 collectors are not active yet). `openSwaps` returns one `open_swap` per leg (e.g. a five-epoch hedge).
+
+## Revenue tokens
+
+A validator can sell a share of its gross revenue for a term as an SPL token launched on a Meteora Dynamic Bonding
+Curve (ADR 0006). The program keeps a `RevenueToken` account at `["revenue_token", vote]` and a system-owned buyback
+escrow at `["buyback", vote]`; `ValidatorPosition.revenueToken` points at the token (null for none).
+
+- **Sweeps pass the token automatically.** The program refuses a sweep of a position with a revenue token unless the
+  token and its escrow are passed (`RevenueTokenAccountsMissing`), so the share cannot be skipped. Use
+  `sweepPosition({ programId, cranker, position })` with the decoded position, or pass `revenueToken:
+  position.revenueToken` to `sweep`; null passes `programId` twice. `releaseValidator` and `updateCommission` take
+  the same optional `revenueToken` (release waits for the end of the term; commission cannot go below its level at
+  registration during the term).
+- **Buybacks.** `executeBuyback({ …, venue: { kind: 'dbc' | 'dammV2', pool }, slice, minAmountOut })` runs one slice.
+  The Meteora vaults are derived (`findMeteoraVaultPda`). `planBuybackSlice` mirrors the handler from the epoch budget
+  to the min-out floor (slice budget, the `max_impact_bps` cap, the fee-free fill) from the raw pool state the program
+  reads (`BuybackVenueState`); a cranker takes a fee-aware quote for `plan.amount`, applies its slippage and checks the
+  result is at least `plan.floor`. `sliceTiming(slotIndex, …)` says whether a slice is due.
+- **Redeem.** `redeem({ …, amount })` burns tokens for `amount / circulating` of the escrow (`redeemPayout`); pass
+  `dammPool` once the token graduated and `treasuryTokens` when the treasury holds a leftover balance.
+- `registerRevenueToken` (operator), `syncRevenueTokenPool` (anyone, after graduation), `configureRevenueToken`
+  (pool admin) and `closeRevenueToken` (anyone, after the term with an empty escrow) complete the set.
+- `splitSweepWithShare` mirrors the sweep waterfall with a share: off the top, unless the open advance predates the
+  token, in which case the advance is repaid first and the share comes out of the validator's part.
+
+## Treasury claims
+
+Epoch's partner treasury `["treasury", pool]` is the fee claimer and leftover receiver of every revenue token's DBC
+config. Anyone can send its claims; the program signs the Meteora call, puts the SOL in the pool as income and burns
+the tokens. The cranker pays the fee only (it fronts and gets back up to two accounts' rent).
+
+```ts
+claimPartnerTradingFee({ programId, cranker, dbcPool, dbcConfig, mint }); // DBC trading fees
+claimPartnerSurplus({ programId, cranker, dbcPool, dbcConfig }); // after the curve completes
+claimPartnerMigrationFee({ programId, cranker, dbcPool, dbcConfig }); // after the curve completes
+burnLeftover({ programId, cranker, dbcPool, dbcConfig, mint }); // after graduation
+claimTreasuryLpFee({ programId, cranker, dammPool, mint, position, nftMint }); // a DAMM v2 position it owns
+```
+
+Vaults, the treasury's accounts and the position NFT account are derived (pass `baseVault` / `quoteVault` /
+`tokenAVault` / `tokenBVault` / `positionNftAccount` to override). `dbcPartnerSurplus`, `dbcPartnerMigrationFee` and
+`dbcLeftover` mirror what DBC pays the partner, and the program checks them before the call (`NothingToClaim`,
+`ClaimNotReady`, `AlreadyClaimed`). Each claim emits `TreasuryClaimed`.
 
 ## Accounts
 
@@ -98,6 +144,7 @@ offered as memcmp filters:
 | FeeIndex | 486 | — |
 | FeeQuote | 151 | pool 8, maker 40 |
 | SwapPosition | 133 | quote 8, taker 40 |
+| RevenueToken | 503 | pool 8, position 40, vote 72, operator 104, mint 136, dbcPool 200 |
 
 `accountFilters(name)` gives `[memcmp(discriminator) at 0, dataSize]`; `fieldFilter(name, field, key)` adds a memcmp
 on one of the fields above and throws for anything else. Ring buffers come back raw (`revenue`, `history`);
@@ -126,7 +173,8 @@ object or a plain string, and `undefined` otherwise (system program and Anchor f
 ## Math
 
 `src/math.ts` mirrors `programs/epoch/src/math/*.rs` and `taker_pnl` in `swap.rs` with `bigint`: the same u128 / i128
-intermediates, rounding (floor, `bps_of_ceil`, i128 division truncating toward zero) and overflow points. Where the
+(and, for the Meteora curve formulas, 256-bit) intermediates, rounding (floor, `bps_of_ceil`, i128 division truncating
+toward zero) and overflow points. Where the
 Rust function returns `None` (the program fails with `MathOverflow`) the mirror throws `EpochMathError`; arguments the
 Rust types cannot hold (a negative amount, a u16 above 65,535) throw `RangeError`/`TypeError`.
 

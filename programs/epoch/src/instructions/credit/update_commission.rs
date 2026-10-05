@@ -36,11 +36,17 @@ pub struct UpdateCommission<'info> {
     /// CHECK: the vote program.
     #[account(address = VOTE_PROGRAM_ID)]
     pub vote_program: UncheckedAccount<'info>,
+
+    /// Required when the position has a revenue token (its commission floor
+    /// applies until the term ends). Pass the program id (`None`) otherwise.
+    pub revenue_token: Option<Account<'info, RevenueToken>>,
 }
 
 /// The operator keeps control of commission, within covenants: never below
-/// the pool minimum, and never lower than at origination while an advance
-/// is open (the runtime adds its own one-epoch delay, SIMD-0249).
+/// the pool minimum, never lower than at origination while an advance is
+/// open, and never below its level at registration while a revenue token's
+/// term runs (the token's buyers priced that commission; the runtime adds its
+/// own one-epoch delay, SIMD-0249).
 /// `kind`: 0 = inflation rewards, 1 = block revenue.
 pub fn update_commission(
     ctx: Context<UpdateCommission>,
@@ -82,6 +88,26 @@ pub fn update_commission(
         require!(
             commission_bps >= current,
             EpochError::CommissionChangeBlocked
+        );
+    }
+    if position.has_revenue_token() {
+        let rt = ctx
+            .accounts
+            .revenue_token
+            .as_ref()
+            .ok_or(EpochError::RevenueTokenAccountsMissing)?;
+        require_keys_eq!(
+            rt.key(),
+            position.revenue_token,
+            EpochError::RevenueTokenMismatch
+        );
+        require!(
+            rt.allows_commission(
+                Clock::get()?.epoch,
+                kind == CommissionKind::BlockRevenue,
+                commission_bps
+            ),
+            EpochError::CommissionBelowSnapshot
         );
     }
 

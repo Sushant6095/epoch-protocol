@@ -126,6 +126,66 @@ describe('toActivityEvent', () => {
     });
   });
 
+  it('maps the revenue-token lifecycle as buybacks', () => {
+    expect(
+      row('BuybackExecuted', { vote: VOTE, venue: 'dbc', lamportsIn: '125660849', tokensBurned: '5711541835' }),
+    ).toEqual({
+      id: 'sig1:0',
+      kind: 'buyback',
+      text: 'Kestrel Nodes · bought back and burned on the curve',
+      amountSol: 0.125660849,
+      value: null,
+      unit: 'SOL',
+      signature: 'sig1',
+    });
+    expect(row('BuybackExecuted', { vote: VOTE, venue: 'dammV2', lamportsIn: '1000000000' })).toMatchObject({
+      text: 'Kestrel Nodes · bought back and burned on DAMM v2',
+      amountSol: 1,
+    });
+    expect(row('RevenueTokenRegistered', { vote: VOTE, shareBps: 2000, termEpochs: 52 })).toMatchObject({
+      kind: 'buyback',
+      text: 'Kestrel Nodes · revenue token: 20% of revenue for 52 epochs',
+      amountSol: null,
+    });
+    expect(row('RevenueShareSwept', { vote: OTHER_VOTE, share: '2000000000' })).toMatchObject({
+      text: 'Ccnj…UYdj · revenue share to the buyback escrow',
+      amountSol: 2,
+    });
+    expect(row('RevenueTokenRedeemed', { vote: VOTE, lamportsOut: '224432500' })).toMatchObject({
+      amountSol: 0.2244325,
+    });
+    expect(row('RevenueTokenPoolSynced', { vote: VOTE })?.text).toBe(
+      'Kestrel Nodes · revenue token graduated to DAMM v2',
+    );
+    expect(row('RevenueTokenClosed', { vote: VOTE })?.text).toBe('Kestrel Nodes · revenue token term closed');
+    expect(row('RevenueTokenConfigured', { vote: VOTE, slicesPerEpoch: 12 })).toBeNull();
+  });
+
+  it("maps the partner treasury's claims: SOL to lenders, tokens burned", () => {
+    const mint = 'EUdJ2RLs9NxeiaJfwTJsqTwX7iA1H7put7fcAVoRiDs1';
+    expect(row('TreasuryClaimed', { mint, kind: 'tradingFee', lamportsToPool: '81234567', tokensBurned: '0' })).toEqual(
+      {
+        id: 'sig1:0',
+        kind: 'buyback',
+        text: 'EUdJ…iDs1 · treasury: curve trading fees to lenders',
+        amountSol: 0.081234567,
+        value: null,
+        unit: 'SOL',
+        signature: 'sig1',
+      },
+    );
+    expect(row('TreasuryClaimed', { mint, kind: 'lpFee', lamportsToPool: '1000000', tokensBurned: '42' })?.text).toBe(
+      'EUdJ…iDs1 · treasury: DAMM v2 LP fees to lenders, tokens burned',
+    );
+    expect(row('TreasuryClaimed', { mint, kind: 'migrationFee', lamportsToPool: '3500000000' })).toMatchObject({
+      text: 'EUdJ…iDs1 · treasury: migration fee to lenders',
+      amountSol: 3.5,
+    });
+    expect(
+      row('TreasuryClaimed', { mint, kind: 'leftover', lamportsToPool: '0', tokensBurned: '578372' }),
+    ).toMatchObject({ text: 'EUdJ…iDs1 · treasury: unsold supply burned', amountSol: null });
+  });
+
   it('skips events the feed does not show', () => {
     for (const name of ['Accrued', 'ScoreUpdated', 'BondPosted', 'QuotePosted', 'PauseToggled'] as const) {
       expect(row(name, { epoch: '1' })).toBeNull();

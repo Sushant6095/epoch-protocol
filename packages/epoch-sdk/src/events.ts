@@ -1,11 +1,20 @@
 /**
- * The 26 `#[event]`s in `programs/epoch/src/events.rs`. Anchor's `emit!` logs each as
+ * The 34 `#[event]`s in `programs/epoch/src/events.rs`. Anchor's `emit!` logs each as
  * `Program data: <base64(discriminator ++ borsh(event))>`.
  */
 import { type PublicKey } from '@solana/web3.js';
 
 import { BorshReader } from './borsh';
-import { SIDES, type Side, type Tranche, TRANCHES } from './constants';
+import {
+  BUYBACK_VENUES,
+  type BuybackVenue,
+  SIDES,
+  type Side,
+  type Tranche,
+  TRANCHES,
+  TREASURY_CLAIM_KINDS,
+  type TreasuryClaimKind,
+} from './constants';
 import { type EventName, eventNameOf } from './discriminators';
 import { base64Decode, bytesToHex } from './encoding';
 
@@ -112,6 +121,96 @@ export interface EpochEventMap {
   };
   /** `takerPnl` is an `i64`: negative when the taker lost. */
   SwapSettled: { swap: PublicKey; epoch: bigint; indexValue: bigint; takerPnl: bigint };
+  RevenueTokenRegistered: {
+    pool: PublicKey;
+    vote: PublicKey;
+    revenueToken: PublicKey;
+    mint: PublicKey;
+    dbcPool: PublicKey;
+    shareBps: number;
+    termEpochs: number;
+    startEpoch: bigint;
+    termEndEpoch: bigint;
+    inflationCommissionBps: number;
+    blockCommissionBps: number;
+  };
+  /** The share a sweep moved into the buyback escrow (next to `Swept`, whose `gross` includes it). */
+  RevenueShareSwept: {
+    vote: PublicKey;
+    mint: PublicKey;
+    epoch: bigint;
+    gross: bigint;
+    share: bigint;
+    /** The share came after a pre-registration advance's remittance. */
+    afterSeniorAdvance: boolean;
+    /** Escrow balance above rent after the sweep. */
+    escrowBalance: bigint;
+  };
+  RevenueTokenPoolSynced: {
+    vote: PublicKey;
+    mint: PublicKey;
+    dbcPool: PublicKey;
+    dammPool: PublicKey;
+    dammConfig: PublicKey;
+  };
+  BuybackExecuted: {
+    vote: PublicKey;
+    mint: PublicKey;
+    venue: BuybackVenue;
+    epoch: bigint;
+    slice: number;
+    /** SOL the swap used. */
+    lamportsIn: bigint;
+    tokensBought: bigint;
+    tokensBurned: bigint;
+    minAmountOut: bigint;
+    /** The pool's output for `lamportsIn` before fees, at execution: the floor's reference. */
+    feeFreeOut: bigint;
+    escrowBalance: bigint;
+  };
+  RevenueTokenRedeemed: {
+    vote: PublicKey;
+    mint: PublicKey;
+    holder: PublicKey;
+    tokensBurned: bigint;
+    lamportsOut: bigint;
+    circulatingSupply: bigint;
+    epoch: bigint;
+  };
+  RevenueTokenConfigured: {
+    vote: PublicKey;
+    slicesPerEpoch: number;
+    windowSlots: number;
+    maxSlippageBps: number;
+    maxImpactBps: number;
+    flags: number;
+  };
+  RevenueTokenClosed: {
+    vote: PublicKey;
+    mint: PublicKey;
+    totalEscrowed: bigint;
+    totalSpent: bigint;
+    totalBurned: bigint;
+    totalRedeemed: bigint;
+  };
+  /** The partner treasury claimed from Meteora: SOL to the pool as income, tokens burned. */
+  TreasuryClaimed: {
+    pool: PublicKey;
+    kind: TreasuryClaimKind;
+    /** The token (DBC base mint / DAMM v2 token A). */
+    mint: PublicKey;
+    /** The DBC pool, or the DAMM v2 pool for `lpFee`. */
+    source: PublicKey;
+    /** The DAMM v2 position for `lpFee`; `PublicKey.default` (`1111…1111`) otherwise. */
+    position: PublicKey;
+    cranker: PublicKey;
+    lamportsClaimed: bigint;
+    lamportsToPool: bigint;
+    tokensClaimed: bigint;
+    tokensBurned: bigint;
+    poolCash: bigint;
+    incomeUnallocated: bigint;
+  };
 }
 
 /** One member per event, discriminated by `name`. */
@@ -226,6 +325,87 @@ const DECODERS: { [K in EventName]: (r: BorshReader) => EpochEventMap[K] } = {
     collateral: r.u64(),
   }),
   SwapSettled: (r) => ({ swap: r.pubkey(), epoch: r.u64(), indexValue: r.u64(), takerPnl: r.i64() }),
+  RevenueTokenRegistered: (r) => ({
+    pool: r.pubkey(),
+    vote: r.pubkey(),
+    revenueToken: r.pubkey(),
+    mint: r.pubkey(),
+    dbcPool: r.pubkey(),
+    shareBps: r.u16(),
+    termEpochs: r.u16(),
+    startEpoch: r.u64(),
+    termEndEpoch: r.u64(),
+    inflationCommissionBps: r.u16(),
+    blockCommissionBps: r.u16(),
+  }),
+  RevenueShareSwept: (r) => ({
+    vote: r.pubkey(),
+    mint: r.pubkey(),
+    epoch: r.u64(),
+    gross: r.u64(),
+    share: r.u64(),
+    afterSeniorAdvance: r.bool('afterSeniorAdvance'),
+    escrowBalance: r.u64(),
+  }),
+  RevenueTokenPoolSynced: (r) => ({
+    vote: r.pubkey(),
+    mint: r.pubkey(),
+    dbcPool: r.pubkey(),
+    dammPool: r.pubkey(),
+    dammConfig: r.pubkey(),
+  }),
+  BuybackExecuted: (r) => ({
+    vote: r.pubkey(),
+    mint: r.pubkey(),
+    venue: r.variant(BUYBACK_VENUES, 'venue'),
+    epoch: r.u64(),
+    slice: r.u8(),
+    lamportsIn: r.u64(),
+    tokensBought: r.u64(),
+    tokensBurned: r.u64(),
+    minAmountOut: r.u64(),
+    feeFreeOut: r.u64(),
+    escrowBalance: r.u64(),
+  }),
+  RevenueTokenRedeemed: (r) => ({
+    vote: r.pubkey(),
+    mint: r.pubkey(),
+    holder: r.pubkey(),
+    tokensBurned: r.u64(),
+    lamportsOut: r.u64(),
+    circulatingSupply: r.u64(),
+    epoch: r.u64(),
+  }),
+  RevenueTokenConfigured: (r) => ({
+    vote: r.pubkey(),
+    slicesPerEpoch: r.u8(),
+    windowSlots: r.u32(),
+    maxSlippageBps: r.u16(),
+    maxImpactBps: r.u16(),
+    flags: r.u8(),
+  }),
+  RevenueTokenClosed: (r) => ({
+    vote: r.pubkey(),
+    mint: r.pubkey(),
+    totalEscrowed: r.u64(),
+    totalSpent: r.u64(),
+    totalBurned: r.u64(),
+    totalRedeemed: r.u64(),
+  }),
+  TreasuryClaimed: (r) => ({
+    pool: r.pubkey(),
+    kind: r.variant(TREASURY_CLAIM_KINDS, 'kind'),
+    mint: r.pubkey(),
+    source: r.pubkey(),
+    position: r.pubkey(),
+    cranker: r.pubkey(),
+    lamportsClaimed: r.u64(),
+    lamportsToPool: r.u64(),
+    tokensClaimed: r.u64(),
+    tokensBurned: r.u64(),
+    poolCash: r.u64(),
+    incomeUnallocated: r.u64(),
+  }),
 };
 
 /**

@@ -78,6 +78,8 @@ const STALE_AFTER: Partial<Record<EventName, CacheKey[]>> = {
   QuotePosted: ['quotes'],
   SwapOpened: ['quotes', 'swaps'],
   SwapSettled: ['quotes', 'swaps'],
+  // A treasury claim adds to the pool's cash and undistributed income.
+  TreasuryClaimed: ['pool'],
 };
 
 /** `https://x` → `wss://x`, `http://x` → `ws://x` (web3.js does the same when no wsEndpoint is given). */

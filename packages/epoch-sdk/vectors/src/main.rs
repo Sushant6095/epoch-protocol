@@ -21,7 +21,7 @@ use epoch::{
     errors::EpochError,
     events::*,
     instructions::{taker_pnl, ScoreUpdate},
-    math::{self, CreditInputs, ScoreInputs},
+    math::{self, u256::U256, CreditInputs, CurvePoint, ScoreInputs, SliceTiming},
     state::*,
 };
 
@@ -234,6 +234,53 @@ impl ToJ for PositionStatus {
 impl ToJ for AdvanceState {
     fn j(&self) -> J {
         s(format!("{self:?}"))
+    }
+}
+impl ToJ for RevenueTokenStatus {
+    fn j(&self) -> J {
+        s(format!("{self:?}"))
+    }
+}
+impl ToJ for BuybackVenue {
+    fn j(&self) -> J {
+        s(format!("{self:?}"))
+    }
+}
+impl ToJ for TreasuryClaimKind {
+    fn j(&self) -> J {
+        s(format!("{self:?}"))
+    }
+}
+impl ToJ for u128 {
+    fn j(&self) -> J {
+        s(self)
+    }
+}
+impl ToJ for U256 {
+    /// Decimal, like the other wide integers.
+    fn j(&self) -> J {
+        const TEN19: u128 = 10_000_000_000_000_000_000;
+        let mut v = *self;
+        let mut chunks = Vec::new();
+        while !v.is_zero() {
+            let (q, r) = v.div_rem(U256::from_u128(TEN19)).expect("nonzero divisor");
+            chunks.push(r.lo);
+            v = q;
+        }
+        let mut text = chunks
+            .pop()
+            .map_or_else(|| "0".to_string(), |c| c.to_string());
+        while let Some(c) = chunks.pop() {
+            text.push_str(&format!("{c:019}"));
+        }
+        s(text)
+    }
+}
+impl ToJ for BuybackParams {
+    fn j(&self) -> J {
+        fields!(self, BuybackParams {
+            slices_per_epoch, window_slots, max_slippage_bps, max_impact_bps, flags,
+        } skip {})
     }
 }
 impl ToJ for PoolParams {
@@ -492,13 +539,31 @@ fn withdraw_examples(g: &mut Gen) -> Vec<J> {
         .collect()
 }
 
+/// An all-zero pubkey field read as "none" (`null`), like the SDK's decoders.
+fn optional_key(key: &Pubkey) -> J {
+    if *key == Pubkey::default() {
+        J::Null
+    } else {
+        key.j()
+    }
+}
+
+/// `fields!` plus one more field at the end.
+fn with_field(mut fields: J, name: &str, value: J) -> J {
+    if let J::Obj(f) = &mut fields {
+        f.push((name.to_string(), value));
+    }
+    fields
+}
+
 fn position_json(a: &ValidatorPosition) -> J {
-    fields!(a, ValidatorPosition {
+    let fields = fields!(a, ValidatorPosition {
         pool, vote, identity, operator, payout, original_withdrawer, bump, vote_auth_bump,
         escrow_bump, status, hedged, score, last_scored_epoch, revenue, revenue_head,
         revenue_count, last_swept_epoch, total_swept, total_remitted, bond_lamports, open_advance,
         advance_seq, late_epochs, inflation_commission_bps, block_commission_bps, onboarded_epoch,
-    } skip { _reserved })
+    } skip { revenue_token });
+    with_field(fields, "revenue_token", optional_key(&a.revenue_token))
 }
 
 fn position(
@@ -534,8 +599,9 @@ fn position(
         inflation_commission_bps: g.u16(),
         block_commission_bps: g.u16(),
         onboarded_epoch: g.u64(),
-        // Non-zero so a stale tail left by a Some → None rewrite is visible garbage.
-        _reserved: [0xc3; 32],
+        // Non-zero so a stale tail left by a Some → None rewrite is visible garbage (these
+        // were the `_reserved` bytes before they became `revenue_token`).
+        revenue_token: Pubkey::new_from_array([0xc3; 32]),
     }
 }
 
@@ -584,8 +650,9 @@ fn position_examples(g: &mut Gen) -> Vec<J> {
         extra(&repaid, &pushed),
     ));
 
-    // None on a fresh, zeroed account; partial ring (4 pushes).
+    // None on a fresh, zeroed account; partial ring (4 pushes); no revenue token (null).
     let mut fresh = position(g, PositionStatus::Active, false, None);
+    fresh.revenue_token = Pubkey::default();
     let pushed: Vec<u64> = (0..4).map(|_| g.sized()).collect();
     for v in &pushed {
         fresh.push_revenue(*v);
@@ -800,6 +867,107 @@ fn swap_examples(g: &mut Gen) -> Vec<J> {
     .collect()
 }
 
+fn revenue_token_json(a: &RevenueToken) -> J {
+    let fields = fields!(a, RevenueToken {
+        pool, position, vote, operator, mint, token_program, dbc_pool, dbc_config,
+    } skip {
+        damm_pool, share_bps, term_epochs, registered_epoch, start_epoch, term_end_epoch,
+        advance_seq_at_registration, inflation_commission_bps, block_commission_bps, bump,
+        escrow_bump, tokens_bump, wsol_bump, slices_per_epoch, window_slots, max_slippage_bps,
+        max_impact_bps, flags, status, buyback_epoch, epoch_budget, epoch_spent, slices_done,
+        last_share_epoch, total_escrowed, total_spent, total_bought, total_burned, total_redeemed,
+        total_redeemed_lamports, buyback_count, _reserved,
+    });
+    let rest = fields!(a, RevenueToken {
+        share_bps, term_epochs, registered_epoch, start_epoch, term_end_epoch,
+        advance_seq_at_registration, inflation_commission_bps, block_commission_bps, bump,
+        escrow_bump, tokens_bump, wsol_bump, slices_per_epoch, window_slots, max_slippage_bps,
+        max_impact_bps, flags, status, buyback_epoch, epoch_budget, epoch_spent, slices_done,
+        last_share_epoch, total_escrowed, total_spent, total_bought, total_burned, total_redeemed,
+        total_redeemed_lamports, buyback_count,
+    } skip {
+        pool, position, vote, operator, mint, token_program, dbc_pool, dbc_config, damm_pool,
+        _reserved,
+    });
+    let mut out = with_field(fields, "damm_pool", optional_key(&a.damm_pool));
+    if let (J::Obj(f), J::Obj(r)) = (&mut out, rest) {
+        f.extend(r);
+    }
+    out
+}
+
+/// Revenue tokens use their own generator so the older sections keep their values.
+fn revenue_token_examples(g: &mut Gen) -> Vec<J> {
+    let mut out = Vec::new();
+    for (label, graduated) in [("curve", false), ("graduated", true)] {
+        let params = if graduated {
+            BuybackParams {
+                slices_per_epoch: 32,
+                window_slots: g.u32(),
+                max_slippage_bps: 2_000,
+                max_impact_bps: 10,
+                flags: FLAG_BUYBACKS_PAUSED | FLAG_REDEEM_DURING_TERM,
+            }
+        } else {
+            BuybackParams::default()
+        };
+        let start = g.u64() >> 1;
+        let a = RevenueToken {
+            pool: g.key(),
+            position: g.key(),
+            vote: g.key(),
+            operator: g.key(),
+            mint: g.key(),
+            token_program: TOKEN_PROGRAM_ID,
+            dbc_pool: g.key(),
+            dbc_config: g.key(),
+            damm_pool: if graduated {
+                g.key()
+            } else {
+                Pubkey::default()
+            },
+            share_bps: if graduated { MAX_SHARE_BPS } else { 1_000 },
+            term_epochs: if graduated { MAX_TERM_EPOCHS } else { 52 },
+            registered_epoch: start - 1,
+            start_epoch: start,
+            term_end_epoch: start + if graduated { 1_000 } else { 52 },
+            advance_seq_at_registration: g.u64(),
+            inflation_commission_bps: g.u16(),
+            block_commission_bps: g.u16(),
+            bump: g.u8(),
+            escrow_bump: g.u8(),
+            tokens_bump: g.u8(),
+            wsol_bump: g.u8(),
+            slices_per_epoch: params.slices_per_epoch,
+            window_slots: params.window_slots,
+            max_slippage_bps: params.max_slippage_bps,
+            max_impact_bps: params.max_impact_bps,
+            flags: params.flags,
+            status: if graduated {
+                RevenueTokenStatus::Graduated
+            } else {
+                RevenueTokenStatus::Curve
+            },
+            buyback_epoch: if graduated { g.u64() } else { 0 },
+            epoch_budget: if graduated { g.u64() } else { 0 },
+            epoch_spent: if graduated { g.sized() } else { 0 },
+            slices_done: if graduated { g.u32() } else { 0 },
+            last_share_epoch: if graduated { g.u64() } else { 0 },
+            total_escrowed: g.u64(),
+            total_spent: g.u64(),
+            total_bought: g.u64(),
+            total_burned: g.u64(),
+            total_redeemed: g.u64(),
+            total_redeemed_lamports: g.u64(),
+            buyback_count: g.u32(),
+            _reserved: [0; 64],
+        };
+        let (data, len) = account_bytes(&a, None);
+        out.push(example(label, &data, len, revenue_token_json(&a), vec![]));
+    }
+    out
+}
+
 fn account_entry<T: Discriminator + Space>(name: &str, examples: Vec<J>) -> (String, J) {
     (
         name.to_string(),
@@ -812,7 +980,7 @@ fn account_entry<T: Discriminator + Space>(name: &str, examples: Vec<J>) -> (Str
     )
 }
 
-fn accounts(g: &mut Gen) -> J {
+fn accounts(g: &mut Gen, g2: &mut Gen) -> J {
     J::Obj(vec![
         account_entry::<Pool>("Pool", pool_examples(g)),
         account_entry::<LenderShares>("LenderShares", lender_examples(g)),
@@ -822,6 +990,7 @@ fn accounts(g: &mut Gen) -> J {
         account_entry::<FeeIndex>("FeeIndex", fee_index_examples(g)),
         account_entry::<FeeQuote>("FeeQuote", quote_examples(g)),
         account_entry::<SwapPosition>("SwapPosition", swap_examples(g)),
+        account_entry::<RevenueToken>("RevenueToken", revenue_token_examples(g2)),
     ])
 }
 
@@ -855,7 +1024,7 @@ macro_rules! event {
     }};
 }
 
-fn events(g: &mut Gen) -> J {
+fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen) -> J {
     let mut out = Vec::new();
     for (label, flag) in [("a", true), ("b", false)] {
         let tranche = if flag {
@@ -1138,6 +1307,141 @@ fn events(g: &mut Gen) -> J {
             }
         );
     }
+    // Revenue tokens: their own generator, so the events above keep their values.
+    let g = g2;
+    for (label, flag) in [("a", true), ("b", false)] {
+        event!(
+            out,
+            label,
+            RevenueTokenRegistered {
+                pool: g.key(),
+                vote: g.key(),
+                revenue_token: g.key(),
+                mint: g.key(),
+                dbc_pool: g.key(),
+                share_bps: g.u16(),
+                term_epochs: g.u16(),
+                start_epoch: g.u64(),
+                term_end_epoch: g.u64(),
+                inflation_commission_bps: g.u16(),
+                block_commission_bps: g.u16(),
+            }
+        );
+        event!(
+            out,
+            label,
+            RevenueShareSwept {
+                vote: g.key(),
+                mint: g.key(),
+                epoch: g.u64(),
+                gross: g.u64(),
+                share: g.sized(),
+                after_senior_advance: flag,
+                escrow_balance: g.u64(),
+            }
+        );
+        event!(
+            out,
+            label,
+            RevenueTokenPoolSynced {
+                vote: g.key(),
+                mint: g.key(),
+                dbc_pool: g.key(),
+                damm_pool: g.key(),
+                damm_config: g.key(),
+            }
+        );
+        event!(
+            out,
+            label,
+            BuybackExecuted {
+                vote: g.key(),
+                mint: g.key(),
+                venue: if flag {
+                    BuybackVenue::Dbc
+                } else {
+                    BuybackVenue::DammV2
+                },
+                epoch: g.u64(),
+                slice: g.u8(),
+                lamports_in: g.u64(),
+                tokens_bought: g.u64(),
+                tokens_burned: g.u64(),
+                min_amount_out: g.sized(),
+                fee_free_out: g.u64(),
+                escrow_balance: g.sized(),
+            }
+        );
+        event!(
+            out,
+            label,
+            RevenueTokenRedeemed {
+                vote: g.key(),
+                mint: g.key(),
+                holder: g.key(),
+                tokens_burned: g.u64(),
+                lamports_out: g.sized(),
+                circulating_supply: g.u64(),
+                epoch: g.u64(),
+            }
+        );
+        event!(
+            out,
+            label,
+            RevenueTokenConfigured {
+                vote: g.key(),
+                slices_per_epoch: g.u8(),
+                window_slots: g.u32(),
+                max_slippage_bps: g.u16(),
+                max_impact_bps: g.u16(),
+                flags: g.u8(),
+            }
+        );
+        event!(
+            out,
+            label,
+            RevenueTokenClosed {
+                vote: g.key(),
+                mint: g.key(),
+                total_escrowed: g.u64(),
+                total_spent: g.u64(),
+                total_burned: g.u64(),
+                total_redeemed: g.sized(),
+            }
+        );
+    }
+    // Treasury claims (added later): their own sequence, so earlier vectors keep their values.
+    let g = g3;
+    for (label, kind) in [
+        ("trading_fee", TreasuryClaimKind::TradingFee),
+        ("surplus", TreasuryClaimKind::Surplus),
+        ("migration_fee", TreasuryClaimKind::MigrationFee),
+        ("leftover", TreasuryClaimKind::Leftover),
+        ("lp_fee", TreasuryClaimKind::LpFee),
+    ] {
+        event!(
+            out,
+            label,
+            TreasuryClaimed {
+                pool: g.key(),
+                kind,
+                mint: g.key(),
+                source: g.key(),
+                position: if kind == TreasuryClaimKind::LpFee {
+                    g.key()
+                } else {
+                    Pubkey::default()
+                },
+                cranker: g.key(),
+                lamports_claimed: g.u64(),
+                lamports_to_pool: g.sized(),
+                tokens_claimed: g.u64(),
+                tokens_burned: g.sized(),
+                pool_cash: g.u64(),
+                income_unallocated: g.sized(),
+            }
+        );
+    }
     J::Arr(out)
 }
 
@@ -1241,6 +1545,8 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
         |maker: Pubkey, epoch: u64| addr(&[QUOTE_SEED, maker.as_ref(), &epoch.to_le_bytes()], &pid);
     let swap =
         |quote: Pubkey, taker: Pubkey| addr(&[SWAP_SEED, quote.as_ref(), taker.as_ref()], &pid);
+    let revenue_token = addr(&[REVENUE_TOKEN_SEED, vote.as_ref()], &pid);
+    let buyback_escrow = addr(&[BUYBACK_SEED, vote.as_ref()], &pid);
 
     let mut out: Vec<Ix> = Vec::new();
 
@@ -1545,6 +1851,8 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
             advance: Some(open_advance),
             vote_program: VOTE_PROGRAM_ID,
             system_program: system,
+            revenue_token: Some(revenue_token),
+            buyback_escrow: Some(buyback_escrow),
         },
         context {}
     );
@@ -1568,6 +1876,8 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
             advance: None,
             vote_program: VOTE_PROGRAM_ID,
             system_program: system,
+            revenue_token: Some(revenue_token),
+            buyback_escrow: Some(buyback_escrow),
         },
         context {}
     );
@@ -1604,10 +1914,12 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
             clock: CLOCK,
             vote_program: VOTE_PROGRAM_ID,
             system_program: system,
+            revenue_token: Some(revenue_token),
         },
         context {}
     );
-    for (kind, bps) in [(0u8, 500u16), (1, 10_000)] {
+    // kind_1 has no revenue token: its optional slot is `None` (see `revenue_instructions`).
+    for (kind, bps, token) in [(0u8, 500u16, Some(revenue_token)), (1, 10_000, None)] {
         ix!(
             out,
             pid,
@@ -1624,6 +1936,7 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
                 vote_account: vote,
                 vote_auth,
                 vote_program: VOTE_PROGRAM_ID,
+                revenue_token: token,
             },
             context {}
         );
@@ -1820,10 +2133,425 @@ fn sweep_declared_id() -> Ix {
             advance: None,
             vote_program: VOTE_PROGRAM_ID,
             system_program: system,
+            revenue_token: None,
+            buyback_escrow: None,
         },
         context {}
     );
     out.pop().expect("one vector")
+}
+
+/// The revenue-token instructions (and the `None` revenue-token cases of `sweep` and
+/// `release_validator`). Their own generator keeps the older sections' values.
+fn revenue_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
+    let system = anchor_lang::solana_program::system_program::ID;
+    let (admin, cranker, operator, vote, payout) = (k(1), k(6), k(7), k(9), k(10));
+    let (new_withdrawer, identity, open_advance) = (k(11), k(12), k(18));
+    let (mint, dbc_pool, dbc_config, damm_pool, damm_config) = (k(32), k(33), k(34), k(35), k(36));
+    let (holder, holder_tokens) = (k(37), k(38));
+
+    let pool = addr(&[POOL_SEED], &pid);
+    let vault = addr(&[VAULT_SEED, pool.as_ref()], &pid);
+    let position = addr(&[POSITION_SEED, vote.as_ref()], &pid);
+    let vote_auth = addr(&[VOTE_AUTH_SEED, vote.as_ref()], &pid);
+    let escrow = addr(&[ESCROW_SEED, vote.as_ref()], &pid);
+    let revenue_token = addr(&[REVENUE_TOKEN_SEED, vote.as_ref()], &pid);
+    let buyback_escrow = addr(&[BUYBACK_SEED, vote.as_ref()], &pid);
+    let buyback_wsol = addr(&[BUYBACK_WSOL_SEED, vote.as_ref()], &pid);
+    let buyback_tokens = addr(&[BUYBACK_TOKENS_SEED, vote.as_ref()], &pid);
+    let partner_treasury = addr(&[PARTNER_TREASURY_SEED, pool.as_ref()], &pid);
+    // Meteora vaults: `["token_vault", mint, pool]` under each program.
+    let vault_of = |program: &Pubkey, mint: &Pubkey, pool: &Pubkey| {
+        addr(&[b"token_vault", mint.as_ref(), pool.as_ref()], program)
+    };
+    let treasury_tokens = addr(
+        &[
+            partner_treasury.as_ref(),
+            TOKEN_PROGRAM_ID.as_ref(),
+            mint.as_ref(),
+        ],
+        &ASSOCIATED_TOKEN_PROGRAM_ID,
+    );
+
+    let mut out: Vec<Ix> = Vec::new();
+    ix!(
+        out,
+        pid,
+        "sweep",
+        "revenue_token_none",
+        Sweep,
+        Sweep {
+            cranker,
+            pool,
+            vault,
+            position,
+            vote_account: vote,
+            vote_auth,
+            escrow,
+            payout,
+            advance: Some(open_advance),
+            vote_program: VOTE_PROGRAM_ID,
+            system_program: system,
+            revenue_token: None,
+            buyback_escrow: None,
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "release_validator",
+        "revenue_token_none",
+        ReleaseValidator,
+        ReleaseValidator {
+            operator,
+            pool,
+            vault,
+            position,
+            vote_account: vote,
+            vote_auth,
+            escrow,
+            new_withdrawer,
+            identity,
+            clock: CLOCK,
+            vote_program: VOTE_PROGRAM_ID,
+            system_program: system,
+            revenue_token: None,
+        },
+        context {}
+    );
+    for (label, share_bps, term_epochs) in [
+        ("default", 1_000u16, 52u16),
+        ("bounds", MAX_SHARE_BPS, MAX_TERM_EPOCHS),
+    ] {
+        ix!(
+            out,
+            pid,
+            "register_revenue_token",
+            label,
+            RegisterRevenueToken {
+                share_bps,
+                term_epochs
+            },
+            RegisterRevenueToken {
+                operator,
+                pool,
+                position,
+                vote_account: vote,
+                vote_auth,
+                revenue_token,
+                buyback_escrow,
+                buyback_tokens,
+                mint,
+                dbc_pool,
+                dbc_config,
+                partner_treasury,
+                token_program: TOKEN_PROGRAM_ID,
+                system_program: system,
+            },
+            context {}
+        );
+    }
+    ix!(
+        out,
+        pid,
+        "sync_revenue_token_pool",
+        "default",
+        SyncRevenueTokenPool,
+        SyncRevenueTokenPool {
+            cranker,
+            revenue_token,
+            dbc_pool,
+            damm_config,
+            damm_pool,
+        },
+        context { vote }
+    );
+    for (venue, slice, min_amount_out) in [
+        (BuybackVenue::Dbc, 0u8, g.u64()),
+        (BuybackVenue::DammV2, 31, u64::MAX),
+    ] {
+        let (program, pool_authority, event_authority, venue_pool) = match venue {
+            BuybackVenue::Dbc => (
+                DBC_PROGRAM_ID,
+                DBC_POOL_AUTHORITY,
+                DBC_EVENT_AUTHORITY,
+                dbc_pool,
+            ),
+            BuybackVenue::DammV2 => (
+                CP_AMM_PROGRAM_ID,
+                CP_AMM_POOL_AUTHORITY,
+                CP_AMM_EVENT_AUTHORITY,
+                damm_pool,
+            ),
+        };
+        ix!(
+            out,
+            pid,
+            "execute_buyback",
+            format!("{venue:?}"),
+            ExecuteBuyback {
+                slice,
+                min_amount_out
+            },
+            ExecuteBuyback {
+                cranker,
+                revenue_token,
+                buyback_escrow,
+                buyback_wsol,
+                buyback_tokens,
+                mint,
+                wsol_mint: NATIVE_MINT,
+                dbc_config,
+                venue_pool,
+                venue_token_vault: vault_of(&program, &mint, &venue_pool),
+                venue_quote_vault: vault_of(&program, &NATIVE_MINT, &venue_pool),
+                venue_pool_authority: pool_authority,
+                venue_event_authority: event_authority,
+                venue_program: program,
+                token_program: TOKEN_PROGRAM_ID,
+                system_program: system,
+            },
+            context { vote, venue }
+        );
+    }
+    for (label, graduated, amount) in [("curve", false, g.u64()), ("graduated", true, 1u64)] {
+        ix!(
+            out,
+            pid,
+            "redeem",
+            label,
+            Redeem { amount },
+            Redeem {
+                holder,
+                holder_tokens,
+                revenue_token,
+                buyback_escrow,
+                buyback_tokens,
+                mint,
+                dbc_pool,
+                dbc_base_vault: vault_of(&DBC_PROGRAM_ID, &mint, &dbc_pool),
+                damm_pool: graduated.then_some(damm_pool),
+                damm_token_vault: graduated.then(|| vault_of(
+                    &CP_AMM_PROGRAM_ID,
+                    &mint,
+                    &damm_pool
+                )),
+                treasury_tokens: graduated.then_some(treasury_tokens),
+                token_program: TOKEN_PROGRAM_ID,
+                system_program: system,
+            },
+            context { vote }
+        );
+    }
+    for (label, params) in [
+        ("default", BuybackParams::default()),
+        (
+            "edges",
+            BuybackParams {
+                slices_per_epoch: MAX_BUYBACK_SLICES,
+                window_slots: u32::MAX,
+                max_slippage_bps: MAX_MAX_SLIPPAGE_BPS,
+                max_impact_bps: MIN_MAX_IMPACT_BPS,
+                flags: FLAG_BUYBACKS_PAUSED | FLAG_REDEEM_DURING_TERM,
+            },
+        ),
+    ] {
+        ix!(
+            out,
+            pid,
+            "configure_revenue_token",
+            label,
+            ConfigureRevenueToken { params },
+            ConfigureRevenueToken {
+                admin,
+                pool,
+                revenue_token
+            },
+            context { vote }
+        );
+    }
+    ix!(
+        out,
+        pid,
+        "close_revenue_token",
+        "default",
+        CloseRevenueToken,
+        CloseRevenueToken {
+            cranker,
+            operator,
+            revenue_token,
+            buyback_escrow,
+            buyback_tokens,
+            mint,
+            position,
+            token_program: TOKEN_PROGRAM_ID,
+            system_program: system,
+        },
+        context { vote }
+    );
+    out
+}
+
+// ─── Treasury claims ───────────────────────────────────────────────────────
+
+fn treasury_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
+    let system = anchor_lang::solana_program::system_program::ID;
+    let cranker = k(6);
+    let (mint, dbc_pool, dbc_config) = (g.key(), g.key(), g.key());
+    let (damm_pool, position, nft_mint) = (g.key(), g.key(), g.key());
+
+    let pool = addr(&[POOL_SEED], &pid);
+    let vault = addr(&[VAULT_SEED, pool.as_ref()], &pid);
+    let treasury = addr(&[PARTNER_TREASURY_SEED, pool.as_ref()], &pid);
+    let treasury_wsol = addr(&[TREASURY_WSOL_SEED, pool.as_ref()], &pid);
+    let treasury_tokens = addr(
+        &[treasury.as_ref(), TOKEN_PROGRAM_ID.as_ref(), mint.as_ref()],
+        &ASSOCIATED_TOKEN_PROGRAM_ID,
+    );
+    let vault_of = |program: &Pubkey, mint: &Pubkey, pool: &Pubkey| {
+        addr(&[b"token_vault", mint.as_ref(), pool.as_ref()], program)
+    };
+    let base_vault = vault_of(&DBC_PROGRAM_ID, &mint, &dbc_pool);
+    let quote_vault = vault_of(&DBC_PROGRAM_ID, &NATIVE_MINT, &dbc_pool);
+    let token_a_vault = vault_of(&CP_AMM_PROGRAM_ID, &mint, &damm_pool);
+    let token_b_vault = vault_of(&CP_AMM_PROGRAM_ID, &NATIVE_MINT, &damm_pool);
+    let position_nft_account = addr(
+        &[CP_AMM_POSITION_NFT_ACCOUNT_SEED, nft_mint.as_ref()],
+        &CP_AMM_PROGRAM_ID,
+    );
+
+    let mut out: Vec<Ix> = Vec::new();
+    ix!(
+        out,
+        pid,
+        "claim_partner_trading_fee",
+        "default",
+        ClaimPartnerTradingFee,
+        ClaimPartnerTradingFee {
+            cranker,
+            pool,
+            vault,
+            treasury,
+            treasury_wsol,
+            treasury_tokens,
+            dbc_pool,
+            dbc_config,
+            base_vault,
+            quote_vault,
+            base_mint: mint,
+            wsol_mint: NATIVE_MINT,
+            dbc_pool_authority: DBC_POOL_AUTHORITY,
+            dbc_event_authority: DBC_EVENT_AUTHORITY,
+            dbc_program: DBC_PROGRAM_ID,
+            token_program: TOKEN_PROGRAM_ID,
+            associated_token_program: ASSOCIATED_TOKEN_PROGRAM_ID,
+            system_program: system,
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "claim_partner_surplus",
+        "default",
+        ClaimPartnerSurplus,
+        ClaimPartnerQuote {
+            cranker,
+            pool,
+            vault,
+            treasury,
+            treasury_wsol,
+            dbc_pool,
+            dbc_config,
+            quote_vault,
+            wsol_mint: NATIVE_MINT,
+            dbc_pool_authority: DBC_POOL_AUTHORITY,
+            dbc_event_authority: DBC_EVENT_AUTHORITY,
+            dbc_program: DBC_PROGRAM_ID,
+            token_program: TOKEN_PROGRAM_ID,
+            system_program: system,
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "claim_partner_migration_fee",
+        "default",
+        ClaimPartnerMigrationFee,
+        ClaimPartnerQuote {
+            cranker,
+            pool,
+            vault,
+            treasury,
+            treasury_wsol,
+            dbc_pool,
+            dbc_config,
+            quote_vault,
+            wsol_mint: NATIVE_MINT,
+            dbc_pool_authority: DBC_POOL_AUTHORITY,
+            dbc_event_authority: DBC_EVENT_AUTHORITY,
+            dbc_program: DBC_PROGRAM_ID,
+            token_program: TOKEN_PROGRAM_ID,
+            system_program: system,
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "burn_leftover",
+        "default",
+        BurnLeftover,
+        BurnLeftover {
+            cranker,
+            pool,
+            treasury,
+            treasury_tokens,
+            dbc_pool,
+            dbc_config,
+            base_vault,
+            base_mint: mint,
+            dbc_pool_authority: DBC_POOL_AUTHORITY,
+            dbc_event_authority: DBC_EVENT_AUTHORITY,
+            dbc_program: DBC_PROGRAM_ID,
+            token_program: TOKEN_PROGRAM_ID,
+            associated_token_program: ASSOCIATED_TOKEN_PROGRAM_ID,
+            system_program: system,
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "claim_treasury_lp_fee",
+        "default",
+        ClaimTreasuryLpFee,
+        ClaimTreasuryLpFee {
+            cranker,
+            pool,
+            vault,
+            treasury,
+            treasury_wsol,
+            treasury_tokens,
+            damm_pool,
+            position,
+            position_nft_account,
+            token_a_vault,
+            token_b_vault,
+            token_a_mint: mint,
+            wsol_mint: NATIVE_MINT,
+            damm_pool_authority: CP_AMM_POOL_AUTHORITY,
+            damm_event_authority: CP_AMM_EVENT_AUTHORITY,
+            damm_program: CP_AMM_PROGRAM_ID,
+            token_program: TOKEN_PROGRAM_ID,
+            associated_token_program: ASSOCIATED_TOKEN_PROGRAM_ID,
+            system_program: system,
+        },
+        context { nft_mint }
+    );
+    out
 }
 
 // ─── PDAs ──────────────────────────────────────────────────────────────────
@@ -1916,6 +2644,26 @@ fn pdas(pid: &Pubkey) -> J {
             &[SWAP_SEED, quote.as_ref(), taker.as_ref()],
         );
     }
+    for vote in [k(9), k(77)] {
+        for (kind, seed) in [
+            ("revenueToken", REVENUE_TOKEN_SEED),
+            ("buyback", BUYBACK_SEED),
+            ("buybackWsol", BUYBACK_WSOL_SEED),
+            ("buybackTokens", BUYBACK_TOKENS_SEED),
+        ] {
+            push(kind, vec![("vote", vote.j())], &[seed, vote.as_ref()]);
+        }
+    }
+    push(
+        "partnerTreasury",
+        vec![("pool", pool.j())],
+        &[PARTNER_TREASURY_SEED, pool.as_ref()],
+    );
+    push(
+        "treasuryWsol",
+        vec![("pool", pool.j())],
+        &[TREASURY_WSOL_SEED, pool.as_ref()],
+    );
     J::Arr(out)
 }
 
@@ -1992,6 +2740,42 @@ fn errors() -> J {
         QuoteHasOpenSwaps,
         AlreadySettled,
         NotMaker,
+        RevenueTokenExists,
+        ShareOutOfRange,
+        TermOutOfRange,
+        InvalidRevenueMint,
+        InvalidDbcPool,
+        InvalidDbcConfig,
+        RevenueTokenMismatch,
+        RevenueTokenAccountsMissing,
+        RevenueTokenTermActive,
+        CommissionBelowSnapshot,
+        PoolNotMigrated,
+        InvalidDammPool,
+        PoolNotSynced,
+        VenueNotTrading,
+        InvalidVenueAccount,
+        OutsideBuybackWindow,
+        SliceNotDue,
+        SliceAlreadyExecuted,
+        InvalidSlice,
+        SweepPending,
+        NothingToBuy,
+        MinOutTooLow,
+        BuybackOutputTooLow,
+        BuybacksPaused,
+        RedeemNotAllowed,
+        RedeemTooLarge,
+        EscrowNotEmpty,
+        InvalidBuybackParams,
+        NotTreasuryFeeClaimer,
+        NotTreasuryLeftoverReceiver,
+        NotTreasuryPosition,
+        NothingToClaim,
+        ClaimNotReady,
+        AlreadyClaimed,
+        UnsupportedClaimPool,
+        InvalidClaimAccount,
     ))
 }
 
@@ -2018,7 +2802,7 @@ fn bps_samples() -> Vec<u16> {
 }
 
 #[allow(clippy::too_many_lines)]
-fn math(g: &mut Gen) -> J {
+fn math(g: &mut Gen, g2: &mut Gen, g3: &mut Gen) -> J {
     let mut out: Vec<(&str, J)> = Vec::new();
 
     // bps_of / bps_of_ceil: every edge amount × every edge bps, plus random pairs.
@@ -2400,7 +3184,502 @@ fn math(g: &mut Gen) -> J {
     }
     out.push(("compute_score", J::Arr(score)));
 
+    out.extend(revenue_math(g2));
+    out.extend(treasury_math(g3));
     obj(out)
+}
+
+fn treasury_math(g: &mut Gen) -> Vec<(&'static str, J)> {
+    let mut out: Vec<(&'static str, J)> = Vec::new();
+    let pcts = [0u8, 1, 20, 50, 70, 99, 100, 101, u8::MAX];
+
+    // dbc_partner_part; args = [fee, creator_trading_fee_percentage]
+    let mut part = Vec::new();
+    for fee in [0u64, 1, 99, 100, 1_001, 1 << 53, u64::MAX, g.sized()] {
+        for pct in pcts {
+            part.push(case(
+                vec![fee.j(), pct.j()],
+                math::dbc_partner_part(fee, pct).j(),
+            ));
+        }
+    }
+    out.push(("dbc_partner_part", J::Arr(part)));
+
+    // dbc_partner_surplus; args = [quote_reserve, threshold, creator_trading_fee_percentage]
+    let mut surplus = Vec::new();
+    for (reserve, threshold) in [
+        (999u64, 1_000u64),
+        (1_000, 1_000),
+        (2_001, 1_000),
+        (10_100_000_000, 10_000_000_000),
+        (u64::MAX, 0),
+        (u64::MAX, u64::MAX - 1),
+        (g.sized(), g.sized()),
+    ] {
+        for pct in [0u8, 30, 50, 100, 101] {
+            surplus.push(case(
+                vec![reserve.j(), threshold.j(), pct.j()],
+                math::dbc_partner_surplus(reserve, threshold, pct).j(),
+            ));
+        }
+    }
+    out.push(("dbc_partner_surplus", J::Arr(surplus)));
+
+    // dbc_partner_migration_fee; args = [threshold, migration_fee_percentage, creator_migration_fee_percentage]
+    let mut migration = Vec::new();
+    for threshold in [0u64, 999, 1_000, 10_000_000_000, u64::MAX, g.sized()] {
+        for (fee_pct, creator_pct) in [
+            (0u8, 0u8),
+            (7, 70),
+            (10, 50),
+            (50, 0),
+            (100, 100),
+            (101, 0),
+            (u8::MAX, 1),
+        ] {
+            migration.push(case(
+                vec![threshold.j(), fee_pct.j(), creator_pct.j()],
+                math::dbc_partner_migration_fee(threshold, fee_pct, creator_pct).j(),
+            ));
+        }
+    }
+    out.push(("dbc_partner_migration_fee", J::Arr(migration)));
+
+    // dbc_leftover; args = [base_vault, partner_base_fee, protocol_base_fee, creator_base_fee, protocol_migration_base_fee]
+    let mut leftover = Vec::new();
+    let mut rows: Vec<[u64; 5]> = vec![
+        [1_000, 10, 20, 30, 40],
+        [100, 10, 20, 30, 40],
+        [99, 10, 20, 30, 40],
+        [u64::MAX, u64::MAX, 1, 0, 0],
+        [u64::MAX, 0, 0, 0, u64::MAX],
+        [0, 0, 0, 0, 0],
+        [500_000_000_000_000, 31_637_637_373, 0, 0, 43_800_000_455],
+    ];
+    for _ in 0..8 {
+        let vault = g.sized();
+        rows.push([vault, vault / 7, vault / 11, vault / 13, vault / 5]);
+    }
+    for r in rows {
+        leftover.push(case(
+            r.iter().map(ToJ::j).collect(),
+            math::dbc_leftover(r[0], r[1], r[2], r[3], r[4]).j(),
+        ));
+    }
+    out.push(("dbc_leftover", J::Arr(leftover)));
+    out
+}
+
+fn fill_json(f: math::BuyFill) -> J {
+    obj(vec![
+        ("output", f.output.j()),
+        ("consumed", f.consumed.j()),
+        ("next_sqrt_price", f.next_sqrt_price.j()),
+    ])
+}
+
+fn curve_json(curve: &[CurvePoint]) -> J {
+    J::Arr(
+        curve
+            .iter()
+            .map(|p| {
+                obj(vec![
+                    ("sqrt_price", p.sqrt_price.j()),
+                    ("liquidity", p.liquidity.j()),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// Q64.64 √P of a price in lamports per raw token unit, as DBC configs hold it.
+fn sqrt_q64(price: f64) -> u128 {
+    (price.sqrt() * 18_446_744_073_709_551_616.0) as u128
+}
+
+/// Revenue-token and Meteora math (`math::revenue_token`, `math::amm`).
+#[allow(clippy::too_many_lines)]
+fn revenue_math(g: &mut Gen) -> Vec<(&'static str, J)> {
+    let mut out: Vec<(&'static str, J)> = Vec::new();
+
+    // split_sweep_with_share; args = [gross, share_bps, outstanding, remit_bps, full_remit, senior_advance]
+    let mut cases: Vec<(u64, u16, u64, u16, bool, bool)> = vec![
+        (10_000, 1_000, 1_000_000, 5_000, false, false),
+        (10_000, 1_000, 0, 0, false, false),
+        (10_000, 2_500, 1_000_000, 5_000, true, false),
+        (10_000, 0, 1_000_000, 5_000, false, false),
+        (10_000, 1_000, 1_000_000, 5_000, false, true),
+        (10_000, 1_000, 1_000_000, 5_000, true, true),
+        (10_000, 5_000, 1_000_000, 8_000, false, true),
+        (u64::MAX, 5_000, u64::MAX, 10_000, false, false),
+        (u64::MAX, u16::MAX, 0, 0, false, false),
+        (u64::MAX, 10_001, 5, 0, false, false),
+        (0, 5_000, 0, 0, true, true),
+    ];
+    for _ in 0..40 {
+        cases.push((
+            g.sized(),
+            g.u16() % 5_200,
+            g.sized(),
+            g.u16() % 10_500,
+            g.u8() % 4 == 0,
+            g.u8() % 2 == 0,
+        ));
+    }
+    out.push((
+        "split_sweep_with_share",
+        J::Arr(
+            cases
+                .into_iter()
+                .map(|(gross, share, outstanding, remit, full, senior)| {
+                    let r = math::split_sweep_with_share(
+                        gross,
+                        share,
+                        outstanding,
+                        remit,
+                        full,
+                        senior,
+                    )
+                    .map(|x| {
+                        obj(vec![
+                            ("share", x.share.j()),
+                            ("remit", x.remit.j()),
+                            ("to_operator", x.to_operator.j()),
+                        ])
+                    });
+                    case(
+                        vec![
+                            gross.j(),
+                            share.j(),
+                            outstanding.j(),
+                            remit.j(),
+                            full.j(),
+                            senior.j(),
+                        ],
+                        r.unwrap_or(J::Null),
+                    )
+                })
+                .collect(),
+        ),
+    ));
+
+    // slice_due_slot and slice_timing; args = [slice, slices, window_slots] / [slot_index, ...]
+    let mut due = Vec::new();
+    let mut timing = Vec::new();
+    let windows = [0u32, 1, 4, 9_000, 431_999, u32::MAX];
+    for slices in [0u8, 1, 4, 12, 32, u8::MAX] {
+        for window in windows {
+            for slice in [0u8, 1, slices.saturating_sub(1), slices, u8::MAX] {
+                due.push(case(
+                    vec![slice.j(), slices.j(), window.j()],
+                    math::slice_due_slot(slice, slices, window).j(),
+                ));
+                let start = math::slice_due_slot(slice, slices, window).unwrap_or(0);
+                for slot in [
+                    0u64,
+                    start.saturating_sub(1),
+                    start,
+                    u64::from(window),
+                    u64::MAX,
+                ] {
+                    let t = math::slice_timing(slot, slice, slices, window).map(|t| match t {
+                        SliceTiming::Due => s("Due"),
+                        SliceTiming::NotDue => s("NotDue"),
+                        SliceTiming::WindowClosed => s("WindowClosed"),
+                    });
+                    timing.push(case(
+                        vec![slot.j(), slice.j(), slices.j(), window.j()],
+                        t.unwrap_or(J::Null),
+                    ));
+                }
+            }
+        }
+    }
+    out.push(("slice_due_slot", J::Arr(due)));
+    out.push(("slice_timing", J::Arr(timing)));
+
+    // slice_budget; args = [epoch_budget, epoch_spent, slices, slices_done, escrow_available]
+    let mut budget_cases: Vec<(u64, u64, u8, u32, u64)> = vec![
+        (12_000, 0, 12, 0, 12_000),
+        (12_000, 5_000, 12, 0b11111, 7_000),
+        (12_000, 4_000, 12, 0b11111, 8_000),
+        (12_000, 11_500, 12, (1 << 11) - 1, 500),
+        (12_000, 0, 12, 0, 600),
+        (12_000, 0, 12, (1 << 12) - 1, 12_000),
+        (100, 150, 4, 1, 500),
+        (u64::MAX, 0, 1, 0, u64::MAX),
+        (u64::MAX, 1, 32, u32::MAX >> 1, u64::MAX),
+        (5, 0, 2, u32::MAX, 5),
+        (5, 0, 0, 0, 5),
+    ];
+    for _ in 0..30 {
+        let slices = g.u8() % 33;
+        budget_cases.push((
+            g.sized(),
+            g.sized(),
+            slices,
+            g.u32() >> (g.u8() % 32),
+            g.sized(),
+        ));
+    }
+    out.push((
+        "slice_budget",
+        J::Arr(
+            budget_cases
+                .into_iter()
+                .map(|(b, spent, slices, done, escrow)| {
+                    case(
+                        vec![b.j(), spent.j(), slices.j(), done.j(), escrow.j()],
+                        math::slice_budget(b, spent, slices, done, escrow).j(),
+                    )
+                })
+                .collect(),
+        ),
+    ));
+
+    // redeem_payout; args = [escrow_available, amount, circulating]
+    let mut redeem_cases: Vec<(u64, u64, u64)> = vec![
+        (1_000, 250, 1_000),
+        (1_000, 1, 3),
+        (1_000, 1_001, 1_000),
+        (0, 5, 10),
+        (1, 0, 0),
+        (u64::MAX, u64::MAX, u64::MAX),
+        (u64::MAX, 1, u64::MAX),
+    ];
+    for _ in 0..20 {
+        let circulating = g.sized();
+        redeem_cases.push((g.sized(), circulating >> (g.u8() % 8), circulating));
+    }
+    out.push((
+        "redeem_payout",
+        J::Arr(
+            redeem_cases
+                .into_iter()
+                .map(|(e, a, c)| case(vec![e.j(), a.j(), c.j()], math::redeem_payout(e, a, c).j()))
+                .collect(),
+        ),
+    ));
+
+    // The Meteora curve math, at realistic Q64.64 prices (1e-9 to 1e-3 lamports per raw unit)
+    // and at the u128 edges.
+    let q64: u128 = 1 << 64;
+    let prices: Vec<u128> = vec![
+        sqrt_q64(1e-9),
+        sqrt_q64(2.5e-8),
+        sqrt_q64(1e-6),
+        sqrt_q64(1e-3),
+        q64,
+        2 * q64,
+        u128::MAX >> 1,
+        u128::MAX,
+        0,
+        1,
+    ];
+    let liquidities: Vec<u128> = vec![0, 1, 1_000_000_000u128 << 65, 1 << 100, u128::MAX];
+    let mut delta_base = Vec::new();
+    let mut delta_quote = Vec::new();
+    let mut next_sqrt = Vec::new();
+    for (i, lower) in prices.iter().enumerate() {
+        for upper in prices.iter().skip(i.saturating_sub(1)).take(3) {
+            for l in &liquidities {
+                for round_up in [false, true] {
+                    delta_base.push(case(
+                        vec![lower.j(), upper.j(), l.j(), round_up.j()],
+                        math::delta_base(*lower, *upper, *l, round_up).j(),
+                    ));
+                    delta_quote.push(case(
+                        vec![lower.j(), upper.j(), l.j(), round_up.j()],
+                        math::delta_quote(*lower, *upper, *l, round_up).j(),
+                    ));
+                }
+            }
+        }
+        for l in &liquidities {
+            for amount in [0u64, 1, 1_000_000_000, u64::MAX] {
+                next_sqrt.push(case(
+                    vec![lower.j(), l.j(), amount.j()],
+                    math::next_sqrt_from_quote_in(*lower, *l, amount).j(),
+                ));
+            }
+        }
+    }
+    for _ in 0..20 {
+        let a = u128::from(g.u64()) << (g.u8() % 64);
+        let b = a.saturating_add(u128::from(g.sized()) << (g.u8() % 40));
+        let l = u128::from(g.u64()) << (g.u8() % 64);
+        delta_base.push(case(
+            vec![a.j(), b.j(), l.j(), false.j()],
+            math::delta_base(a, b, l, false).j(),
+        ));
+        delta_quote.push(case(
+            vec![a.j(), b.j(), l.j(), true.j()],
+            math::delta_quote(a, b, l, true).j(),
+        ));
+        let amount = g.sized();
+        next_sqrt.push(case(
+            vec![a.j(), l.j(), amount.j()],
+            math::next_sqrt_from_quote_in(a, l, amount).j(),
+        ));
+    }
+    out.push(("delta_base", J::Arr(delta_base)));
+    out.push(("delta_quote", J::Arr(delta_quote)));
+    out.push(("next_sqrt_from_quote_in", J::Arr(next_sqrt)));
+
+    // DBC curves: a two-segment toy curve and a revenue-anchored 3-point curve (start 2.5e-8,
+    // migration 1e-7 SOL per raw unit; liquidity sized for ~10 SOL per segment).
+    let toy = vec![
+        CurvePoint {
+            sqrt_price: 2 * q64,
+            liquidity: 1_000_000_000u128 << 65,
+        },
+        CurvePoint {
+            sqrt_price: 4 * q64,
+            liquidity: 2_000_000_000u128 << 65,
+        },
+        CurvePoint::default(),
+    ];
+    let (s0, s1, s2, s3) = (
+        sqrt_q64(2.5e-8),
+        sqrt_q64(5e-8),
+        sqrt_q64(7.5e-8),
+        sqrt_q64(1e-7),
+    );
+    let seg = |from: u128, to: u128, quote: u64| -> u128 {
+        // L = Δquote × 2^128 / Δ√P
+        let (q, _) = U256::shl128(u128::from(quote))
+            .div_rem(U256::from_u128(to - from))
+            .expect("nonzero");
+        q.to_u128().expect("fits")
+    };
+    let real = vec![
+        CurvePoint {
+            sqrt_price: s1,
+            liquidity: seg(s0, s1, 3_000_000_000),
+        },
+        CurvePoint {
+            sqrt_price: s2,
+            liquidity: seg(s1, s2, 3_500_000_000),
+        },
+        CurvePoint {
+            sqrt_price: s3,
+            liquidity: seg(s2, s3, 4_000_000_000),
+        },
+    ];
+    let mut dbc_buy = Vec::new();
+    let mut dbc_max = Vec::new();
+    for (curve, start, stop) in [
+        (&toy, q64, 4 * q64),
+        (&toy, q64, 3 * q64),
+        (&toy, 3 * q64, 3 * q64),
+        (&real, s0, s3),
+        (&real, s1 + 12_345, s3),
+        (&real, s2, s2 + (s3 - s2) / 2),
+    ] {
+        for amount in [
+            0u64,
+            1,
+            9_999_999,
+            1_000_000_000,
+            6_000_000_000,
+            50_000_000_000,
+            u64::MAX,
+        ] {
+            dbc_buy.push(case(
+                vec![curve_json(curve), start.j(), stop.j(), amount.j()],
+                math::dbc_buy(curve, start, stop, amount)
+                    .map(fill_json)
+                    .unwrap_or(J::Null),
+            ));
+        }
+        for bps in [0u16, 10, 100, 1_000, u16::MAX] {
+            let target = math::impact_target_sqrt_price(start, bps).unwrap_or(u128::MAX);
+            dbc_max.push(case(
+                vec![curve_json(curve), start.j(), stop.j(), target.j()],
+                math::dbc_max_quote_in(curve, start, stop, target).j(),
+            ));
+        }
+    }
+    out.push(("dbc_buy", J::Arr(dbc_buy)));
+    out.push(("dbc_max_quote_in", J::Arr(dbc_max)));
+
+    // DAMM v2: concentrated (√P, L, √P_max) and compounding (reserves).
+    let mut conc_buy = Vec::new();
+    let mut conc_max = Vec::new();
+    for (sqrt, l, max) in [
+        (q64, 1_000_000_000u128 << 65, u128::MAX),
+        (q64, 1_000_000_000u128 << 65, q64 + 1),
+        (s3, 1u128 << 90, sqrt_q64(1e-3)),
+        (sqrt_q64(1e-6), 1u128 << 70, u128::MAX),
+        (q64, 0, u128::MAX),
+    ] {
+        for amount in [0u64, 1, 2_000_000_000, 1 << 40, u64::MAX] {
+            conc_buy.push(case(
+                vec![sqrt.j(), l.j(), max.j(), amount.j()],
+                math::damm_concentrated_buy(sqrt, l, max, amount)
+                    .map(fill_json)
+                    .unwrap_or(J::Null),
+            ));
+        }
+        for bps in [0u16, 10, 100, 1_000] {
+            let target = math::impact_target_sqrt_price(sqrt, bps).unwrap_or(u128::MAX);
+            conc_max.push(case(
+                vec![sqrt.j(), l.j(), max.j(), target.j()],
+                math::damm_concentrated_max_quote_in(sqrt, l, max, target).j(),
+            ));
+        }
+    }
+    out.push(("damm_concentrated_buy", J::Arr(conc_buy)));
+    out.push(("damm_concentrated_max_quote_in", J::Arr(conc_max)));
+    let mut comp_buy = Vec::new();
+    let mut comp_max = Vec::new();
+    for (a, b) in [
+        (1_000u64, 1_000u64),
+        (0, 0),
+        (u64::MAX, u64::MAX),
+        (500_000_000_000_000, 80_000_000_000),
+        (g.sized(), g.sized()),
+    ] {
+        for amount in [0u64, 1, 1_000, 2_000_000_000, u64::MAX] {
+            comp_buy.push(case(
+                vec![a.j(), b.j(), amount.j()],
+                math::damm_compounding_buy(a, b, amount)
+                    .map(fill_json)
+                    .unwrap_or(J::Null),
+            ));
+        }
+        for bps in [0u16, 10, 100, 1_000, u16::MAX] {
+            comp_max.push(case(
+                vec![b.j(), bps.j()],
+                math::damm_compounding_max_quote_in(b, bps).j(),
+            ));
+        }
+    }
+    out.push(("damm_compounding_buy", J::Arr(comp_buy)));
+    out.push(("damm_compounding_max_quote_in", J::Arr(comp_max)));
+
+    // impact_target_sqrt_price and min_out_floor
+    let mut target = Vec::new();
+    for sqrt in prices.iter().copied().chain([u128::MAX - 7]) {
+        for bps in [0u16, 1, 10, 100, 1_000, u16::MAX] {
+            target.push(case(
+                vec![sqrt.j(), bps.j()],
+                math::impact_target_sqrt_price(sqrt, bps).j(),
+            ));
+        }
+    }
+    out.push(("impact_target_sqrt_price", J::Arr(target)));
+    let mut floor = Vec::new();
+    for out_amount in [0u64, 1, 999, 1_000, 1_001, 1 << 53, u64::MAX, g.sized()] {
+        for bps in [0u16, 50, 300, 2_000, 9_999, 10_000, 10_001, u16::MAX] {
+            floor.push(case(
+                vec![out_amount.j(), bps.j()],
+                math::min_out_floor(out_amount, bps).j(),
+            ));
+        }
+    }
+    out.push(("min_out_floor", J::Arr(floor)));
+    out
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -2413,12 +3692,27 @@ fn main() {
 
     let program_id = Pubkey::new_from_array([42u8; 32]);
     let mut g = Gen(0x0e70_c4e9_5d1c_0001);
+    // Revenue tokens (added later) draw from their own sequence, so the older vectors keep
+    // their values and the fixture diff shows only what changed.
+    let mut g2 = Gen(0x0e70_c4e9_5d1c_0002);
+    // Treasury claims (added after that): a third sequence, for the same reason.
+    let mut g3 = Gen(0x0e70_c4e9_5d1c_0003);
 
     let mut ixs: Vec<J> = instructions(&mut g, program_id)
         .into_iter()
         .map(Ix::json)
         .collect();
     ixs.push(sweep_declared_id().json());
+    ixs.extend(
+        revenue_instructions(&mut g2, program_id)
+            .into_iter()
+            .map(Ix::json),
+    );
+    ixs.extend(
+        treasury_instructions(&mut g3, program_id)
+            .into_iter()
+            .map(Ix::json),
+    );
 
     let root = obj(vec![
         (
@@ -2443,6 +3737,12 @@ fn main() {
                 ("feeIndex", s(String::from_utf8_lossy(FEE_INDEX_SEED))),
                 ("quote", s(String::from_utf8_lossy(QUOTE_SEED))),
                 ("swap", s(String::from_utf8_lossy(SWAP_SEED))),
+                ("revenueToken", s(String::from_utf8_lossy(REVENUE_TOKEN_SEED))),
+                ("buyback", s(String::from_utf8_lossy(BUYBACK_SEED))),
+                ("buybackWsol", s(String::from_utf8_lossy(BUYBACK_WSOL_SEED))),
+                ("buybackTokens", s(String::from_utf8_lossy(BUYBACK_TOKENS_SEED))),
+                ("partnerTreasury", s(String::from_utf8_lossy(PARTNER_TREASURY_SEED))),
+                ("treasuryWsol", s(String::from_utf8_lossy(TREASURY_WSOL_SEED))),
             ]),
         ),
         (
@@ -2458,14 +3758,45 @@ fn main() {
                 ("DEFAULT_AFTER_LATE_EPOCHS", DEFAULT_AFTER_LATE_EPOCHS.j()),
                 ("INDEX_HISTORY", J::Int(INDEX_HISTORY as i64)),
                 ("VOTE_PROGRAM_ID", VOTE_PROGRAM_ID.j()),
+                ("MIN_SHARE_BPS", MIN_SHARE_BPS.j()),
+                ("MAX_SHARE_BPS", MAX_SHARE_BPS.j()),
+                ("MIN_TERM_EPOCHS", MIN_TERM_EPOCHS.j()),
+                ("MAX_TERM_EPOCHS", MAX_TERM_EPOCHS.j()),
+                ("DEFAULT_BUYBACK_SLICES", DEFAULT_BUYBACK_SLICES.j()),
+                ("DEFAULT_BUYBACK_WINDOW_SLOTS", DEFAULT_BUYBACK_WINDOW_SLOTS.j()),
+                ("MAX_BUYBACK_SLICES", MAX_BUYBACK_SLICES.j()),
+                ("DEFAULT_MAX_SLIPPAGE_BPS", DEFAULT_MAX_SLIPPAGE_BPS.j()),
+                ("MIN_MAX_SLIPPAGE_BPS", MIN_MAX_SLIPPAGE_BPS.j()),
+                ("MAX_MAX_SLIPPAGE_BPS", MAX_MAX_SLIPPAGE_BPS.j()),
+                ("DEFAULT_MAX_IMPACT_BPS", DEFAULT_MAX_IMPACT_BPS.j()),
+                ("MIN_MAX_IMPACT_BPS", MIN_MAX_IMPACT_BPS.j()),
+                ("MAX_MAX_IMPACT_BPS", MAX_MAX_IMPACT_BPS.j()),
+                ("MAX_CLOSE_DUST_LAMPORTS", MAX_CLOSE_DUST_LAMPORTS.j()),
+                ("FLAG_BUYBACKS_PAUSED", FLAG_BUYBACKS_PAUSED.j()),
+                ("FLAG_REDEEM_DURING_TERM", FLAG_REDEEM_DURING_TERM.j()),
+                ("DBC_PROGRAM_ID", DBC_PROGRAM_ID.j()),
+                ("DBC_POOL_AUTHORITY", DBC_POOL_AUTHORITY.j()),
+                ("DBC_EVENT_AUTHORITY", DBC_EVENT_AUTHORITY.j()),
+                ("CP_AMM_PROGRAM_ID", CP_AMM_PROGRAM_ID.j()),
+                ("CP_AMM_POOL_AUTHORITY", CP_AMM_POOL_AUTHORITY.j()),
+                ("CP_AMM_EVENT_AUTHORITY", CP_AMM_EVENT_AUTHORITY.j()),
+                ("TOKEN_PROGRAM_ID", TOKEN_PROGRAM_ID.j()),
+                ("ASSOCIATED_TOKEN_PROGRAM_ID", ASSOCIATED_TOKEN_PROGRAM_ID.j()),
+                ("NATIVE_MINT", NATIVE_MINT.j()),
+                ("INSTRUCTIONS_SYSVAR_ID", INSTRUCTIONS_SYSVAR_ID.j()),
+                ("TOKEN_2022_PROGRAM_ID", TOKEN_2022_PROGRAM_ID.j()),
+                ("CP_AMM_POSITION_NFT_ACCOUNT_SEED", s(String::from_utf8_lossy(CP_AMM_POSITION_NFT_ACCOUNT_SEED))),
+                ("DBC_MIGRATION_PROGRESS_CREATED_POOL", DBC_MIGRATION_PROGRESS_CREATED_POOL.j()),
+                ("DBC_PARTNER_MIGRATION_FEE_MASK", DBC_PARTNER_MIGRATION_FEE_MASK.j()),
+                ("DBC_PARTNER_AND_CREATOR_SURPLUS_SHARE", J::Int(DBC_PARTNER_AND_CREATOR_SURPLUS_SHARE as i64)),
             ]),
         ),
-        ("accounts", accounts(&mut g)),
+        ("accounts", accounts(&mut g, &mut g2)),
         ("instructions", J::Arr(ixs)),
-        ("events", events(&mut g)),
+        ("events", events(&mut g, &mut g2, &mut g3)),
         ("pdas", pdas(&program_id)),
         ("errors", errors()),
-        ("math", math(&mut g)),
+        ("math", math(&mut g, &mut g2, &mut g3)),
     ]);
 
     let mut text = String::new();

@@ -1,5 +1,5 @@
 /**
- * Instruction builders for all 29 instructions in `programs/epoch/src/lib.rs`.
+ * Instruction builders for all 40 instructions in `programs/epoch/src/lib.rs`.
  *
  * Accounts are listed in the exact order of each Rust `#[derive(Accounts)]` struct, with its signer and `mut`
  * flags; PDAs are derived from `programId`. Data is `discriminator ++ borsh(args)` in `lib.rs` argument order.
@@ -18,17 +18,36 @@ import {
 
 import { type PoolParams, writePoolParams } from './accounts';
 import { BorshWriter, U64_MAX } from './borsh';
-import { SIDES, type Side, type Tranche, TRANCHES, VOTE_PROGRAM_ID } from './constants';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  INSTRUCTIONS_SYSVAR_ID,
+  METEORA,
+  NATIVE_MINT,
+  SIDES,
+  type Side,
+  TOKEN_PROGRAM_ID,
+  type Tranche,
+  TRANCHES,
+  VOTE_PROGRAM_ID,
+} from './constants';
 import { INSTRUCTION_DISCRIMINATORS, type InstructionName } from './discriminators';
 import {
   findAdvancePda,
+  findAssociatedTokenAddress,
+  findBuybackEscrowPda,
+  findBuybackTokensPda,
+  findBuybackWsolPda,
   findEscrowPda,
   findFeeIndexPda,
   findLenderPda,
+  findPartnerTreasuryPda,
   findPoolPda,
   findPositionPda,
   findQuotePda,
+  findRevenueTokenPda,
+  findDammPositionNftAccount,
   findSwapPda,
+  findTreasuryWsolPda,
   findVaultPda,
   findVoteAuthPda,
   findWithdrawRequestPda,
@@ -472,10 +491,22 @@ export interface SweepInput extends WithProgram {
   payout: PublicKey;
   /** `position.open_advance`; null when there is none (passed as `programId`, Anchor's `None`). */
   openAdvance: PublicKey | null;
+  /**
+   * `position.revenue_token`. When set, the revenue token and its buyback escrow are passed (the program requires
+   * them, so the share cannot be skipped); null or omitted passes `programId` twice (Anchor's `None`).
+   */
+  revenueToken?: PublicKey | null;
 }
 
 /** `sweep()`: once per epoch per validator. Anyone may crank. */
-export function sweep({ programId, cranker, vote, payout, openAdvance }: SweepInput): TransactionInstruction[] {
+export function sweep({
+  programId,
+  cranker,
+  vote,
+  payout,
+  openAdvance,
+  revenueToken,
+}: SweepInput): TransactionInstruction[] {
   const { pool, vault } = poolKeys(programId);
   const { position, voteAuth, escrow } = voteKeys(programId, vote);
   return instruction(programId, 'sweep', [
@@ -490,7 +521,32 @@ export function sweep({ programId, cranker, vote, payout, openAdvance }: SweepIn
     openAdvance ? writable(openAdvance) : readonly(programId),
     readonly(VOTE_PROGRAM_ID),
     readonly(SYSTEM_PROGRAM_ID),
+    ...revenueTokenMetas(programId, vote, revenueToken ?? null),
   ]);
+}
+
+/** The two optional `sweep` accounts: the revenue token and its escrow, or `None` twice. */
+function revenueTokenMetas(programId: PublicKey, vote: PublicKey, revenueToken: PublicKey | null): AccountMeta[] {
+  if (!revenueToken) return [readonly(programId), readonly(programId)];
+  return [writable(revenueToken), writable(findBuybackEscrowPda(programId, vote)[0])];
+}
+
+/** The fields of a decoded `ValidatorPosition` a sweep needs. */
+export interface SweepPositionInput extends WithProgram {
+  cranker: PublicKey;
+  position: { vote: PublicKey; payout: PublicKey; openAdvance: PublicKey | null; revenueToken: PublicKey | null };
+}
+
+/** `sweep()` for a decoded position: payout, open advance and revenue token come from the account. */
+export function sweepPosition({ programId, cranker, position }: SweepPositionInput): TransactionInstruction[] {
+  return sweep({
+    programId,
+    cranker,
+    vote: position.vote,
+    payout: position.payout,
+    openAdvance: position.openAdvance,
+    revenueToken: position.revenueToken,
+  });
 }
 
 export interface MarkDefaultInput extends WithProgram {
@@ -519,6 +575,8 @@ export interface ReleaseValidatorInput extends WithProgram {
   newWithdrawer: PublicKey;
   /** Must equal `position.identity`. */
   identity: PublicKey;
+  /** `position.revenue_token` (required by the program when set: release waits for the end of its term). */
+  revenueToken?: PublicKey | null;
 }
 
 /** `release_validator()`: hands the withdraw authority back and closes the position. Signer: operator. */
@@ -528,6 +586,7 @@ export function releaseValidator({
   vote,
   newWithdrawer,
   identity,
+  revenueToken,
 }: ReleaseValidatorInput): TransactionInstruction[] {
   const { pool, vault } = poolKeys(programId);
   const { position, voteAuth, escrow } = voteKeys(programId, vote);
@@ -540,10 +599,12 @@ export function releaseValidator({
     readonly(voteAuth),
     writable(escrow),
     readonly(newWithdrawer),
-    readonly(identity),
+    // Writable: restoring the block revenue collector to the identity passes it writable to the vote program.
+    writable(identity),
     readonly(SYSVAR_CLOCK_PUBKEY),
     readonly(VOTE_PROGRAM_ID),
     readonly(SYSTEM_PROGRAM_ID),
+    readonly(revenueToken ?? programId),
   ]);
 }
 
@@ -554,6 +615,8 @@ export interface UpdateCommissionInput extends WithProgram {
   kind: number;
   /** u16, bps. */
   commissionBps: number;
+  /** `position.revenue_token` (required by the program when set: its commission floor applies during the term). */
+  revenueToken?: PublicKey | null;
 }
 
 /** `update_commission(kind, commission_bps)`. Signer: operator. */
@@ -563,6 +626,7 @@ export function updateCommission({
   vote,
   kind,
   commissionBps,
+  revenueToken,
 }: UpdateCommissionInput): TransactionInstruction[] {
   const { pool } = poolKeys(programId);
   const { position, voteAuth } = voteKeys(programId, vote);
@@ -576,6 +640,7 @@ export function updateCommission({
       writable(vote),
       readonly(voteAuth),
       readonly(VOTE_PROGRAM_ID),
+      readonly(revenueToken ?? programId),
     ],
     (w) => w.u8(kind, 'kind').u16(commissionBps, 'commissionBps'),
   );
@@ -801,6 +866,497 @@ export function settleSwap({ programId, cranker, quote, taker }: SettleSwapInput
     writable(quote),
     writable(taker),
     writable(swap),
+  ]);
+}
+
+// ─── Revenue tokens (Meteora) ──────────────────────────────────────────────
+
+const TOKEN_VAULT_SEED = Uint8Array.from('token_vault', (c) => c.charCodeAt(0));
+
+/** A Meteora pool's token vault: `["token_vault", mint, pool]` under the DBC or DAMM v2 program. */
+export function findMeteoraVaultPda(program: PublicKey, mint: PublicKey, pool: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync([TOKEN_VAULT_SEED, mint.toBytes(), pool.toBytes()], program)[0];
+}
+
+export interface RegisterRevenueTokenInput extends WithProgram {
+  /** The position's operator: signs and pays rent. */
+  operator: PublicKey;
+  vote: PublicKey;
+  /** The token, launched on DBC with the Epoch treasury PDA as fee claimer. */
+  mint: PublicKey;
+  dbcPool: PublicKey;
+  dbcConfig: PublicKey;
+  /** u16, 1–5,000 bps of gross revenue. */
+  shareBps: number;
+  /** u16, 10–1,000 epochs. */
+  termEpochs: number;
+}
+
+/** `register_revenue_token(share_bps, term_epochs)`. Signer: operator (payer). */
+export function registerRevenueToken({
+  programId,
+  operator,
+  vote,
+  mint,
+  dbcPool,
+  dbcConfig,
+  shareBps,
+  termEpochs,
+}: RegisterRevenueTokenInput): TransactionInstruction[] {
+  const { pool } = poolKeys(programId);
+  const { position, voteAuth } = voteKeys(programId, vote);
+  return instruction(
+    programId,
+    'register_revenue_token',
+    [
+      signerWritable(operator),
+      readonly(pool),
+      writable(position),
+      readonly(vote),
+      readonly(voteAuth),
+      writable(findRevenueTokenPda(programId, vote)[0]),
+      writable(findBuybackEscrowPda(programId, vote)[0]),
+      writable(findBuybackTokensPda(programId, vote)[0]),
+      readonly(mint),
+      readonly(dbcPool),
+      readonly(dbcConfig),
+      readonly(findPartnerTreasuryPda(programId, pool)[0]),
+      readonly(TOKEN_PROGRAM_ID),
+      readonly(SYSTEM_PROGRAM_ID),
+    ],
+    (w) => w.u16(shareBps, 'shareBps').u16(termEpochs, 'termEpochs'),
+  );
+}
+
+export interface SyncRevenueTokenPoolInput extends WithProgram {
+  cranker: PublicKey;
+  vote: PublicKey;
+  dbcPool: PublicKey;
+  /** The DAMM v2 config DBC migrated with (`DAMM_V2_MIGRATION_FEE_ADDRESS[option]` in the DBC SDK). */
+  dammConfig: PublicKey;
+  dammPool: PublicKey;
+}
+
+/** `sync_revenue_token_pool()`: records the DAMM v2 pool once the curve graduated. Anyone may crank. */
+export function syncRevenueTokenPool({
+  programId,
+  cranker,
+  vote,
+  dbcPool,
+  dammConfig,
+  dammPool,
+}: SyncRevenueTokenPoolInput): TransactionInstruction[] {
+  checkProgramId(programId);
+  return instruction(programId, 'sync_revenue_token_pool', [
+    signer(cranker),
+    writable(findRevenueTokenPda(programId, vote)[0]),
+    readonly(dbcPool),
+    readonly(dammConfig),
+    readonly(dammPool),
+  ]);
+}
+
+/** The venue of a buyback: the DBC pool until the token graduates and its DAMM v2 pool is synced. */
+export interface BuybackVenueKeys {
+  kind: 'dbc' | 'dammV2';
+  pool: PublicKey;
+  /** The pool's vault of the revenue token (derived when omitted). */
+  tokenVault?: PublicKey;
+  /** The pool's wrapped-SOL vault (derived when omitted). */
+  quoteVault?: PublicKey;
+}
+
+export interface ExecuteBuybackInput extends WithProgram {
+  cranker: PublicKey;
+  vote: PublicKey;
+  mint: PublicKey;
+  dbcConfig: PublicKey;
+  venue: BuybackVenueKeys;
+  /** u8: the slice index, 0 … slices_per_epoch − 1. */
+  slice: number;
+  /** From a fresh quote; must be ≥ the program's floor (fee-free output − max_slippage_bps). */
+  minAmountOut: bigint;
+  /** Append the instructions sysvar (only pools whose rate limiter asks for it). */
+  withInstructionsSysvar?: boolean;
+}
+
+/** `execute_buyback(slice, min_amount_out)`: one slice. Anyone may crank; the cranker fronts ~0.002 SOL of rent. */
+export function executeBuyback({
+  programId,
+  cranker,
+  vote,
+  mint,
+  dbcConfig,
+  venue,
+  slice,
+  minAmountOut,
+  withInstructionsSysvar,
+}: ExecuteBuybackInput): TransactionInstruction[] {
+  checkProgramId(programId);
+  const isDbc = venue.kind === 'dbc';
+  const program = isDbc ? METEORA.DBC_PROGRAM_ID : METEORA.CP_AMM_PROGRAM_ID;
+  const tokenVault = venue.tokenVault ?? findMeteoraVaultPda(program, mint, venue.pool);
+  const quoteVault = venue.quoteVault ?? findMeteoraVaultPda(program, NATIVE_MINT, venue.pool);
+  const keys = [
+    signerWritable(cranker),
+    writable(findRevenueTokenPda(programId, vote)[0]),
+    writable(findBuybackEscrowPda(programId, vote)[0]),
+    writable(findBuybackWsolPda(programId, vote)[0]),
+    writable(findBuybackTokensPda(programId, vote)[0]),
+    writable(mint),
+    readonly(NATIVE_MINT),
+    readonly(dbcConfig),
+    writable(venue.pool),
+    writable(tokenVault),
+    writable(quoteVault),
+    readonly(isDbc ? METEORA.DBC_POOL_AUTHORITY : METEORA.CP_AMM_POOL_AUTHORITY),
+    readonly(isDbc ? METEORA.DBC_EVENT_AUTHORITY : METEORA.CP_AMM_EVENT_AUTHORITY),
+    readonly(program),
+    readonly(TOKEN_PROGRAM_ID),
+    readonly(SYSTEM_PROGRAM_ID),
+  ];
+  if (withInstructionsSysvar) keys.push(readonly(INSTRUCTIONS_SYSVAR_ID));
+  return instruction(programId, 'execute_buyback', keys, (w) => w.u8(slice, 'slice').u64(minAmountOut, 'minAmountOut'));
+}
+
+export interface RedeemInput extends WithProgram {
+  holder: PublicKey;
+  /** The holder's token account for `mint` (burned from). */
+  holderTokens: PublicKey;
+  vote: PublicKey;
+  mint: PublicKey;
+  dbcPool: PublicKey;
+  /** The DBC pool's base vault (derived when omitted). */
+  dbcBaseVault?: PublicKey;
+  /** After graduation: the DAMM v2 pool (and its token A vault, derived when omitted). Null before. */
+  dammPool?: PublicKey | null;
+  dammTokenVault?: PublicKey;
+  /** The Epoch treasury's token account for `mint` (DBC leftover), when it exists: excluded from circulation. */
+  treasuryTokens?: PublicKey | null;
+  amount: bigint;
+}
+
+/** `redeem(amount)`: burn tokens for a pro-rata share of the buyback escrow. Signer: holder. */
+export function redeem({
+  programId,
+  holder,
+  holderTokens,
+  vote,
+  mint,
+  dbcPool,
+  dbcBaseVault,
+  dammPool,
+  dammTokenVault,
+  treasuryTokens,
+  amount,
+}: RedeemInput): TransactionInstruction[] {
+  checkProgramId(programId);
+  const baseVault = dbcBaseVault ?? findMeteoraVaultPda(METEORA.DBC_PROGRAM_ID, mint, dbcPool);
+  const damm = dammPool ?? null;
+  return instruction(
+    programId,
+    'redeem',
+    [
+      signerWritable(holder),
+      writable(holderTokens),
+      writable(findRevenueTokenPda(programId, vote)[0]),
+      writable(findBuybackEscrowPda(programId, vote)[0]),
+      readonly(findBuybackTokensPda(programId, vote)[0]),
+      writable(mint),
+      readonly(dbcPool),
+      readonly(baseVault),
+      readonly(damm ?? programId),
+      readonly(damm ? (dammTokenVault ?? findMeteoraVaultPda(METEORA.CP_AMM_PROGRAM_ID, mint, damm)) : programId),
+      readonly(treasuryTokens ?? programId),
+      readonly(TOKEN_PROGRAM_ID),
+      readonly(SYSTEM_PROGRAM_ID),
+    ],
+    (w) => w.u64(amount, 'amount'),
+  );
+}
+
+/** `BuybackParams` (`configure_revenue_token`). */
+export interface BuybackParams {
+  /** u8, 1–32. */
+  slicesPerEpoch: number;
+  /** u32, ≥ slicesPerEpoch. */
+  windowSlots: number;
+  /** u16, 50–2,000. */
+  maxSlippageBps: number;
+  /** u16, 10–1,000. */
+  maxImpactBps: number;
+  /** u8, `REVENUE_TOKEN_FLAGS` bits. */
+  flags: number;
+}
+
+export interface ConfigureRevenueTokenInput extends WithProgram {
+  admin: PublicKey;
+  vote: PublicKey;
+  params: BuybackParams;
+}
+
+/** `configure_revenue_token(params)`: buyback schedule, protections and flags. Signer: the pool admin. */
+export function configureRevenueToken({
+  programId,
+  admin,
+  vote,
+  params,
+}: ConfigureRevenueTokenInput): TransactionInstruction[] {
+  const { pool } = poolKeys(programId);
+  return instruction(
+    programId,
+    'configure_revenue_token',
+    [signer(admin), readonly(pool), writable(findRevenueTokenPda(programId, vote)[0])],
+    (w) =>
+      w
+        .u8(params.slicesPerEpoch, 'slicesPerEpoch')
+        .u32(params.windowSlots, 'windowSlots')
+        .u16(params.maxSlippageBps, 'maxSlippageBps')
+        .u16(params.maxImpactBps, 'maxImpactBps')
+        .u8(params.flags, 'flags'),
+  );
+}
+
+export interface CloseRevenueTokenInput extends WithProgram {
+  cranker: PublicKey;
+  vote: PublicKey;
+  /** `revenue_token.operator`: receives the rent and dust. */
+  operator: PublicKey;
+  mint: PublicKey;
+}
+
+/** `close_revenue_token()`: after the term, with an empty escrow. Anyone may crank. */
+export function closeRevenueToken({
+  programId,
+  cranker,
+  vote,
+  operator,
+  mint,
+}: CloseRevenueTokenInput): TransactionInstruction[] {
+  checkProgramId(programId);
+  return instruction(programId, 'close_revenue_token', [
+    signer(cranker),
+    writable(operator),
+    writable(findRevenueTokenPda(programId, vote)[0]),
+    writable(findBuybackEscrowPda(programId, vote)[0]),
+    writable(findBuybackTokensPda(programId, vote)[0]),
+    writable(mint),
+    writable(findPositionPda(programId, vote)[0]),
+    readonly(TOKEN_PROGRAM_ID),
+    readonly(SYSTEM_PROGRAM_ID),
+  ]);
+}
+
+// ─── Partner treasury claims (Meteora) ─────────────────────────────────────
+//
+// Permissionless: the program signs the Meteora claim as the treasury PDA `["treasury", pool]`, books the SOL as pool
+// income and burns the token side. The cranker pays the transaction fee and fronts the rent of the claim's token
+// accounts (about 0.002 SOL each), which comes back in the same instruction.
+
+/** The accounts every treasury claim starts with. */
+function treasuryKeys(programId: PublicKey): {
+  pool: PublicKey;
+  vault: PublicKey;
+  treasury: PublicKey;
+  treasuryWsol: PublicKey;
+} {
+  const { pool, vault } = poolKeys(programId);
+  return {
+    pool,
+    vault,
+    treasury: findPartnerTreasuryPda(programId, pool)[0],
+    treasuryWsol: findTreasuryWsolPda(programId, pool)[0],
+  };
+}
+
+/** A DBC pool whose config names the treasury. Its vaults are derived (`["token_vault", mint, pool]`) when omitted. */
+export interface DbcClaimPoolKeys {
+  dbcPool: PublicKey;
+  dbcConfig: PublicKey;
+  /** The pool's base mint (the token). */
+  mint: PublicKey;
+  baseVault?: PublicKey;
+  quoteVault?: PublicKey;
+}
+
+export interface ClaimPartnerTradingFeeInput extends WithProgram, DbcClaimPoolKeys {
+  cranker: PublicKey;
+}
+
+/**
+ * `claim_partner_trading_fee()`: DBC `claim_trading_fee` for the treasury. SOL → pool income; base tokens (pools that
+ * collect fees in the output token) → burned. Anyone may crank.
+ */
+export function claimPartnerTradingFee({
+  programId,
+  cranker,
+  dbcPool,
+  dbcConfig,
+  mint,
+  baseVault,
+  quoteVault,
+}: ClaimPartnerTradingFeeInput): TransactionInstruction[] {
+  const { pool, vault, treasury, treasuryWsol } = treasuryKeys(checkProgramId(programId));
+  const dbc = METEORA.DBC_PROGRAM_ID;
+  return instruction(programId, 'claim_partner_trading_fee', [
+    signerWritable(cranker),
+    writable(pool),
+    writable(vault),
+    readonly(treasury),
+    writable(treasuryWsol),
+    writable(findAssociatedTokenAddress(treasury, mint)),
+    writable(dbcPool),
+    readonly(dbcConfig),
+    writable(baseVault ?? findMeteoraVaultPda(dbc, mint, dbcPool)),
+    writable(quoteVault ?? findMeteoraVaultPda(dbc, NATIVE_MINT, dbcPool)),
+    writable(mint),
+    readonly(NATIVE_MINT),
+    readonly(METEORA.DBC_POOL_AUTHORITY),
+    readonly(METEORA.DBC_EVENT_AUTHORITY),
+    readonly(dbc),
+    readonly(TOKEN_PROGRAM_ID),
+    readonly(ASSOCIATED_TOKEN_PROGRAM_ID),
+    readonly(SYSTEM_PROGRAM_ID),
+  ]);
+}
+
+export interface ClaimPartnerQuoteInput extends WithProgram {
+  cranker: PublicKey;
+  dbcPool: PublicKey;
+  dbcConfig: PublicKey;
+  /** The pool's wrapped-SOL vault (derived when omitted). */
+  quoteVault?: PublicKey;
+}
+
+function partnerQuoteClaim(
+  name: 'claim_partner_surplus' | 'claim_partner_migration_fee',
+  { programId, cranker, dbcPool, dbcConfig, quoteVault }: ClaimPartnerQuoteInput,
+): TransactionInstruction[] {
+  const { pool, vault, treasury, treasuryWsol } = treasuryKeys(checkProgramId(programId));
+  const dbc = METEORA.DBC_PROGRAM_ID;
+  return instruction(programId, name, [
+    signerWritable(cranker),
+    writable(pool),
+    writable(vault),
+    readonly(treasury),
+    writable(treasuryWsol),
+    writable(dbcPool),
+    readonly(dbcConfig),
+    writable(quoteVault ?? findMeteoraVaultPda(dbc, NATIVE_MINT, dbcPool)),
+    readonly(NATIVE_MINT),
+    readonly(METEORA.DBC_POOL_AUTHORITY),
+    readonly(METEORA.DBC_EVENT_AUTHORITY),
+    readonly(dbc),
+    readonly(TOKEN_PROGRAM_ID),
+    readonly(SYSTEM_PROGRAM_ID),
+  ]);
+}
+
+/** `claim_partner_surplus()`: the partner's share of a completed curve's surplus → pool income. Anyone may crank. */
+export function claimPartnerSurplus(input: ClaimPartnerQuoteInput): TransactionInstruction[] {
+  return partnerQuoteClaim('claim_partner_surplus', input);
+}
+
+/** `claim_partner_migration_fee()`: the partner's share of the DBC migration fee → pool income. Anyone may crank. */
+export function claimPartnerMigrationFee(input: ClaimPartnerQuoteInput): TransactionInstruction[] {
+  return partnerQuoteClaim('claim_partner_migration_fee', input);
+}
+
+export interface BurnLeftoverInput extends WithProgram {
+  cranker: PublicKey;
+  dbcPool: PublicKey;
+  dbcConfig: PublicKey;
+  /** The pool's base mint. */
+  mint: PublicKey;
+  /** The pool's base vault (derived when omitted). */
+  baseVault?: PublicKey;
+}
+
+/**
+ * `burn_leftover()`: DBC `withdraw_leftover` to the treasury (the receiver must be the treasury), then burn all of it;
+ * after someone else withdrew it, burns what the treasury's token account holds. Anyone may crank.
+ */
+export function burnLeftover({
+  programId,
+  cranker,
+  dbcPool,
+  dbcConfig,
+  mint,
+  baseVault,
+}: BurnLeftoverInput): TransactionInstruction[] {
+  const { pool, treasury } = treasuryKeys(checkProgramId(programId));
+  const dbc = METEORA.DBC_PROGRAM_ID;
+  return instruction(programId, 'burn_leftover', [
+    signerWritable(cranker),
+    readonly(pool),
+    readonly(treasury),
+    writable(findAssociatedTokenAddress(treasury, mint)),
+    writable(dbcPool),
+    readonly(dbcConfig),
+    writable(baseVault ?? findMeteoraVaultPda(dbc, mint, dbcPool)),
+    writable(mint),
+    readonly(METEORA.DBC_POOL_AUTHORITY),
+    readonly(METEORA.DBC_EVENT_AUTHORITY),
+    readonly(dbc),
+    readonly(TOKEN_PROGRAM_ID),
+    readonly(ASSOCIATED_TOKEN_PROGRAM_ID),
+    readonly(SYSTEM_PROGRAM_ID),
+  ]);
+}
+
+export interface ClaimTreasuryLpFeeInput extends WithProgram {
+  cranker: PublicKey;
+  /** The DAMM v2 pool (token A = the token, token B = wrapped SOL). */
+  dammPool: PublicKey;
+  /** Token A's mint. */
+  mint: PublicKey;
+  /** A position in that pool whose NFT the treasury holds. */
+  position: PublicKey;
+  /** The position's NFT mint (`position.nft_mint`); its NFT account is derived from it unless given. */
+  nftMint: PublicKey;
+  positionNftAccount?: PublicKey;
+  /** The pool's vaults (derived when omitted). */
+  tokenAVault?: PublicKey;
+  tokenBVault?: PublicKey;
+}
+
+/**
+ * `claim_treasury_lp_fee()`: DAMM v2 `claim_position_fee` on a treasury-owned position. SOL → pool income, token A →
+ * burned. Anyone may crank.
+ */
+export function claimTreasuryLpFee({
+  programId,
+  cranker,
+  dammPool,
+  mint,
+  position,
+  nftMint,
+  positionNftAccount,
+  tokenAVault,
+  tokenBVault,
+}: ClaimTreasuryLpFeeInput): TransactionInstruction[] {
+  const { pool, vault, treasury, treasuryWsol } = treasuryKeys(checkProgramId(programId));
+  const cpAmm = METEORA.CP_AMM_PROGRAM_ID;
+  return instruction(programId, 'claim_treasury_lp_fee', [
+    signerWritable(cranker),
+    writable(pool),
+    writable(vault),
+    readonly(treasury),
+    writable(treasuryWsol),
+    writable(findAssociatedTokenAddress(treasury, mint)),
+    readonly(dammPool),
+    writable(position),
+    readonly(positionNftAccount ?? findDammPositionNftAccount(nftMint)),
+    writable(tokenAVault ?? findMeteoraVaultPda(cpAmm, mint, dammPool)),
+    writable(tokenBVault ?? findMeteoraVaultPda(cpAmm, NATIVE_MINT, dammPool)),
+    writable(mint),
+    readonly(NATIVE_MINT),
+    readonly(METEORA.CP_AMM_POOL_AUTHORITY),
+    readonly(METEORA.CP_AMM_EVENT_AUTHORITY),
+    readonly(cpAmm),
+    readonly(TOKEN_PROGRAM_ID),
+    readonly(ASSOCIATED_TOKEN_PROGRAM_ID),
+    readonly(SYSTEM_PROGRAM_ID),
   ]);
 }
 

@@ -2,14 +2,23 @@ import { type PublicKey, type TransactionInstruction } from '@solana/web3.js';
 
 import { hex, key, type RustInstruction, sdkEnum, vectors } from './__fixtures__/vectors';
 import { type PoolParams } from './accounts';
-import { type Side, type Tranche } from './constants';
+import { INSTRUCTIONS_SYSVAR_ID, METEORA, NATIVE_MINT, type Side, type Tranche } from './constants';
 import { INSTRUCTION_DISCRIMINATORS, INSTRUCTION_NAMES, type InstructionName } from './discriminators';
 import {
   accrue,
+  burnLeftover,
   cancelWithdraw,
+  claimPartnerMigrationFee,
+  claimPartnerSurplus,
+  claimPartnerTradingFee,
+  claimTreasuryLpFee,
+  closeRevenueToken,
   configureIndex,
+  configureRevenueToken,
   deposit,
+  executeBuyback,
   finalizeIndex,
+  findMeteoraVaultPda,
   initializeIndex,
   initializePool,
   lamportsToSolString,
@@ -22,6 +31,8 @@ import {
   postIndex,
   postQuote,
   processWithdrawal,
+  redeem,
+  registerRevenueToken,
   releaseValidator,
   requestAdvance,
   requestWithdraw,
@@ -31,6 +42,8 @@ import {
   settleSwap,
   solToLamports,
   sweep,
+  sweepPosition,
+  syncRevenueTokenPool,
   updateCommission,
   updateIdentity,
   updateParams,
@@ -39,6 +52,7 @@ import {
   withdrawBond,
   withdrawQuote,
 } from './instructions';
+import { findDammPositionNftAccount, findTreasuryTokensAddress } from './pda';
 
 // web3.js loads its websocket client at import time (rpc-websockets → ESM-only uuid), which jest's CommonJS runtime
 // cannot parse. The SDK never opens a websocket, so a stub is enough; everything else is the real web3.js.
@@ -52,6 +66,10 @@ const acc = (v: RustInstruction, name: string): PublicKey => {
   return key(value);
 };
 const ctxKey = (v: RustInstruction, name: string): PublicKey => key(v.context[name] as string);
+const optional = (v: RustInstruction, name: string): PublicKey | null => {
+  const value = v.accounts[name];
+  return typeof value === 'string' ? key(value) : null;
+};
 const big = (value: unknown): bigint => BigInt(value as string);
 const bytes32 = (value: unknown): Uint8Array => new Uint8Array(Buffer.from(value as string, 'hex'));
 
@@ -177,6 +195,7 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
       vote: acc(v, 'vote_account'),
       payout: acc(v, 'payout'),
       openAdvance: v.accounts.advance ? key(v.accounts.advance) : null,
+      revenueToken: optional(v, 'revenue_token'),
     }),
   mark_default: (v, programId) =>
     markDefault({ programId, cranker: acc(v, 'cranker'), vote: ctxKey(v, 'vote'), advance: acc(v, 'advance') }),
@@ -187,6 +206,7 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
       vote: acc(v, 'vote_account'),
       newWithdrawer: acc(v, 'new_withdrawer'),
       identity: acc(v, 'identity'),
+      revenueToken: optional(v, 'revenue_token'),
     }),
   update_commission: (v, programId) =>
     updateCommission({
@@ -195,6 +215,7 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
       vote: acc(v, 'vote_account'),
       kind: v.args.kind as number,
       commissionBps: v.args.commission_bps as number,
+      revenueToken: optional(v, 'revenue_token'),
     }),
   update_identity: (v, programId) =>
     updateIdentity({
@@ -250,12 +271,131 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
     }),
   settle_swap: (v, programId) =>
     settleSwap({ programId, cranker: acc(v, 'cranker'), quote: acc(v, 'quote'), taker: acc(v, 'taker') }),
+  register_revenue_token: (v, programId) =>
+    registerRevenueToken({
+      programId,
+      operator: acc(v, 'operator'),
+      vote: acc(v, 'vote_account'),
+      mint: acc(v, 'mint'),
+      dbcPool: acc(v, 'dbc_pool'),
+      dbcConfig: acc(v, 'dbc_config'),
+      shareBps: v.args.share_bps as number,
+      termEpochs: v.args.term_epochs as number,
+    }),
+  sync_revenue_token_pool: (v, programId) =>
+    syncRevenueTokenPool({
+      programId,
+      cranker: acc(v, 'cranker'),
+      vote: ctxKey(v, 'vote'),
+      dbcPool: acc(v, 'dbc_pool'),
+      dammConfig: acc(v, 'damm_config'),
+      dammPool: acc(v, 'damm_pool'),
+    }),
+  // The Meteora vaults are left to the SDK to derive (`["token_vault", mint, pool]`).
+  execute_buyback: (v, programId) =>
+    executeBuyback({
+      programId,
+      cranker: acc(v, 'cranker'),
+      vote: ctxKey(v, 'vote'),
+      mint: acc(v, 'mint'),
+      dbcConfig: acc(v, 'dbc_config'),
+      venue: { kind: sdkEnum<'dbc' | 'dammV2'>(v.context.venue), pool: acc(v, 'venue_pool') },
+      slice: v.args.slice as number,
+      minAmountOut: big(v.args.min_amount_out),
+    }),
+  redeem: (v, programId) =>
+    redeem({
+      programId,
+      holder: acc(v, 'holder'),
+      holderTokens: acc(v, 'holder_tokens'),
+      vote: ctxKey(v, 'vote'),
+      mint: acc(v, 'mint'),
+      dbcPool: acc(v, 'dbc_pool'),
+      dammPool: optional(v, 'damm_pool'),
+      treasuryTokens: optional(v, 'treasury_tokens'),
+      amount: big(v.args.amount),
+    }),
+  configure_revenue_token: (v, programId) => {
+    const p = v.args.params as Args;
+    return configureRevenueToken({
+      programId,
+      admin: acc(v, 'admin'),
+      vote: ctxKey(v, 'vote'),
+      params: {
+        slicesPerEpoch: p.slices_per_epoch as number,
+        windowSlots: p.window_slots as number,
+        maxSlippageBps: p.max_slippage_bps as number,
+        maxImpactBps: p.max_impact_bps as number,
+        flags: p.flags as number,
+      },
+    });
+  },
+  close_revenue_token: (v, programId) =>
+    closeRevenueToken({
+      programId,
+      cranker: acc(v, 'cranker'),
+      vote: ctxKey(v, 'vote'),
+      operator: acc(v, 'operator'),
+      mint: acc(v, 'mint'),
+    }),
+  // Treasury claims: the SDK derives the treasury, its accounts and the Meteora vaults.
+  claim_partner_trading_fee: (v, programId) =>
+    claimPartnerTradingFee({
+      programId,
+      cranker: acc(v, 'cranker'),
+      dbcPool: acc(v, 'dbc_pool'),
+      dbcConfig: acc(v, 'dbc_config'),
+      mint: acc(v, 'base_mint'),
+    }),
+  claim_partner_surplus: (v, programId) =>
+    claimPartnerSurplus({
+      programId,
+      cranker: acc(v, 'cranker'),
+      dbcPool: acc(v, 'dbc_pool'),
+      dbcConfig: acc(v, 'dbc_config'),
+    }),
+  claim_partner_migration_fee: (v, programId) =>
+    claimPartnerMigrationFee({
+      programId,
+      cranker: acc(v, 'cranker'),
+      dbcPool: acc(v, 'dbc_pool'),
+      dbcConfig: acc(v, 'dbc_config'),
+    }),
+  burn_leftover: (v, programId) =>
+    burnLeftover({
+      programId,
+      cranker: acc(v, 'cranker'),
+      dbcPool: acc(v, 'dbc_pool'),
+      dbcConfig: acc(v, 'dbc_config'),
+      mint: acc(v, 'base_mint'),
+    }),
+  claim_treasury_lp_fee: (v, programId) =>
+    claimTreasuryLpFee({
+      programId,
+      cranker: acc(v, 'cranker'),
+      dammPool: acc(v, 'damm_pool'),
+      mint: acc(v, 'token_a_mint'),
+      position: acc(v, 'position'),
+      nftMint: ctxKey(v, 'nft_mint'),
+    }),
 };
 
 const metas = (ix: TransactionInstruction) =>
   ix.keys.map((m) => ({ pubkey: m.pubkey.toBase58(), isSigner: m.isSigner, isWritable: m.isWritable }));
 
-const exact = vectors.instructions.filter((v) => !(v.name === 'sweep' && v.label === 'advance_none'));
+/**
+ * Anchor's Rust client fills an absent optional account with the compile-time `declare_id!` (the 1111…1111
+ * placeholder); the SDK passes the program id it was given, which is what the program compares against. Vectors with
+ * a `None` account under another program id differ in exactly those slots (checked in 'optional accounts').
+ */
+const noneSlots = (v: RustInstruction): number[] =>
+  Object.values(v.accounts).flatMap((value, i) => (value === null ? [i] : []));
+const exact = vectors.instructions.filter(
+  (v) => v.programId === vectors.declaredProgramId || noneSlots(v).length === 0,
+);
+const withNone = vectors.instructions.filter(
+  (v) => v.programId !== vectors.declaredProgramId && noneSlots(v).length > 0,
+);
 
 describe('instruction builders match the program crate byte for byte', () => {
   it('has a vector for every instruction in lib.rs', () => {
@@ -291,6 +431,140 @@ describe('optional accounts', () => {
   it('marks a present advance writable, like #[account(mut)]', () => {
     const [ix] = BUILDERS.sweep(some, key(some.programId));
     expect(metas(ix)[8]).toEqual({ pubkey: some.accounts.advance, isSigner: false, isWritable: true });
+  });
+
+  it.each(withNone.map((v) => [`${v.name} (${v.label})`, v] as const))(
+    '%s: the program id in every None slot, the Rust metas elsewhere',
+    (_label, v) => {
+      const [ix] = BUILDERS[v.name as InstructionName](v, key(v.programId));
+      expect(hex(ix.data)).toBe(v.data);
+      const slots = noneSlots(v);
+      const expected = v.metas.map((m, i) => {
+        if (!slots.includes(i)) return m;
+        expect(m.pubkey).toBe(vectors.declaredProgramId);
+        return { pubkey: v.programId, isSigner: false, isWritable: false };
+      });
+      expect(metas(ix)).toEqual(expected);
+    },
+  );
+
+  it('covers the revenue-token slots of sweep, release_validator, update_commission and redeem', () => {
+    expect(new Set(withNone.map((v) => v.name))).toEqual(
+      new Set(['sweep', 'release_validator', 'update_commission', 'redeem']),
+    );
+  });
+});
+
+describe('revenue tokens', () => {
+  const sweepSome = vectors.instructions.find((v) => v.name === 'sweep' && v.label === 'advance_some')!;
+  const programId = key(sweepSome.programId);
+
+  it('sweep passes the revenue token and its buyback escrow, writable, when the position has one', () => {
+    const [ix] = BUILDERS.sweep(sweepSome, programId);
+    expect(metas(ix).slice(11)).toEqual([
+      { pubkey: sweepSome.accounts.revenue_token, isSigner: false, isWritable: true },
+      { pubkey: sweepSome.accounts.buyback_escrow, isSigner: false, isWritable: true },
+    ]);
+  });
+
+  it('sweepPosition takes payout, advance and revenue token from the decoded position', () => {
+    const position = {
+      vote: acc(sweepSome, 'vote_account'),
+      payout: acc(sweepSome, 'payout'),
+      openAdvance: acc(sweepSome, 'advance'),
+      revenueToken: acc(sweepSome, 'revenue_token'),
+    };
+    const [ix] = sweepPosition({ programId, cranker: acc(sweepSome, 'cranker'), position });
+    expect(metas(ix)).toEqual(sweepSome.metas);
+    const [none] = sweepPosition({ programId, cranker: position.vote, position: { ...position, revenueToken: null } });
+    expect(
+      metas(none)
+        .slice(11)
+        .map((m) => m.pubkey),
+    ).toEqual([programId.toBase58(), programId.toBase58()]);
+  });
+
+  it('derives the Meteora vaults like the mainnet pools hold them', () => {
+    // DBC pool 2k7BV8… (mainnet) and the DAMM v2 pool it graduated to, F3s7gr…: vaults read from the accounts.
+    const mint = key('3SLNKtp6yyumAcKEZ5SvA92vF76boHQKMnjKqLCiTUNd');
+    const dbcPool = key('2k7BV8AJ2SdAVK6ePyCRVre6Y4NuNLQHUiAUgZ8BRwtt');
+    const dammPool = key('F3s7grue6Lpi1JKE5CqFv6YGMELFg6KfT2an3XiJsAbe');
+    expect(findMeteoraVaultPda(METEORA.DBC_PROGRAM_ID, mint, dbcPool).toBase58()).toBe(
+      'HnmJqLkRjdE1nXwtNEMcgV519y3aTcHbBc5krptgY5Vw',
+    );
+    expect(findMeteoraVaultPda(METEORA.DBC_PROGRAM_ID, NATIVE_MINT, dbcPool).toBase58()).toBe(
+      '2ePcacrPfMUNyzfKpddPzZsyE76D64JLnCdVNRn9nHSM',
+    );
+    expect(findMeteoraVaultPda(METEORA.CP_AMM_PROGRAM_ID, mint, dammPool).toBase58()).toBe(
+      'Gt3rHeZgG49ShZj42yDobrncAB5m9hcG5r6WfA8j7Yd3',
+    );
+    expect(findMeteoraVaultPda(METEORA.CP_AMM_PROGRAM_ID, NATIVE_MINT, dammPool).toBase58()).toBe(
+      '5WTdcTpgrDZMBt1DJNzLKQyoEGfacQjSgDgqLRorCYCa',
+    );
+  });
+
+  it('execute_buyback forwards the instructions sysvar only on request, as the one remaining account', () => {
+    const v = vectors.instructions.find((i) => i.name === 'execute_buyback')!;
+    const [plain] = BUILDERS.execute_buyback(v, key(v.programId));
+    expect(plain.keys).toHaveLength(16);
+    const [withSysvar] = executeBuyback({
+      programId: key(v.programId),
+      cranker: acc(v, 'cranker'),
+      vote: ctxKey(v, 'vote'),
+      mint: acc(v, 'mint'),
+      dbcConfig: acc(v, 'dbc_config'),
+      venue: {
+        kind: 'dbc',
+        pool: acc(v, 'venue_pool'),
+        tokenVault: acc(v, 'venue_token_vault'),
+        quoteVault: acc(v, 'venue_quote_vault'),
+      },
+      slice: 0,
+      minAmountOut: 1n,
+      withInstructionsSysvar: true,
+    });
+    expect(metas(withSysvar).slice(0, 16)).toEqual(v.metas);
+    expect(metas(withSysvar)[16]).toEqual({
+      pubkey: INSTRUCTIONS_SYSVAR_ID.toBase58(),
+      isSigner: false,
+      isWritable: false,
+    });
+  });
+
+  it('rejects arguments outside their Rust types', () => {
+    const k = programId;
+    expect(() =>
+      registerRevenueToken({
+        programId,
+        operator: k,
+        vote: k,
+        mint: k,
+        dbcPool: k,
+        dbcConfig: k,
+        shareBps: 70_000,
+        termEpochs: 1,
+      }),
+    ).toThrow(/shareBps/);
+    expect(() =>
+      executeBuyback({
+        programId,
+        cranker: k,
+        vote: k,
+        mint: k,
+        dbcConfig: k,
+        venue: { kind: 'dbc', pool: k },
+        slice: 256,
+        minAmountOut: 1n,
+      }),
+    ).toThrow(/slice/);
+    expect(() =>
+      configureRevenueToken({
+        programId,
+        admin: k,
+        vote: k,
+        params: { slicesPerEpoch: 12, windowSlots: 2 ** 32, maxSlippageBps: 300, maxImpactBps: 100, flags: 0 },
+      }),
+    ).toThrow(/windowSlots/);
   });
 });
 
@@ -430,5 +704,41 @@ describe('TransactionInstruction.data', () => {
     expect(a.data.toString('hex')).toBe(hex(INSTRUCTION_DISCRIMINATORS.finalize_index));
     a.data[0] ^= 0xff;
     expect(hex(b.data)).toBe(hex(INSTRUCTION_DISCRIMINATORS.finalize_index));
+  });
+});
+
+describe('treasury claims', () => {
+  const find = (name: InstructionName) => vectors.instructions.find((v) => v.name === name)!;
+
+  it('name the treasury, its one-claim wrapped-SOL account and its associated token account', () => {
+    const v = find('claim_partner_trading_fee');
+    const programId = key(v.programId);
+    expect(findTreasuryTokensAddress(programId, acc(v, 'base_mint')).toBase58()).toBe(v.accounts.treasury_tokens);
+    expect(find('burn_leftover').accounts.treasury_tokens).toBe(v.accounts.treasury_tokens);
+    expect(find('claim_treasury_lp_fee').accounts.treasury_wsol).toBe(v.accounts.treasury_wsol);
+    expect(find('claim_partner_surplus').accounts.treasury).toBe(v.accounts.treasury);
+  });
+
+  it('derive the position NFT account from the NFT mint, and take an explicit one', () => {
+    const v = find('claim_treasury_lp_fee');
+    const nft = findDammPositionNftAccount(ctxKey(v, 'nft_mint'));
+    expect(nft.toBase58()).toBe(v.accounts.position_nft_account);
+    const [ix] = claimTreasuryLpFee({
+      programId: key(v.programId),
+      cranker: acc(v, 'cranker'),
+      dammPool: acc(v, 'damm_pool'),
+      mint: acc(v, 'token_a_mint'),
+      position: acc(v, 'position'),
+      nftMint: ctxKey(v, 'nft_mint'),
+      positionNftAccount: acc(v, 'cranker'),
+    });
+    expect(ix.keys[8].pubkey.toBase58()).toBe(v.accounts.cranker);
+  });
+
+  it('surplus and migration fee share one account list and differ only in the discriminator', () => {
+    const surplus = find('claim_partner_surplus');
+    const fee = find('claim_partner_migration_fee');
+    expect(fee.metas).toEqual(surplus.metas);
+    expect(fee.data).not.toBe(surplus.data);
   });
 });

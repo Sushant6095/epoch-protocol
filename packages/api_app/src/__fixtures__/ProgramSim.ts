@@ -374,6 +374,7 @@ export class ProgramSim implements ProgramReader {
       inflationCommissionBps: 500,
       blockCommissionBps: 0,
       onboardedEpoch: BigInt(this.epoch),
+      revenueToken: null,
     });
     p.validators += 1;
     this.tx(

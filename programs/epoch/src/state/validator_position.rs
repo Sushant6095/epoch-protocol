@@ -68,7 +68,11 @@ pub struct ValidatorPosition {
     pub inflation_commission_bps: u16,
     pub block_commission_bps: u16,
     pub onboarded_epoch: u64,
-    pub _reserved: [u8; 32],
+    /// The validator's `RevenueToken` (`["revenue_token", vote]`), or all
+    /// zeros for none. Takes the 32 bytes that were `_reserved`, so the
+    /// account size (415) and every other field are unchanged, and positions
+    /// onboarded before revenue tokens existed read as "none".
+    pub revenue_token: Pubkey,
 }
 
 impl ValidatorPosition {
@@ -92,6 +96,10 @@ impl ValidatorPosition {
 
     pub fn has_open_advance(&self) -> bool {
         self.open_advance.is_some()
+    }
+
+    pub fn has_revenue_token(&self) -> bool {
+        self.revenue_token != Pubkey::default()
     }
 }
 
@@ -127,7 +135,7 @@ mod tests {
             inflation_commission_bps: 0,
             block_commission_bps: 0,
             onboarded_epoch: 0,
-            _reserved: [0; 32],
+            revenue_token: Pubkey::default(),
         }
     }
 

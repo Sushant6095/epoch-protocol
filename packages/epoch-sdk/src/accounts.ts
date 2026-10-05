@@ -8,7 +8,7 @@
  * later field sits 32 bytes earlier, and the unused tail of the allocation keeps whatever bytes were there before.
  * Only fields before that Option have fixed offsets (see `FIELD_OFFSETS`).
  */
-import { type GetProgramAccountsFilter, type PublicKey } from '@solana/web3.js';
+import { type GetProgramAccountsFilter, PublicKey } from '@solana/web3.js';
 
 import { BorshReader, type BorshWriter, U64_MAX } from './borsh';
 import {
@@ -17,6 +17,9 @@ import {
   POSITION_STATUSES,
   type PositionStatus,
   PROGRAM_CONSTANTS,
+  REVENUE_TOKEN_FLAGS,
+  REVENUE_TOKEN_STATUSES,
+  type RevenueTokenStatus,
   SIDES,
   type Side,
   type Tranche,
@@ -126,6 +129,8 @@ export interface ValidatorPositionAccount {
   inflationCommissionBps: number;
   blockCommissionBps: number;
   onboardedEpoch: bigint;
+  /** The validator's `RevenueToken` account, or null for none (all zeros on chain; the bytes were `_reserved`). */
+  revenueToken: PublicKey | null;
 }
 
 export interface AdvanceAccount {
@@ -202,6 +207,56 @@ export interface SwapPositionAccount {
   bump: number;
 }
 
+/** A validator's revenue token (`["revenue_token", vote]`). */
+export interface RevenueTokenAccount {
+  pool: PublicKey;
+  position: PublicKey;
+  vote: PublicKey;
+  /** Paid the rent; receives it back on close. */
+  operator: PublicKey;
+  mint: PublicKey;
+  tokenProgram: PublicKey;
+  dbcPool: PublicKey;
+  dbcConfig: PublicKey;
+  /** The DAMM v2 pool it graduated to; null until `sync_revenue_token_pool`. */
+  dammPool: PublicKey | null;
+  shareBps: number;
+  termEpochs: number;
+  registeredEpoch: bigint;
+  /** First epoch whose sweep pays the share. */
+  startEpoch: bigint;
+  /** `startEpoch + termEpochs`: the first epoch after the term. */
+  termEndEpoch: bigint;
+  /** Advances with a lower `seq` predate the token and are repaid before the share. */
+  advanceSeqAtRegistration: bigint;
+  inflationCommissionBps: number;
+  blockCommissionBps: number;
+  bump: number;
+  escrowBump: number;
+  tokensBump: number;
+  wsolBump: number;
+  slicesPerEpoch: number;
+  windowSlots: number;
+  maxSlippageBps: number;
+  maxImpactBps: number;
+  /** `REVENUE_TOKEN_FLAGS` bits. */
+  flags: number;
+  status: RevenueTokenStatus;
+  buybackEpoch: bigint;
+  epochBudget: bigint;
+  epochSpent: bigint;
+  /** Bit i set = slice i ran in `buybackEpoch`. */
+  slicesDone: number;
+  lastShareEpoch: bigint;
+  totalEscrowed: bigint;
+  totalSpent: bigint;
+  totalBought: bigint;
+  totalBurned: bigint;
+  totalRedeemed: bigint;
+  totalRedeemedLamports: bigint;
+  buybackCount: number;
+}
+
 /** Account name → decoded type. */
 export interface EpochAccountMap {
   Pool: PoolAccount;
@@ -212,6 +267,7 @@ export interface EpochAccountMap {
   FeeIndex: FeeIndexAccount;
   FeeQuote: FeeQuoteAccount;
   SwapPosition: SwapPositionAccount;
+  RevenueToken: RevenueTokenAccount;
 }
 
 /** A decoded account of any type, discriminated by `name`. */
@@ -227,6 +283,7 @@ export const ACCOUNT_SIZES: Readonly<Record<AccountName, number>> = Object.freez
   FeeIndex: 486,
   FeeQuote: 151,
   SwapPosition: 133,
+  RevenueToken: 503,
 });
 
 /** Byte offsets of the fixed-position pubkey fields used in getProgramAccounts memcmp filters. */
@@ -237,6 +294,7 @@ export const FIELD_OFFSETS = Object.freeze({
   Advance: Object.freeze({ pool: 8, vote: 40 }),
   FeeQuote: Object.freeze({ pool: 8, maker: 40 }),
   SwapPosition: Object.freeze({ quote: 8, taker: 40 }),
+  RevenueToken: Object.freeze({ pool: 8, position: 40, vote: 72, operator: 104, mint: 136, dbcPool: 200 }),
 });
 
 /** Length of each account's trailing `_reserved: [u8; N]`: read past (Borsh requires the bytes), never exposed. */
@@ -244,11 +302,13 @@ const RESERVED: Readonly<Record<AccountName, number>> = {
   Pool: 64,
   LenderShares: 16,
   WithdrawRequest: 16,
-  ValidatorPosition: 32,
+  // Its 32 reserved bytes are `revenue_token` now.
+  ValidatorPosition: 0,
   Advance: 16,
   FeeIndex: 32,
   FeeQuote: 16,
   SwapPosition: 16,
+  RevenueToken: 64,
 };
 
 // ─── Field codecs ──────────────────────────────────────────────────────────
@@ -300,6 +360,9 @@ export function writePoolParams(w: BorshWriter, p: PoolParams): BorshWriter {
 }
 
 // ─── Decoders ──────────────────────────────────────────────────────────────
+
+/** All-zero pubkey fields mean "none". */
+const optionalKey = (key: PublicKey): PublicKey | null => (key.equals(PublicKey.default) ? null : key);
 
 /** Check the 8-byte discriminator and return a reader positioned after it. */
 function open(name: AccountName, data: Uint8Array): BorshReader {
@@ -406,10 +469,73 @@ export function decodeValidatorPosition(data: Uint8Array): ValidatorPositionAcco
     inflationCommissionBps: r.u16('inflationCommissionBps'),
     blockCommissionBps: r.u16('blockCommissionBps'),
     onboardedEpoch: r.u64('onboardedEpoch'),
+    revenueToken: optionalKey(r.pubkey('revenueToken')),
   };
   r.skip(RESERVED.ValidatorPosition, '_reserved');
   return account;
 }
+
+export function decodeRevenueToken(data: Uint8Array): RevenueTokenAccount {
+  const r = open('RevenueToken', data);
+  const account: RevenueTokenAccount = {
+    pool: r.pubkey('pool'),
+    position: r.pubkey('position'),
+    vote: r.pubkey('vote'),
+    operator: r.pubkey('operator'),
+    mint: r.pubkey('mint'),
+    tokenProgram: r.pubkey('tokenProgram'),
+    dbcPool: r.pubkey('dbcPool'),
+    dbcConfig: r.pubkey('dbcConfig'),
+    dammPool: optionalKey(r.pubkey('dammPool')),
+    shareBps: r.u16('shareBps'),
+    termEpochs: r.u16('termEpochs'),
+    registeredEpoch: r.u64('registeredEpoch'),
+    startEpoch: r.u64('startEpoch'),
+    termEndEpoch: r.u64('termEndEpoch'),
+    advanceSeqAtRegistration: r.u64('advanceSeqAtRegistration'),
+    inflationCommissionBps: r.u16('inflationCommissionBps'),
+    blockCommissionBps: r.u16('blockCommissionBps'),
+    bump: r.u8('bump'),
+    escrowBump: r.u8('escrowBump'),
+    tokensBump: r.u8('tokensBump'),
+    wsolBump: r.u8('wsolBump'),
+    slicesPerEpoch: r.u8('slicesPerEpoch'),
+    windowSlots: r.u32('windowSlots'),
+    maxSlippageBps: r.u16('maxSlippageBps'),
+    maxImpactBps: r.u16('maxImpactBps'),
+    flags: r.u8('flags'),
+    status: r.variant(REVENUE_TOKEN_STATUSES, 'status'),
+    buybackEpoch: r.u64('buybackEpoch'),
+    epochBudget: r.u64('epochBudget'),
+    epochSpent: r.u64('epochSpent'),
+    slicesDone: r.u32('slicesDone'),
+    lastShareEpoch: r.u64('lastShareEpoch'),
+    totalEscrowed: r.u64('totalEscrowed'),
+    totalSpent: r.u64('totalSpent'),
+    totalBought: r.u64('totalBought'),
+    totalBurned: r.u64('totalBurned'),
+    totalRedeemed: r.u64('totalRedeemed'),
+    totalRedeemedLamports: r.u64('totalRedeemedLamports'),
+    buybackCount: r.u32('buybackCount'),
+  };
+  r.skip(RESERVED.RevenueToken, '_reserved');
+  return account;
+}
+
+/** The sweep in `epoch` pays the share (`RevenueToken::in_term`). */
+export const revenueTokenInTerm = (rt: RevenueTokenAccount, epoch: bigint): boolean =>
+  epoch >= rt.startEpoch && epoch < rt.termEndEpoch;
+
+/** Release and commission cuts are blocked (`RevenueToken::term_active`). */
+export const revenueTokenTermActive = (rt: RevenueTokenAccount, epoch: bigint): boolean => epoch < rt.termEndEpoch;
+
+/** `redeem` is open: after the term, or during it when the admin set `redeemDuringTerm`. */
+export const revenueTokenRedeemOpen = (rt: RevenueTokenAccount, epoch: bigint): boolean =>
+  !revenueTokenTermActive(rt, epoch) || (rt.flags & REVENUE_TOKEN_FLAGS.redeemDuringTerm) !== 0;
+
+/** Buybacks paused by the pool admin. */
+export const revenueTokenBuybacksPaused = (rt: RevenueTokenAccount): boolean =>
+  (rt.flags & REVENUE_TOKEN_FLAGS.buybacksPaused) !== 0;
 
 export function decodeAdvance(data: Uint8Array): AdvanceAccount {
   const r = open('Advance', data);
@@ -510,6 +636,7 @@ const DECODERS: { [K in AccountName]: (data: Uint8Array) => EpochAccountMap[K] }
   FeeIndex: decodeFeeIndex,
   FeeQuote: decodeFeeQuote,
   SwapPosition: decodeSwapPosition,
+  RevenueToken: decodeRevenueToken,
 };
 
 /**

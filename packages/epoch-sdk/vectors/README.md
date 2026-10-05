@@ -11,7 +11,7 @@ program's own code, so the fixtures are the chain's encoding, not a re-derivatio
 | `events` | `anchor_lang::Event::data()` on every `epoch::events::*` struct |
 | `pdas` | `Pubkey::find_program_address` for every seed scheme, with u64 seeds at 0, small, 2^32+, 2^53+ and `u64::MAX` |
 | `errors` | `EpochError::name()`, `u32::from(e)` (Anchor's 6000 offset) and `to_string()` (the `#[msg]`) for every variant |
-| `math` | `epoch::math::*` and `epoch::instructions::taker_pnl` over edge values and seeded random inputs; `null` = `None` |
+| `math` | `epoch::math::*` (incl. the revenue-token waterfall, slice schedule, the Meteora curve quotes and what DBC pays the partner treasury) and `epoch::instructions::taker_pnl` over edge values and seeded random inputs; `null` = `None` |
 
 Struct fields are listed through exhaustive destructuring and the error list through an exhaustive `match`, so adding
 a field or a variant to the program breaks this build until the generator covers it.
@@ -31,5 +31,6 @@ cd .. && pnpm test                     # the SDK must still pass against the new
   If the program's dependencies change, copy the root `Cargo.lock` here again before regenerating.
 - The toolchain comes from the repository's `rust-toolchain.toml` (1.89). The first build takes about a minute.
 - Output is deterministic (fixed program id `[42; 32]`, fixed keys `[n; 32]`, a seeded LCG for field values), so a
-  diff of `rust-vectors.json` shows exactly what a program change did to the encoding.
+  diff of `rust-vectors.json` shows exactly what a program change did to the encoding. Revenue-token vectors draw from
+  a second LCG, so adding them left every older value unchanged.
 - An optional output path can be passed as the first argument: `cargo run --offline --release -- /tmp/vectors.json`.

@@ -1,4 +1,4 @@
-import { sweep } from '@epoch/epoch-sdk';
+import { sweepPosition } from '@epoch/epoch-sdk';
 import { Logger } from '@epoch/logger';
 
 import { describeFailure, type EpochChain } from '../Chain/EpochChain';
@@ -10,7 +10,8 @@ const logger = Logger.create('SweepJob');
  * `sweep` once per epoch for every Active, Late or Defaulted position not yet swept this epoch, after the cluster
  * has finished paying stake rewards (the program refuses with RewardsInProgress until then). Sweeping also records
  * the epoch's revenue and the late-epoch count, so positions without an advance are swept too. Released positions
- * are never swept.
+ * are never swept. A position with a revenue token gets its token and buyback escrow passed (`sweepPosition`): the
+ * program refuses the sweep without them, so the share always reaches the escrow.
  */
 export class SweepJob implements Job {
   readonly name = 'SweepJob';
@@ -35,13 +36,7 @@ export class SweepJob implements Job {
       const vote = position.vote.toBase58();
       const result = await this.chain.execute(
         `sweep ${vote}`,
-        sweep({
-          programId: this.chain.programId,
-          cranker,
-          vote: position.vote,
-          payout: position.payout,
-          openAdvance: position.openAdvance,
-        }),
+        sweepPosition({ programId: this.chain.programId, cranker, position }),
         'crank',
       );
       if (result.status !== 'failed') continue;

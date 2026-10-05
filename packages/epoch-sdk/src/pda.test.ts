@@ -4,13 +4,19 @@ import { key, type RustPda, sdkEnum, vectors } from './__fixtures__/vectors';
 import { type Tranche } from './constants';
 import {
   findAdvancePda,
+  findBuybackEscrowPda,
+  findBuybackTokensPda,
+  findBuybackWsolPda,
   findEscrowPda,
   findFeeIndexPda,
   findLenderPda,
+  findPartnerTreasuryPda,
   findPoolPda,
   findPositionPda,
   findQuotePda,
+  findRevenueTokenPda,
   findSwapPda,
+  findTreasuryWsolPda,
   findVaultPda,
   findVoteAuthPda,
   findWithdrawRequestPda,
@@ -47,6 +53,18 @@ function derive(pda: RustPda): [PublicKey, number] {
       return findQuotePda(programId, key(i.maker), BigInt(i.epoch));
     case 'swap':
       return findSwapPda(programId, key(i.quote), key(i.taker));
+    case 'revenueToken':
+      return findRevenueTokenPda(programId, key(i.vote));
+    case 'buyback':
+      return findBuybackEscrowPda(programId, key(i.vote));
+    case 'buybackWsol':
+      return findBuybackWsolPda(programId, key(i.vote));
+    case 'buybackTokens':
+      return findBuybackTokensPda(programId, key(i.vote));
+    case 'partnerTreasury':
+      return findPartnerTreasuryPda(programId, key(i.pool));
+    case 'treasuryWsol':
+      return findTreasuryWsolPda(programId, key(i.pool));
     default:
       throw new Error(`unknown PDA kind ${pda.kind}`);
   }
@@ -67,6 +85,12 @@ describe('PDAs match Pubkey::find_program_address in the program crate', () => {
         'feeIndex',
         'quote',
         'swap',
+        'revenueToken',
+        'buyback',
+        'buybackWsol',
+        'buybackTokens',
+        'partnerTreasury',
+        'treasuryWsol',
       ]),
     );
   });

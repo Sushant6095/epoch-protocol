@@ -4,6 +4,7 @@ import {
   type InstructionName,
   instructionNameOf,
   type PoolAccount,
+  type RevenueTokenAccount,
   type SwapPositionAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
@@ -13,6 +14,7 @@ import { type PublicKey, type TransactionInstruction } from '@solana/web3.js';
 import {
   type ChainClock,
   type EpochChain,
+  type ExecuteOptions,
   type ExecuteResult,
   type ProgramAccount,
   type SignerRole,
@@ -26,6 +28,7 @@ export interface ChainCall {
   name: InstructionName | null;
   instructions: TransactionInstruction[];
   kind: 'simulate' | 'execute';
+  options?: ExecuteOptions;
 }
 
 export const sent = (signature = 'sig'): ExecuteResult => ({ status: 'sent', signature });
@@ -51,6 +54,7 @@ export class FakeChain implements EpochChain {
   scorer: PublicKey | undefined = key(91);
   epoch = 100n;
   slot = 43_200_000n;
+  slotIndex = 0n;
   rewardsActive = false;
   poolAccount: PoolAccount | null = pool();
   positionAccounts: ProgramAccount<ValidatorPositionAccount>[] = [];
@@ -58,6 +62,10 @@ export class FakeChain implements EpochChain {
   feeIndexAccount: FeeIndexAccount | null = null;
   requests = new Map<bigint, WithdrawRequestAccount>();
   swapAccounts: ProgramAccount<SwapPositionAccount>[] = [];
+  revenueTokenAccounts: ProgramAccount<RevenueTokenAccount>[] = [];
+  balances = new Map<string, bigint>();
+  /** Rent-exempt minimum per byte count (mainnet's: (128 + space) × 6,960). */
+  rentFor = (space: number): bigint => BigInt((128 + space) * 6_960);
   readonly calls: ChainCall[] = [];
   /** Result of each execute call (default: sent). May mutate the fake's state to model the transaction landing. */
   onExecute: (call: ChainCall) => ExecuteResult = () => sent();
@@ -68,7 +76,7 @@ export class FakeChain implements EpochChain {
     return role === 'crank' ? this.crank : this.scorer;
   }
   async clock(): Promise<ChainClock> {
-    return { epoch: this.epoch, slot: this.slot };
+    return { epoch: this.epoch, slot: this.slot, slotIndex: this.slotIndex };
   }
   async epochRewardsActive(): Promise<boolean> {
     return this.rewardsActive;
@@ -91,13 +99,32 @@ export class FakeChain implements EpochChain {
   async swaps(taker?: PublicKey): Promise<ProgramAccount<SwapPositionAccount>[]> {
     return taker ? this.swapAccounts.filter((s) => s.account.taker.equals(taker)) : this.swapAccounts;
   }
-  async simulate(label: string, instructions: TransactionInstruction[], role: SignerRole): Promise<ExecuteResult> {
-    const call = this.record(label, instructions, role, 'simulate');
+  async revenueTokens(): Promise<ProgramAccount<RevenueTokenAccount>[]> {
+    return this.revenueTokenAccounts;
+  }
+  async lamports(address: PublicKey): Promise<bigint> {
+    return this.balances.get(address.toBase58()) ?? 0n;
+  }
+  async rentExempt(space: number): Promise<bigint> {
+    return this.rentFor(space);
+  }
+  async simulate(
+    label: string,
+    instructions: TransactionInstruction[],
+    role: SignerRole,
+    options?: ExecuteOptions,
+  ): Promise<ExecuteResult> {
+    const call = this.record(label, instructions, role, 'simulate', options);
     return this.onSimulate(call);
   }
-  async execute(label: string, instructions: TransactionInstruction[], role: SignerRole): Promise<ExecuteResult> {
-    if (this.dryRun) return this.simulate(label, instructions, role);
-    return this.onExecute(this.record(label, instructions, role, 'execute'));
+  async execute(
+    label: string,
+    instructions: TransactionInstruction[],
+    role: SignerRole,
+    options?: ExecuteOptions,
+  ): Promise<ExecuteResult> {
+    if (this.dryRun) return this.simulate(label, instructions, role, options);
+    return this.onExecute(this.record(label, instructions, role, 'execute', options));
   }
 
   /** Names of the executed (not simulated) instructions, in order. */
@@ -110,9 +137,10 @@ export class FakeChain implements EpochChain {
     instructions: TransactionInstruction[],
     role: SignerRole,
     kind: ChainCall['kind'],
+    options?: ExecuteOptions,
   ): ChainCall {
     const last = instructions[instructions.length - 1];
-    const call = { label, role, name: last ? instructionNameOf(last.data) : null, instructions, kind };
+    const call = { label, role, name: last ? instructionNameOf(last.data) : null, instructions, kind, options };
     this.calls.push(call);
     return call;
   }

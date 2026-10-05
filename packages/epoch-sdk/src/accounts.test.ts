@@ -10,6 +10,7 @@ import {
   decodeFeeQuote,
   decodeLenderShares,
   decodePool,
+  decodeRevenueToken,
   decodeSwapPosition,
   decodeValidatorPosition,
   decodeWithdrawRequest,
@@ -19,6 +20,10 @@ import {
   FIELD_OFFSETS,
   fieldFilter,
   revenueHistory,
+  revenueTokenBuybacksPaused,
+  revenueTokenInTerm,
+  revenueTokenRedeemOpen,
+  revenueTokenTermActive,
   trailingRevenue,
   type ValidatorPositionAccount,
 } from './accounts';
@@ -38,6 +43,7 @@ const DECODERS: Record<AccountName, (data: Uint8Array) => unknown> = {
   FeeIndex: decodeFeeIndex,
   FeeQuote: decodeFeeQuote,
   SwapPosition: decodeSwapPosition,
+  RevenueToken: decodeRevenueToken,
 };
 
 const examples = ACCOUNT_NAMES.flatMap((name) =>
@@ -63,6 +69,7 @@ describe('account layout matches the program (8 + INIT_SPACE)', () => {
       FeeIndex: 486,
       FeeQuote: 151,
       SwapPosition: 133,
+      RevenueToken: 503,
     });
   });
 });
@@ -123,6 +130,51 @@ describe('ValidatorPosition and its Option<Pubkey>', () => {
   );
 });
 
+describe('ValidatorPosition.revenueToken (the 32 bytes that were _reserved)', () => {
+  const byLabel = (label: string): RustAccountExample =>
+    vectors.accounts.ValidatorPosition.examples.find((e) => e.label === label)!;
+
+  it('is null when all zeros and the key otherwise, after open_advance like the other tail fields', () => {
+    expect(decodeValidatorPosition(fromHex(byLabel('open_advance_none').data)).revenueToken).toBeNull();
+    const some = decodeValidatorPosition(fromHex(byLabel('open_advance_some').data));
+    expect(some.revenueToken?.toBase58()).toBe(new PublicKey(new Uint8Array(32).fill(0xc3)).toBase58());
+    // The account keeps its size: the field took the reserved bytes.
+    expect(byLabel('open_advance_some').serializedLen).toBe(ACCOUNT_SIZES.ValidatorPosition);
+  });
+});
+
+describe('RevenueToken', () => {
+  const curve = decodeRevenueToken(fromHex(vectors.accounts.RevenueToken.examples[0].data));
+  const graduated = decodeRevenueToken(fromHex(vectors.accounts.RevenueToken.examples[1].data));
+
+  it('reads a fresh registration (no DAMM v2 pool yet, default buyback parameters)', () => {
+    expect(curve.status).toBe('curve');
+    expect(curve.dammPool).toBeNull();
+    expect([curve.slicesPerEpoch, curve.windowSlots, curve.maxSlippageBps, curve.maxImpactBps, curve.flags]).toEqual([
+      12, 9_000, 300, 100, 0,
+    ]);
+    expect(graduated.status).toBe('graduated');
+    expect(graduated.dammPool).toBeInstanceOf(PublicKey);
+  });
+
+  it('mirrors the term gates', () => {
+    const { startEpoch, termEndEpoch } = curve;
+    expect(revenueTokenInTerm(curve, startEpoch - 1n)).toBe(false);
+    expect(revenueTokenInTerm(curve, startEpoch)).toBe(true);
+    expect(revenueTokenInTerm(curve, termEndEpoch - 1n)).toBe(true);
+    expect(revenueTokenInTerm(curve, termEndEpoch)).toBe(false);
+    // Release and commission cuts wait for the end of the term; so does redeem by default.
+    expect(revenueTokenTermActive(curve, startEpoch - 1n)).toBe(true);
+    expect(revenueTokenTermActive(curve, termEndEpoch)).toBe(false);
+    expect(revenueTokenRedeemOpen(curve, termEndEpoch - 1n)).toBe(false);
+    expect(revenueTokenRedeemOpen(curve, termEndEpoch)).toBe(true);
+    // The graduated example has both flags set.
+    expect(revenueTokenRedeemOpen(graduated, graduated.startEpoch)).toBe(true);
+    expect(revenueTokenBuybacksPaused(graduated)).toBe(true);
+    expect(revenueTokenBuybacksPaused(curve)).toBe(false);
+  });
+});
+
 describe('FeeIndex history', () => {
   it.each(vectors.accounts.FeeIndex.examples.map((e) => [e.label, e] as const))('%s', (_label, example) => {
     const index: FeeIndexAccount = decodeFeeIndex(fromHex(example.data));
@@ -144,6 +196,7 @@ describe('FIELD_OFFSETS', () => {
       Advance: { pool: 8, vote: 40 },
       FeeQuote: { pool: 8, maker: 40 },
       SwapPosition: { quote: 8, taker: 40 },
+      RevenueToken: { pool: 8, position: 40, vote: 72, operator: 104, mint: 136, dbcPool: 200 },
     });
   });
 
@@ -152,7 +205,8 @@ describe('FIELD_OFFSETS', () => {
       for (const example of vectors.accounts[name].examples) {
         const data = fromHex(example.data);
         for (const [field, offset] of Object.entries(fields)) {
-          const expected = base58Decode(example.fields[field] as string);
+          const snake = field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+          const expected = base58Decode(example.fields[snake] as string);
           expect(hex(data.subarray(offset, offset + 32))).toBe(hex(expected));
         }
       }

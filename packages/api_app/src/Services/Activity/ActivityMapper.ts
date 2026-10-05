@@ -21,7 +21,25 @@ export const ACTIVITY_EVENT_NAMES: readonly EventName[] = [
   'IndexVetoed',
   'SwapOpened',
   'SwapSettled',
+  // Revenue tokens (ADR 0006): kind "buyback".
+  'RevenueTokenRegistered',
+  'RevenueShareSwept',
+  'BuybackExecuted',
+  'RevenueTokenPoolSynced',
+  'RevenueTokenRedeemed',
+  'RevenueTokenClosed',
+  // Epoch's partner treasury claiming its Meteora fees for lenders (kind "buyback": the revenue-token family).
+  'TreasuryClaimed',
 ];
+
+/** `TreasuryClaimed.kind` in the feed's words. */
+const TREASURY_CLAIM_TEXT: Record<string, string> = {
+  tradingFee: 'curve trading fees to lenders',
+  surplus: 'curve surplus to lenders',
+  migrationFee: 'migration fee to lenders',
+  leftover: 'unsold supply burned',
+  lpFee: 'DAMM v2 LP fees to lenders',
+};
 
 /** `WithdrawCancelled.reason`: the crank bounced the request at the Junior floor (0 = the owner cancelled it). */
 const BOUNCED_AT_FLOOR = 1;
@@ -116,6 +134,38 @@ function rowFor(stored: StoredProgramEvent, names: NameIndex): Omit<ActivityEven
     case 'SwapSettled':
       // The taker's profit (+) or loss (−).
       return solRow('swap', `Swap settled · epoch ${data.epoch}`, sol(data.takerPnl));
+    case 'RevenueTokenRegistered': {
+      const pct = (num(data.shareBps) ?? 0) / 100;
+      return solRow(
+        'buyback',
+        `${validatorName(data, names)} · revenue token: ${pct}% of revenue for ${data.termEpochs} epochs`,
+        null,
+      );
+    }
+    case 'RevenueShareSwept':
+      return solRow('buyback', `${validatorName(data, names)} · revenue share to the buyback escrow`, sol(data.share));
+    case 'BuybackExecuted':
+      return solRow(
+        'buyback',
+        `${validatorName(data, names)} · bought back and burned on ${data.venue === 'dammV2' ? 'DAMM v2' : 'the curve'}`,
+        sol(data.lamportsIn),
+      );
+    case 'RevenueTokenPoolSynced':
+      return solRow('buyback', `${validatorName(data, names)} · revenue token graduated to DAMM v2`, null);
+    case 'RevenueTokenRedeemed':
+      return solRow('buyback', `${validatorName(data, names)} · revenue token redeemed`, sol(data.lamportsOut));
+    case 'RevenueTokenClosed':
+      return solRow('buyback', `${validatorName(data, names)} · revenue token term closed`, null);
+    case 'TreasuryClaimed': {
+      const what = TREASURY_CLAIM_TEXT[String(data.kind)] ?? 'claimed';
+      const burned = data.kind !== 'leftover' && (num(data.tokensBurned) ?? 0) > 0 ? ', tokens burned' : '';
+      const lamports = num(data.lamportsToPool) ?? 0;
+      return solRow(
+        'buyback',
+        `${shortKey(String(data.mint ?? ''))} · treasury: ${what}${burned}`,
+        lamports > 0 ? lamports / LAMPORTS_PER_SOL : null,
+      );
+    }
     default:
       return null;
   }

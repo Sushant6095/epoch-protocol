@@ -26,6 +26,13 @@ describe('EpochProgramSource', () => {
     expect(source.poolAddress().toBase58()).toBe(expected.toBase58());
   });
 
+  it('drops the pool cache after a treasury claim (cash and income changed)', () => {
+    const source = new EpochProgramSource(config);
+    const invalidate = jest.spyOn(source, 'invalidate');
+    source.invalidateFor('TreasuryClaimed');
+    expect(invalidate.mock.calls).toEqual([['pool']]);
+  });
+
   it('turns an http RPC url into its websocket url', () => {
     expect(toWsUrl('https://api.devnet.solana.com')).toBe('wss://api.devnet.solana.com');
     expect(toWsUrl('http://127.0.0.1:8899')).toBe('ws://127.0.0.1:8899');

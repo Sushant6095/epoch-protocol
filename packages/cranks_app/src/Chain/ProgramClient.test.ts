@@ -135,7 +135,7 @@ describe('ProgramClient reads', () => {
     expect(await programClient.feeIndex()).toBeNull();
     expect((await programClient.withdrawRequest(3n))?.seq).toBe(3n);
     expect(await programClient.withdrawRequest(4n)).toBeNull();
-    expect(await programClient.clock()).toEqual({ epoch: 812n, slot: 350_000_123n });
+    expect(await programClient.clock()).toEqual({ epoch: 812n, slot: 350_000_123n, slotIndex: 1n });
   });
 });
 

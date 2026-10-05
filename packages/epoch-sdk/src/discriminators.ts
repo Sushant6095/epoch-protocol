@@ -13,7 +13,8 @@ export type AccountName =
   | 'Advance'
   | 'FeeIndex'
   | 'FeeQuote'
-  | 'SwapPosition';
+  | 'SwapPosition'
+  | 'RevenueToken';
 
 /** Instruction names exactly as in `lib.rs` (snake_case; the discriminator preimage is `global:<name>`). */
 export type InstructionName =
@@ -45,7 +46,18 @@ export type InstructionName =
   | 'post_quote'
   | 'withdraw_quote'
   | 'open_swap'
-  | 'settle_swap';
+  | 'settle_swap'
+  | 'register_revenue_token'
+  | 'sync_revenue_token_pool'
+  | 'execute_buyback'
+  | 'redeem'
+  | 'configure_revenue_token'
+  | 'close_revenue_token'
+  | 'claim_partner_trading_fee'
+  | 'claim_partner_surplus'
+  | 'claim_partner_migration_fee'
+  | 'burn_leftover'
+  | 'claim_treasury_lp_fee';
 
 export type EventName =
   | 'PoolInitialized'
@@ -73,7 +85,15 @@ export type EventName =
   | 'IndexVetoed'
   | 'QuotePosted'
   | 'SwapOpened'
-  | 'SwapSettled';
+  | 'SwapSettled'
+  | 'RevenueTokenRegistered'
+  | 'RevenueShareSwept'
+  | 'RevenueTokenPoolSynced'
+  | 'BuybackExecuted'
+  | 'RevenueTokenRedeemed'
+  | 'RevenueTokenConfigured'
+  | 'RevenueTokenClosed'
+  | 'TreasuryClaimed';
 
 export const ACCOUNT_DISCRIMINATORS: Readonly<Record<AccountName, Uint8Array>> = Object.freeze({
   Pool: new Uint8Array([241, 154, 109, 4, 17, 177, 109, 188]),
@@ -84,6 +104,7 @@ export const ACCOUNT_DISCRIMINATORS: Readonly<Record<AccountName, Uint8Array>> =
   FeeIndex: new Uint8Array([120, 150, 229, 157, 248, 45, 110, 249]),
   FeeQuote: new Uint8Array([228, 252, 197, 237, 1, 50, 181, 20]),
   SwapPosition: new Uint8Array([65, 203, 85, 175, 129, 154, 6, 152]),
+  RevenueToken: new Uint8Array([123, 71, 28, 221, 233, 129, 80, 207]),
 });
 
 export const INSTRUCTION_DISCRIMINATORS: Readonly<Record<InstructionName, Uint8Array>> = Object.freeze({
@@ -116,6 +137,17 @@ export const INSTRUCTION_DISCRIMINATORS: Readonly<Record<InstructionName, Uint8A
   withdraw_quote: new Uint8Array([209, 209, 177, 248, 7, 105, 157, 66]),
   open_swap: new Uint8Array([109, 109, 21, 132, 201, 76, 67, 113]),
   settle_swap: new Uint8Array([3, 130, 133, 180, 251, 87, 242, 250]),
+  register_revenue_token: new Uint8Array([212, 153, 133, 48, 164, 75, 131, 42]),
+  sync_revenue_token_pool: new Uint8Array([177, 191, 191, 37, 193, 225, 157, 235]),
+  execute_buyback: new Uint8Array([47, 32, 19, 100, 184, 96, 144, 49]),
+  redeem: new Uint8Array([184, 12, 86, 149, 70, 196, 97, 225]),
+  configure_revenue_token: new Uint8Array([57, 116, 133, 153, 50, 219, 215, 86]),
+  close_revenue_token: new Uint8Array([250, 78, 2, 43, 3, 113, 229, 213]),
+  claim_partner_trading_fee: new Uint8Array([123, 126, 241, 171, 152, 241, 18, 123]),
+  claim_partner_surplus: new Uint8Array([88, 48, 210, 241, 182, 188, 75, 118]),
+  claim_partner_migration_fee: new Uint8Array([5, 91, 233, 246, 90, 63, 86, 200]),
+  burn_leftover: new Uint8Array([58, 137, 245, 55, 2, 29, 142, 89]),
+  claim_treasury_lp_fee: new Uint8Array([120, 183, 249, 249, 185, 84, 122, 60]),
 });
 
 export const EVENT_DISCRIMINATORS: Readonly<Record<EventName, Uint8Array>> = Object.freeze({
@@ -145,6 +177,14 @@ export const EVENT_DISCRIMINATORS: Readonly<Record<EventName, Uint8Array>> = Obj
   QuotePosted: new Uint8Array([130, 69, 35, 209, 183, 130, 239, 156]),
   SwapOpened: new Uint8Array([31, 172, 136, 212, 249, 139, 42, 67]),
   SwapSettled: new Uint8Array([104, 192, 63, 194, 238, 236, 149, 85]),
+  RevenueTokenRegistered: new Uint8Array([10, 214, 138, 160, 177, 211, 87, 12]),
+  RevenueShareSwept: new Uint8Array([72, 98, 155, 56, 89, 44, 3, 197]),
+  RevenueTokenPoolSynced: new Uint8Array([174, 77, 19, 3, 191, 201, 129, 151]),
+  BuybackExecuted: new Uint8Array([150, 109, 157, 10, 124, 24, 38, 189]),
+  RevenueTokenRedeemed: new Uint8Array([141, 111, 135, 82, 133, 221, 9, 69]),
+  RevenueTokenConfigured: new Uint8Array([248, 253, 70, 189, 104, 149, 85, 34]),
+  RevenueTokenClosed: new Uint8Array([138, 210, 233, 69, 76, 119, 152, 53]),
+  TreasuryClaimed: new Uint8Array([59, 99, 64, 13, 118, 14, 251, 106]),
 });
 
 export const ACCOUNT_NAMES = Object.freeze(Object.keys(ACCOUNT_DISCRIMINATORS) as AccountName[]);

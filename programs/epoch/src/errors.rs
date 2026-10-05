@@ -121,4 +121,82 @@ pub enum EpochError {
     AlreadySettled,
     #[msg("Signer is not the quote maker")]
     NotMaker,
+
+    // ── Revenue tokens (appended: earlier codes never move) ──────────────
+    #[msg("Validator already has a revenue token")]
+    RevenueTokenExists,
+    #[msg("Revenue share must be 1 to 5,000 bps")]
+    ShareOutOfRange,
+    #[msg("Revenue token term must be 10 to 1,000 epochs")]
+    TermOutOfRange,
+    #[msg("Mint must be an SPL Token mint with a fixed supply and no mint or freeze authority")]
+    InvalidRevenueMint,
+    #[msg("Not a Meteora DBC pool for this mint")]
+    InvalidDbcPool,
+    #[msg(
+        "DBC config must quote SOL, graduate to DAMM v2 and name the Epoch treasury as fee claimer"
+    )]
+    InvalidDbcConfig,
+    #[msg("Revenue token account does not match the position")]
+    RevenueTokenMismatch,
+    #[msg("This position has a revenue token: pass its revenue token and buyback escrow accounts")]
+    RevenueTokenAccountsMissing,
+    #[msg("Not allowed before the revenue token's term ends")]
+    RevenueTokenTermActive,
+    #[msg("Commission cannot go below its level when the revenue token was registered")]
+    CommissionBelowSnapshot,
+    #[msg("The DBC pool has not graduated to DAMM v2 yet")]
+    PoolNotMigrated,
+    #[msg("Not the DAMM v2 pool this DBC pool graduated to")]
+    InvalidDammPool,
+    #[msg("The DBC pool graduated: sync its DAMM v2 pool first")]
+    PoolNotSynced,
+    #[msg("The curve is complete and waits for migration; buybacks resume on DAMM v2")]
+    VenueNotTrading,
+    #[msg("A Meteora account does not match the revenue token's pool")]
+    InvalidVenueAccount,
+    #[msg("Outside this epoch's buyback window")]
+    OutsideBuybackWindow,
+    #[msg("This buyback slice is not due yet")]
+    SliceNotDue,
+    #[msg("This buyback slice already ran this epoch")]
+    SliceAlreadyExecuted,
+    #[msg("Slice index is out of range")]
+    InvalidSlice,
+    #[msg("Sweep this epoch's revenue share before buying back")]
+    SweepPending,
+    #[msg("Nothing to buy back this slice")]
+    NothingToBuy,
+    #[msg("min_amount_out is below the floor computed from the pool price")]
+    MinOutTooLow,
+    #[msg("The swap returned less than min_amount_out")]
+    BuybackOutputTooLow,
+    #[msg("Buybacks are paused for this revenue token")]
+    BuybacksPaused,
+    #[msg("Redemptions open when the term ends")]
+    RedeemNotAllowed,
+    #[msg("Amount exceeds the circulating supply")]
+    RedeemTooLarge,
+    #[msg("The buyback escrow still holds SOL")]
+    EscrowNotEmpty,
+    #[msg("Buyback parameters are out of range")]
+    InvalidBuybackParams,
+
+    // ── Treasury claims (appended: earlier codes never move) ─────────────
+    #[msg("The DBC config's fee claimer is not the Epoch treasury")]
+    NotTreasuryFeeClaimer,
+    #[msg("The DBC config's leftover receiver is not the Epoch treasury")]
+    NotTreasuryLeftoverReceiver,
+    #[msg("The Epoch treasury does not own this DAMM v2 position")]
+    NotTreasuryPosition,
+    #[msg("Nothing to claim")]
+    NothingToClaim,
+    #[msg("Not claimable yet: the curve is not complete or the DAMM v2 pool does not exist yet")]
+    ClaimNotReady,
+    #[msg("The treasury already claimed this")]
+    AlreadyClaimed,
+    #[msg("Only SPL Token pools that quote wrapped SOL are supported (and a fixed supply for leftover)")]
+    UnsupportedClaimPool,
+    #[msg("A Meteora account does not match the pool being claimed")]
+    InvalidClaimAccount,
 }

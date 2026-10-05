@@ -2,14 +2,21 @@
 //! is total over its inputs (returns `Option`/`Result` instead of panicking)
 //! and is covered by unit tests. Rounding always favours the pool.
 
+pub mod amm;
 pub mod credit_limit;
+pub mod revenue_token;
 pub mod score;
 pub mod shares;
+pub mod treasury;
+pub mod u256;
 pub mod waterfall;
 
+pub use amm::*;
 pub use credit_limit::*;
+pub use revenue_token::*;
 pub use score::*;
 pub use shares::*;
+pub use treasury::*;
 pub use waterfall::*;
 
 use crate::constants::BPS_DENOMINATOR;

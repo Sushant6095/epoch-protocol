@@ -2,10 +2,13 @@ import { sleep } from '@epoch/common';
 import { Logger, runWithTrace } from '@epoch/logger';
 import { type PublicKey } from '@solana/web3.js';
 
+import { type BuybackMarket } from './Chain/BuybackMarket';
 import { type EpochChain } from './Chain/EpochChain';
 import { type ValidatorDataSource } from './Chain/MainnetData';
 import {
   AccrueJob,
+  BuybackJob,
+  type BuybackJobOptions,
   ClaimMevJob,
   FinalizeIndexJob,
   type Job,
@@ -46,7 +49,8 @@ export interface JobRunnerOptions {
  *    claim MEV → update scores → sweep (gate: waits for epoch rewards) → mark defaults (gate) → accrue (gate).
  *    A gate that is not done yet stops the steps after it; the next tick retries it. Claim and score never block.
  * 2. **Steady jobs** once every gate is done, then on every tick: process withdrawals (the queue is paid as soon as
- *    the cash is there, never before this epoch's sweep and accrual).
+ *    the cash is there, never before this epoch's sweep and accrual), and revenue-token buybacks (one due slice per
+ *    token per tick, after the sweep has moved this epoch's share into the escrow).
  * 3. **Pollers** on every tick regardless: finalize the Fee Index after its dispute window, settle swaps; and every
  *    `rescoreMs` (30 minutes) the scorer again, which posts only when a score or hedged flag changed.
  *
@@ -73,14 +77,17 @@ export class JobRunner {
     this.sleep = options.sleep ?? sleep;
   }
 
-  /** The production wiring: every job on one chain client. */
+  /** The production wiring: every job on one chain client (BuybackJob when a market is given). */
   static create(
     chain: EpochChain,
     data: ValidatorDataSource,
     hedgeMakers: readonly PublicKey[],
     options: JobRunnerOptions,
+    buyback?: { market: BuybackMarket; options: BuybackJobOptions },
   ): JobRunner {
     const scores = new UpdateScoreJob(chain, data, hedgeMakers);
+    const steady: Job[] = [new ProcessWithdrawalsJob(chain)];
+    if (buyback) steady.push(new BuybackJob(chain, buyback.market, buyback.options));
     return new JobRunner(
       async () => (await chain.clock()).epoch,
       [
@@ -90,7 +97,7 @@ export class JobRunner {
         { job: new MarkDefaultJob(chain), gate: true },
         { job: new AccrueJob(chain), gate: true },
       ],
-      [new ProcessWithdrawalsJob(chain)],
+      steady,
       [
         new FinalizeIndexJob(chain),
         new SettleSwapsJob(chain),

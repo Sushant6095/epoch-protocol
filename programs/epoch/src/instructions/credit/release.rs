@@ -50,8 +50,11 @@ pub struct ReleaseValidator<'info> {
     pub new_withdrawer: UncheckedAccount<'info>,
 
     /// CHECK: the validator identity; needed only to restore the block
-    /// revenue collector on v4 vote accounts.
-    #[account(address = position.identity @ EpochError::IdentityMismatch)]
+    /// revenue collector on v4 vote accounts. Writable: the vote program's
+    /// `UpdateCommissionCollector` takes the new collector writable, so a
+    /// read-only identity fails the CPI with a privilege escalation once
+    /// `set_collectors` pointed the collector at the escrow.
+    #[account(mut, address = position.identity @ EpochError::IdentityMismatch)]
     pub identity: UncheckedAccount<'info>,
 
     pub clock: Sysvar<'info, Clock>,
@@ -59,12 +62,17 @@ pub struct ReleaseValidator<'info> {
     #[account(address = VOTE_PROGRAM_ID)]
     pub vote_program: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
+
+    /// Required when the position has a revenue token: release waits for the
+    /// end of its term. Pass the program id (Anchor's `None`) otherwise.
+    pub revenue_token: Option<Account<'info, RevenueToken>>,
 }
 
-/// Leave Epoch. Allowed only with nothing owed: the collectors go back to
-/// their defaults (vote account and identity), the withdraw authority is
-/// handed to `new_withdrawer`, and escrow, bond and rent return to the
-/// operator.
+/// Leave Epoch. Allowed only with nothing owed and no revenue token in its
+/// term: the collectors go back to their defaults (vote account and
+/// identity), the withdraw authority is handed to `new_withdrawer`, and
+/// escrow, bond and rent return to the operator. A revenue token outlives the
+/// position: holders keep `redeem` (and buybacks) against its escrow.
 pub fn release_validator(ctx: Context<ReleaseValidator>) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     let position = &ctx.accounts.position;
@@ -73,6 +81,22 @@ pub fn release_validator(ctx: Context<ReleaseValidator>) -> Result<()> {
         position.status == PositionStatus::Active,
         EpochError::PositionNotActive
     );
+    if position.has_revenue_token() {
+        let rt = ctx
+            .accounts
+            .revenue_token
+            .as_ref()
+            .ok_or(EpochError::RevenueTokenAccountsMissing)?;
+        require_keys_eq!(
+            rt.key(),
+            position.revenue_token,
+            EpochError::RevenueTokenMismatch
+        );
+        require!(
+            rt.allows_release(ctx.accounts.clock.epoch),
+            EpochError::RevenueTokenTermActive
+        );
+    }
 
     let header = VoteHeader::load(&ctx.accounts.vote_account)?;
     require_keys_eq!(

@@ -31,6 +31,23 @@ describe('decodeEvent reproduces every event the program emits', () => {
     expect(opened?.name === 'SwapOpened' && opened.data.side).toBe('receiveFixed');
     const deposited = decodeEvent(fromHex(rustEvent('Deposited', 'b').data));
     expect(deposited?.name === 'Deposited' && deposited.data.tranche).toBe('senior');
+    const onCurve = decodeEvent(fromHex(rustEvent('BuybackExecuted', 'a').data));
+    expect(onCurve?.name === 'BuybackExecuted' && onCurve.data.venue).toBe('dbc');
+    const graduated = decodeEvent(fromHex(rustEvent('BuybackExecuted', 'b').data));
+    expect(graduated?.name === 'BuybackExecuted' && graduated.data.venue).toBe('dammV2');
+  });
+
+  it('decodes every treasury claim kind, with a position only for LP fees', () => {
+    const kinds = ['trading_fee', 'surplus', 'migration_fee', 'leftover', 'lp_fee'].map((label) => {
+      const event = decodeEvent(fromHex(rustEvent('TreasuryClaimed', label).data));
+      if (event?.name !== 'TreasuryClaimed') throw new Error(label);
+      expect(event.data.position.equals(PublicKey.default)).toBe(label !== 'lp_fee');
+      return event.data.kind;
+    });
+    expect(kinds).toEqual(['tradingFee', 'surplus', 'migrationFee', 'leftover', 'lpFee']);
+    const json = eventToJson(decodeEvent(fromHex(rustEvent('TreasuryClaimed', 'lp_fee').data))!);
+    expect(json.data.kind).toBe('lpFee');
+    expect(json.data.lamportsToPool).toBe(rustEvent('TreasuryClaimed', 'lp_fee').fields.lamports_to_pool);
   });
 
   it('returns null for unknown discriminators and short data, throws for a truncated known event', () => {
@@ -54,7 +71,7 @@ describe('eventToJson', () => {
     const expected = Object.fromEntries(
       Object.entries(rust.fields).map(([k, v]) => {
         const camel = k.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
-        const isEnum = ['tranche', 'side'].includes(k);
+        const isEnum = ['tranche', 'side', 'venue'].includes(k);
         return [camel, isEnum ? sdkEnum(v) : v];
       }),
     );

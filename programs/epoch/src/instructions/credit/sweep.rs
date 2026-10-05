@@ -5,8 +5,8 @@ use crate::{
     constants::*,
     cpi::{system::transfer_from_pda, vote},
     errors::EpochError,
-    events::{AdvanceRepaid, Swept},
-    math::{attribute_repayment, split_sweep},
+    events::{AdvanceRepaid, RevenueShareSwept, Swept},
+    math::{attribute_repayment, split_sweep_with_share},
     state::*,
     vote_account::VoteHeader,
 };
@@ -53,6 +53,16 @@ pub struct Sweep<'info> {
     #[account(address = VOTE_PROGRAM_ID)]
     pub vote_program: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
+
+    /// Required when the position has a revenue token (`position.revenue_token`):
+    /// its `RevenueToken`. Pass the program id (Anchor's `None`) otherwise.
+    #[account(mut)]
+    pub revenue_token: Option<Account<'info, RevenueToken>>,
+
+    /// CHECK: required with `revenue_token`: its buyback escrow
+    /// `["buyback", vote]` (checked against the recorded bump in the handler).
+    #[account(mut)]
+    pub buyback_escrow: Option<UncheckedAccount<'info>>,
 }
 
 /// The heart of the protocol. Once per epoch, after rewards distribution:
@@ -61,10 +71,19 @@ pub struct Sweep<'info> {
 ///    delegator rewards + the admission-ticket reserve) into the escrow;
 /// 2. take the escrow balance above rent as this epoch's gross revenue
 ///    (it also holds whatever the collectors deposited);
-/// 3. remit `remit_bps` of it to the pool while an advance is open (all of
-///    it while defaulted), the rest to the validator's payout account;
-/// 4. attribute the remittance to principal and fee, close the advance when
-///    it is paid, and record the epoch's revenue for the credit limit.
+/// 3. with a revenue token in its term, move `share_bps` of it to the token's
+///    buyback escrow first (after the remittance instead, while an advance
+///    that predates the token is open: its lenders underwrote gross revenue);
+/// 4. remit `remit_bps` of the rest to the pool while an advance is open (all
+///    of it while defaulted), the rest to the validator's payout account;
+/// 5. attribute the remittance to principal and fee, close the advance when
+///    it is paid, and record the epoch's revenue **net of the share** for the
+///    credit limit (the share never repays anything, so an advance is sized on
+///    what is left).
+///
+/// A position with a revenue token must pass its `RevenueToken` and escrow:
+/// leaving them out fails with `RevenueTokenAccountsMissing`, so a cranker
+/// cannot skip the share.
 pub fn sweep(ctx: Context<Sweep>) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     let position = &mut ctx.accounts.position;
@@ -132,8 +151,38 @@ pub fn sweep(ctx: Context<Sweep>) -> Result<()> {
         .lamports()
         .saturating_sub(rent.minimum_balance(0));
 
-    // ── 3. Split ──
-    let (outstanding, remit_bps, full_remit) =
+    // ── 3. Revenue token ──
+    // (share_bps this sweep, the token's advance cut-off, the escrow)
+    let revenue_token = if position.has_revenue_token() {
+        let (Some(rt), Some(buyback)) = (
+            ctx.accounts.revenue_token.as_ref(),
+            ctx.accounts.buyback_escrow.as_ref(),
+        ) else {
+            return err!(EpochError::RevenueTokenAccountsMissing);
+        };
+        require_keys_eq!(
+            rt.key(),
+            position.revenue_token,
+            EpochError::RevenueTokenMismatch
+        );
+        let expected = Pubkey::create_program_address(
+            &[BUYBACK_SEED, vote_key.as_ref(), &[rt.escrow_bump]],
+            ctx.program_id,
+        )
+        .map_err(|_| error!(EpochError::RevenueTokenMismatch))?;
+        require_keys_eq!(buyback.key(), expected, EpochError::RevenueTokenMismatch);
+        let share_bps = if rt.in_term(epoch) { rt.share_bps } else { 0 };
+        Some((
+            share_bps,
+            rt.advance_seq_at_registration,
+            buyback.to_account_info(),
+        ))
+    } else {
+        None
+    };
+
+    // ── 4. Split ──
+    let (outstanding, remit_bps, full_remit, advance_seq) =
         match (position.open_advance, ctx.accounts.advance.as_ref()) {
             (Some(expected), Some(adv)) => {
                 require_keys_eq!(adv.key(), expected, EpochError::AdvanceMismatch);
@@ -145,15 +194,37 @@ pub fn sweep(ctx: Context<Sweep>) -> Result<()> {
                     adv.outstanding(),
                     adv.remit_bps,
                     position.status == PositionStatus::Defaulted,
+                    Some(adv.seq),
                 )
             }
             (Some(_), None) => return err!(EpochError::AdvanceMismatch),
-            (None, _) => (0, 0, false),
+            (None, _) => (0, 0, false, None),
         };
-    let split =
-        split_sweep(gross, outstanding, remit_bps, full_remit).ok_or(EpochError::MathOverflow)?;
+    let (share_bps, senior_advance) = match (&revenue_token, advance_seq) {
+        (Some((bps, cutoff, _)), Some(seq)) => (*bps, seq < *cutoff),
+        (Some((bps, _, _)), None) => (*bps, false),
+        (None, _) => (0, false),
+    };
+    let split = split_sweep_with_share(
+        gross,
+        share_bps,
+        outstanding,
+        remit_bps,
+        full_remit,
+        senior_advance,
+    )
+    .ok_or(EpochError::MathOverflow)?;
 
     let escrow_seeds: &[&[u8]] = &[ESCROW_SEED, vote_key.as_ref(), &[position.escrow_bump]];
+    if let Some((_, _, buyback)) = &revenue_token {
+        transfer_from_pda(
+            &ctx.accounts.escrow.to_account_info(),
+            buyback,
+            &ctx.accounts.system_program.to_account_info(),
+            split.share,
+            &[escrow_seeds],
+        )?;
+    }
     transfer_from_pda(
         &ctx.accounts.escrow.to_account_info(),
         &ctx.accounts.vault.to_account_info(),
@@ -169,7 +240,7 @@ pub fn sweep(ctx: Context<Sweep>) -> Result<()> {
         &[escrow_seeds],
     )?;
 
-    // ── 4. Accounting ──
+    // ── 5. Accounting ──
     if let Some(adv) = ctx.accounts.advance.as_mut() {
         if split.remit > 0 {
             match adv.state {
@@ -249,9 +320,30 @@ pub fn sweep(ctx: Context<Sweep>) -> Result<()> {
         }
     }
 
-    position.push_revenue(gross);
+    // The credit limit and the hedge rule read this ring buffer: net of the share.
+    position.push_revenue(gross - split.share);
     position.last_swept_epoch = epoch;
     position.total_swept = position.total_swept.saturating_add(gross);
+    if let Some((share_bps, _, buyback)) = &revenue_token {
+        let rt = ctx
+            .accounts
+            .revenue_token
+            .as_mut()
+            .ok_or(EpochError::RevenueTokenAccountsMissing)?;
+        rt.last_share_epoch = epoch;
+        rt.total_escrowed = rt.total_escrowed.saturating_add(split.share);
+        if *share_bps > 0 {
+            emit!(RevenueShareSwept {
+                vote: vote_key,
+                mint: rt.mint,
+                epoch,
+                gross,
+                share: split.share,
+                after_senior_advance: senior_advance,
+                escrow_balance: buyback.lamports().saturating_sub(rent.minimum_balance(0)),
+            });
+        }
+    }
     pool.assert_ledger()?;
     require!(
         ctx.accounts.vault.lamports() >= pool.required_vault_lamports(rent.minimum_balance(0))?,

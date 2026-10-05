@@ -5,6 +5,7 @@ import {
   decodeAdvance,
   decodeFeeIndex,
   decodePool,
+  decodeRevenueToken,
   decodeSwapPosition,
   decodeValidatorPosition,
   decodeWithdrawRequest,
@@ -15,6 +16,7 @@ import {
   findWithdrawRequestPda,
   parseEpochError,
   type PoolAccount,
+  type RevenueTokenAccount,
   type SwapPositionAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
@@ -38,6 +40,7 @@ import {
   type ChainClock,
   describeFailure,
   type EpochChain,
+  type ExecuteOptions,
   type ExecuteResult,
   type ProgramAccount,
   type SignerRole,
@@ -74,6 +77,7 @@ export class ProgramClient implements EpochChain {
   private readonly computeUnitPriceMicroLamports: number;
   private readonly now: () => number;
   private readonly dryRunMemo = new Map<string, { at: number; result: ExecuteResult }>();
+  private readonly rent = new Map<number, bigint>();
 
   constructor(options: ProgramClientOptions) {
     this.programId = options.programId;
@@ -93,7 +97,7 @@ export class ProgramClient implements EpochChain {
 
   async clock(): Promise<ChainClock> {
     const info = await this.connections.withFailover((c) => c.getEpochInfo('confirmed'));
-    return { epoch: BigInt(info.epoch), slot: BigInt(info.absoluteSlot) };
+    return { epoch: BigInt(info.epoch), slot: BigInt(info.absoluteSlot), slotIndex: BigInt(info.slotIndex) };
   }
 
   epochRewardsActive(): Promise<boolean> {
@@ -127,13 +131,35 @@ export class ProgramClient implements EpochChain {
     return this.loadAll('SwapPosition', decodeSwapPosition, taker ? [fieldFilter('SwapPosition', 'taker', taker)] : []);
   }
 
+  revenueTokens(): Promise<ProgramAccount<RevenueTokenAccount>[]> {
+    return this.loadAll('RevenueToken', decodeRevenueToken);
+  }
+
+  async lamports(address: PublicKey): Promise<bigint> {
+    return BigInt(await this.connections.withFailover((c) => c.getBalance(address, 'confirmed')));
+  }
+
+  async rentExempt(space: number): Promise<bigint> {
+    const cached = this.rent.get(space);
+    if (cached !== undefined) return cached;
+    const value = BigInt(await this.connections.withFailover((c) => c.getMinimumBalanceForRentExemption(space)));
+    this.rent.set(space, value);
+    return value;
+  }
+
   // ── Transactions ───────────────────────────────────────────────────────────
 
-  async simulate(label: string, instructions: TransactionInstruction[], role: SignerRole): Promise<ExecuteResult> {
+  async simulate(
+    label: string,
+    instructions: TransactionInstruction[],
+    role: SignerRole,
+    options: ExecuteOptions = {},
+  ): Promise<ExecuteResult> {
     if (role === 'scorer') this.requireScorer();
     try {
       const sim = await this.sender.simulate(instructions, {
         computeUnitPriceMicroLamports: this.computeUnitPriceMicroLamports,
+        computeUnitLimit: options.computeUnitLimit,
       });
       if (sim.ok) return { status: 'simulated', logs: sim.logs, unitsConsumed: sim.unitsConsumed };
       const error = parseEpochError({ err: sim.err, logs: sim.logs });
@@ -145,12 +171,18 @@ export class ProgramClient implements EpochChain {
     }
   }
 
-  async execute(label: string, instructions: TransactionInstruction[], role: SignerRole): Promise<ExecuteResult> {
-    if (this.dryRun) return this.dryRunSimulate(label, instructions, role);
+  async execute(
+    label: string,
+    instructions: TransactionInstruction[],
+    role: SignerRole,
+    options: ExecuteOptions = {},
+  ): Promise<ExecuteResult> {
+    if (this.dryRun) return this.dryRunSimulate(label, instructions, role, options);
     const signers = role === 'scorer' ? [this.requireScorer()] : [];
     try {
       const signature = await this.sender.send(instructions, signers, {
         computeUnitPriceMicroLamports: this.computeUnitPriceMicroLamports,
+        computeUnitLimit: options.computeUnitLimit,
         retries: 2,
         // An instruction that failed fails again: re-sending cannot help, the next tick re-reads the chain instead.
         shouldRetry: (error) => !isExecutionFailure({ logs: errorLogs(error), message: String(error) }),
@@ -177,13 +209,14 @@ export class ProgramClient implements EpochChain {
     label: string,
     instructions: TransactionInstruction[],
     role: SignerRole,
+    options: ExecuteOptions,
   ): Promise<ExecuteResult> {
     const memo = this.dryRunMemo.get(label);
     if (memo && this.now() - memo.at < DRY_RUN_MEMO_MS) {
       logger.debug('DRY_RUN: already simulated', { label, status: memo.result.status });
       return memo.result;
     }
-    const result = await this.simulate(label, instructions, role);
+    const result = await this.simulate(label, instructions, role, options);
     if (result.status === 'simulated') {
       logger.info('DRY_RUN: simulated, not sent', { label, unitsConsumed: result.unitsConsumed });
       this.dryRunMemo.set(label, { at: this.now(), result });

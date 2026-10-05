@@ -15,7 +15,7 @@ describe('EPOCH_ERRORS', () => {
     const rust = [...vectors.errors].sort((a, b) => a.code - b.code);
     expect(EPOCH_ERRORS.map((e) => ({ name: e.name, code: e.code, message: e.message }))).toEqual(rust);
     EPOCH_ERRORS.forEach((e, i) => expect(e.code).toBe(6000 + i));
-    expect(EPOCH_ERRORS).toHaveLength(54);
+    expect(EPOCH_ERRORS).toHaveLength(90);
   });
 
   it('is frozen', () => {
@@ -26,7 +26,14 @@ describe('EPOCH_ERRORS', () => {
   it('epochErrorFromCode looks codes up', () => {
     expect(epochErrorFromCode(6000)?.name).toBe('Paused');
     expect(epochErrorFromCode(6053)?.name).toBe('NotMaker');
-    expect(epochErrorFromCode(6054)).toBeUndefined();
+    // Revenue tokens were appended: every earlier code kept its number.
+    expect(epochErrorFromCode(6054)?.name).toBe('RevenueTokenExists');
+    expect(epochErrorFromCode(6061)?.name).toBe('RevenueTokenAccountsMissing');
+    expect(epochErrorFromCode(6081)?.name).toBe('InvalidBuybackParams');
+    // Then the treasury claims.
+    expect(epochErrorFromCode(6082)?.name).toBe('NotTreasuryFeeClaimer');
+    expect(epochErrorFromCode(6089)?.name).toBe('InvalidClaimAccount');
+    expect(epochErrorFromCode(6090)).toBeUndefined();
     expect(epochErrorFromCode(2006)).toBeUndefined();
   });
 });

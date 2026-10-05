@@ -6,15 +6,38 @@ import {
   attributeRepayment,
   bpsOf,
   bpsOfCeil,
+  type BuyFill,
   computeScore,
   creditLimit,
+  type CurvePoint,
+  dammCompoundingBuy,
+  dammCompoundingMaxQuoteIn,
+  dammConcentratedBuy,
+  dammConcentratedMaxQuoteIn,
+  dbcBuy,
+  dbcLeftover,
+  dbcMaxQuoteIn,
+  dbcPartnerMigrationFee,
+  dbcPartnerPart,
+  dbcPartnerSurplus,
+  deltaBase,
+  deltaQuote,
   distributeIncome,
   EpochMathError,
+  impactTargetSqrtPrice,
   juniorRatioBps,
+  minOutFloor,
   mulDiv,
+  nextSqrtFromQuoteIn,
+  planBuybackSlice,
+  redeemPayout,
   sharePriceE9,
   sharesToAssets,
+  sliceBudget,
+  sliceDueSlot,
+  sliceTiming,
   splitSweep,
+  splitSweepWithShare,
   swapCollateral,
   takerPnl,
 } from './math';
@@ -27,6 +50,18 @@ type Args = unknown[];
 const big = (v: unknown): bigint => BigInt(v as string);
 const num = (v: unknown): number => v as number;
 const str = (v: bigint): string => v.toString();
+const curveOf = (raw: unknown): CurvePoint[] =>
+  (raw as { sqrt_price: string; liquidity: string }[]).map((p) => ({
+    sqrtPrice: big(p.sqrt_price),
+    liquidity: big(p.liquidity),
+  }));
+const fill = (f: BuyFill) => ({
+  output: str(f.output),
+  consumed: str(f.consumed),
+  next_sqrt_price: str(f.nextSqrtPrice),
+});
+const rustVariant = (v: string | null): string | null =>
+  v === null ? null : `${v.charAt(0).toUpperCase()}${v.slice(1)}`;
 
 /** Run every Rust case; `null` results must throw EpochMathError (the program's `None`). */
 function runCases(name: string, run: (args: Args) => unknown): { actual: unknown[]; expected: unknown[] } {
@@ -88,6 +123,49 @@ const MIRRORS: Record<string, (args: Args) => unknown> = {
       delinquent: delinquent as boolean,
       superminority: superminority as boolean,
     }),
+  // Revenue tokens
+  split_sweep_with_share: ([gross, share, outstanding, remit, full, senior]) => {
+    const r = splitSweepWithShare(
+      big(gross),
+      num(share),
+      big(outstanding),
+      num(remit),
+      full as boolean,
+      senior as boolean,
+    );
+    return { share: str(r.share), remit: str(r.remit), to_operator: str(r.toOperator) };
+  },
+  slice_due_slot: ([slice, slices, window]) => {
+    const r = sliceDueSlot(num(slice), num(slices), num(window));
+    return r === null ? null : str(r);
+  },
+  slice_timing: ([slot, slice, slices, window]) =>
+    rustVariant(sliceTiming(big(slot), num(slice), num(slices), num(window))),
+  slice_budget: ([budget, spent, slices, done, escrow]) =>
+    str(sliceBudget(big(budget), big(spent), num(slices), num(done), big(escrow))),
+  redeem_payout: ([escrow, amount, circulating]) => str(redeemPayout(big(escrow), big(amount), big(circulating))),
+  // Meteora quotes
+  delta_base: ([lower, upper, l, up]) => str(deltaBase(big(lower), big(upper), big(l), up as boolean)),
+  delta_quote: ([lower, upper, l, up]) => str(deltaQuote(big(lower), big(upper), big(l), up as boolean)),
+  next_sqrt_from_quote_in: ([sqrt, l, amount]) => str(nextSqrtFromQuoteIn(big(sqrt), big(l), big(amount))),
+  dbc_buy: ([curve, sqrt, stop, amount]) => fill(dbcBuy(curveOf(curve), big(sqrt), big(stop), big(amount))),
+  dbc_max_quote_in: ([curve, sqrt, stop, target]) =>
+    str(dbcMaxQuoteIn(curveOf(curve), big(sqrt), big(stop), big(target))),
+  damm_concentrated_buy: ([sqrt, l, max, amount]) =>
+    fill(dammConcentratedBuy(big(sqrt), big(l), big(max), big(amount))),
+  damm_concentrated_max_quote_in: ([sqrt, l, max, target]) =>
+    str(dammConcentratedMaxQuoteIn(big(sqrt), big(l), big(max), big(target))),
+  damm_compounding_buy: ([a, b, amount]) => fill(dammCompoundingBuy(big(a), big(b), big(amount))),
+  damm_compounding_max_quote_in: ([b, bps]) => str(dammCompoundingMaxQuoteIn(big(b), num(bps))),
+  impact_target_sqrt_price: ([sqrt, bps]) => str(impactTargetSqrtPrice(big(sqrt), num(bps))),
+  min_out_floor: ([out, bps]) => str(minOutFloor(big(out), num(bps))),
+  // Treasury claims
+  dbc_partner_part: ([fee, pct]) => str(dbcPartnerPart(big(fee), num(pct))),
+  dbc_partner_surplus: ([reserve, threshold, pct]) => str(dbcPartnerSurplus(big(reserve), big(threshold), num(pct))),
+  dbc_partner_migration_fee: ([threshold, feePct, creatorPct]) =>
+    str(dbcPartnerMigrationFee(big(threshold), num(feePct), num(creatorPct))),
+  dbc_leftover: ([vault, partner, protocol, creator, migration]) =>
+    str(dbcLeftover(big(vault), big(partner), big(protocol), big(creator), big(migration))),
 };
 
 describe('math mirrors programs/epoch/src/math and swap.rs exactly', () => {
@@ -101,7 +179,26 @@ describe('math mirrors programs/epoch/src/math and swap.rs exactly', () => {
   });
 
   it('exercises the None paths (they must throw EpochMathError, not return)', () => {
-    for (const name of ['bps_of', 'mul_div', 'assets_to_shares', 'credit_limit', 'distribute_income', 'taker_pnl']) {
+    for (const name of [
+      'bps_of',
+      'mul_div',
+      'assets_to_shares',
+      'credit_limit',
+      'distribute_income',
+      'taker_pnl',
+      'split_sweep_with_share',
+      'slice_budget',
+      'redeem_payout',
+      'delta_base',
+      'next_sqrt_from_quote_in',
+      'damm_concentrated_buy',
+      'impact_target_sqrt_price',
+      'min_out_floor',
+      'dbc_partner_part',
+      'dbc_partner_surplus',
+      'dbc_partner_migration_fee',
+      'dbc_leftover',
+    ]) {
       expect(vectors.math[name].some((c) => c.result === null)).toBe(true);
     }
   });
@@ -147,6 +244,138 @@ describe('program unit-test examples', () => {
   it('swap collateral is bps_of(notional, max_move_bps)', () => {
     expect(swapCollateral(1_000_000_000n, 2_000)).toBe(200_000_000n);
     expect(swapCollateral(3n, 3_333)).toBe(0n);
+  });
+});
+
+describe('revenue tokens', () => {
+  const Q64 = 1n << 64n;
+  const L = 1_000_000_000n << 65n;
+  const curve: CurvePoint[] = [
+    { sqrtPrice: 2n * Q64, liquidity: L },
+    { sqrtPrice: 4n * Q64, liquidity: 2n * L },
+  ];
+  const rt = {
+    buybackEpoch: 700n,
+    epochBudget: 12_000_000_000n,
+    epochSpent: 0n,
+    slicesPerEpoch: 12,
+    slicesDone: 0,
+    maxSlippageBps: 300,
+    maxImpactBps: 100,
+  };
+  const dbc = {
+    kind: 'dbc' as const,
+    sqrtPrice: Q64,
+    quoteReserve: 0n,
+    isMigrated: false,
+    migrationSqrtPrice: 4n * Q64,
+    migrationQuoteThreshold: 10_000_000_000n,
+    curve,
+  };
+
+  it('the share comes off the top unless the advance predates the token', () => {
+    expect(splitSweepWithShare(10_000n, 1_000, 1_000_000n, 5_000, false, false)).toEqual({
+      share: 1_000n,
+      remit: 4_500n,
+      toOperator: 4_500n,
+    });
+    expect(splitSweepWithShare(10_000n, 1_000, 1_000_000n, 5_000, false, true)).toEqual({
+      share: 1_000n,
+      remit: 5_000n,
+      toOperator: 4_000n,
+    });
+    expect(splitSweepWithShare(10_000n, 0, 1_000_000n, 5_000, false, false)).toEqual({
+      share: 0n,
+      ...splitSweep(10_000n, 1_000_000n, 5_000, false),
+    });
+  });
+
+  it('spreads twelve slices over the window', () => {
+    expect([0, 1, 11].map((i) => sliceDueSlot(i, 12, 9_000))).toEqual([0n, 750n, 8_250n]);
+    expect(sliceDueSlot(12, 12, 9_000)).toBeNull();
+    expect(sliceTiming(749n, 1, 12, 9_000)).toBe('notDue');
+    expect(sliceTiming(8_999n, 1, 12, 9_000)).toBe('due');
+    expect(sliceTiming(9_000n, 11, 12, 9_000)).toBe('windowClosed');
+    expect(sliceBudget(12_000n, 4_000n, 12, 0b11111, 8_000n)).toBe(1_142n);
+    expect(redeemPayout(1_000n, 1n, 3n)).toBe(333n);
+  });
+
+  it('plans a DBC slice the way execute_buyback computes it', () => {
+    const plan = planBuybackSlice({
+      epoch: 700n,
+      revenueToken: rt,
+      escrowAvailable: 12_000_000_000n,
+      slice: 0,
+      venue: dbc,
+    });
+    // 1 SOL budget, but the 100 bps impact cap allows 9,999,999 lamports (√P + 0.5%).
+    expect(plan).toEqual({
+      status: 'ready',
+      amount: 9_999_999n,
+      feeFreeOut: dbcBuy(curve, Q64, 4n * Q64, 9_999_999n).output,
+      floor: minOutFloor(dbcBuy(curve, Q64, 4n * Q64, 9_999_999n).output, 300),
+      nextSqrtPrice: dbcBuy(curve, Q64, 4n * Q64, 9_999_999n).nextSqrtPrice,
+    });
+    if (plan.status !== 'ready') throw new Error('expected a plan');
+    expect(plan.nextSqrtPrice).toBeLessThanOrEqual(impactTargetSqrtPrice(Q64, 100));
+    // A looser cap: the slice budget binds (12 SOL / 12).
+    const loose = planBuybackSlice({
+      epoch: 700n,
+      revenueToken: { ...rt, maxImpactBps: 1_000 },
+      escrowAvailable: 12_000_000_000n,
+      slice: 0,
+      venue: dbc,
+    });
+    expect(loose.status === 'ready' && loose.amount).toBe(100_000_000n - 1n);
+  });
+
+  it('resets the budget in a new epoch and skips what the program rejects', () => {
+    const stale = { ...rt, buybackEpoch: 699n, epochBudget: 1n, epochSpent: 1n, slicesDone: 1 };
+    const fresh = planBuybackSlice({ epoch: 700n, revenueToken: stale, escrowAvailable: 1_200n, slice: 0, venue: dbc });
+    expect(fresh.status === 'ready' && fresh.amount).toBe(100n);
+    const base = { epoch: 700n, revenueToken: { ...rt, slicesDone: 1 }, escrowAvailable: 1_200n, slice: 0, venue: dbc };
+    expect(planBuybackSlice(base)).toEqual({ status: 'skip', reason: 'SliceAlreadyExecuted' });
+    expect(planBuybackSlice({ ...base, slice: 1, venue: { ...dbc, isMigrated: true } })).toEqual({
+      status: 'skip',
+      reason: 'PoolNotSynced',
+    });
+    expect(planBuybackSlice({ ...base, slice: 1, venue: { ...dbc, quoteReserve: 10_000_000_000n } })).toEqual({
+      status: 'skip',
+      reason: 'VenueNotTrading',
+    });
+    expect(planBuybackSlice({ ...base, slice: 1, escrowAvailable: 0n })).toEqual({
+      status: 'skip',
+      reason: 'NothingToBuy',
+    });
+    expect(() => planBuybackSlice({ ...base, slice: 12 })).toThrow(/InvalidSlice/);
+  });
+
+  it('plans DAMM v2 slices (concentrated and compounding)', () => {
+    const damm = {
+      kind: 'dammV2' as const,
+      sqrtPrice: Q64,
+      liquidity: L,
+      sqrtMaxPrice: 1n << 127n,
+      collectFeeMode: 1,
+      tokenAAmount: 0n,
+      tokenBAmount: 0n,
+      poolStatus: 0,
+    };
+    const input = { epoch: 700n, revenueToken: rt, escrowAvailable: 12_000_000_000n, slice: 3, venue: damm };
+    const concentrated = planBuybackSlice(input);
+    expect(concentrated.status === 'ready' && concentrated.amount).toBe(
+      dammConcentratedMaxQuoteIn(Q64, L, 1n << 127n, impactTargetSqrtPrice(Q64, 100)),
+    );
+    const compounding = planBuybackSlice({
+      ...input,
+      venue: { ...damm, collectFeeMode: 2, tokenAAmount: 1_000_000_000_000n, tokenBAmount: 50_000_000_000n },
+    });
+    // b × 100 / 20,000 = 0.25 SOL caps the 1 SOL slice.
+    expect(compounding.status === 'ready' && compounding.amount).toBe(250_000_000n);
+    expect(planBuybackSlice({ ...input, venue: { ...damm, poolStatus: 1 } })).toEqual({
+      status: 'skip',
+      reason: 'VenueNotTrading',
+    });
   });
 });
 

@@ -42,6 +42,7 @@ export const position = (overrides: Partial<ValidatorPositionAccount> = {}): Val
   inflationCommissionBps: 500,
   blockCommissionBps: 1_000,
   onboardedEpoch: 90n,
+  revenueToken: null,
   ...overrides,
 });
 
