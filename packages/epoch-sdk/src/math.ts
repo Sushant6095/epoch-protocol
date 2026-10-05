@@ -351,6 +351,90 @@ export function redeemPayout(escrowAvailable: bigint, amount: bigint, circulatin
   return mulDiv(escrowAvailable, amount, circulating);
 }
 
+/**
+ * `circulating_supply`: what can claim the escrow on `redeem`: the mint supply less what Epoch's own token accounts
+ * hold (the buyback account and the treasury's), never below zero. Tokens in the Meteora pools count.
+ */
+export function circulatingSupply(supply: bigint, heldByEpoch: bigint): bigint {
+  const v = u64(supply, 'supply') - u64(heldByEpoch, 'heldByEpoch');
+  return v > 0n ? v : 0n;
+}
+
+// ─── Venue fee floor and the impact bound (`register_revenue_token`) ──────
+
+/** Meteora fee numerators are over 10⁹: one bps is 10⁵. */
+export const FEE_NUMERATOR_PER_BPS = 100_000n;
+const ONE_Q64 = 1n << 64n;
+
+/**
+ * `dbc_min_base_fee_numerator`: the lowest base fee a DBC curve can charge (numerator over 10⁹). Fee scheduler (mode
+ * 0 linear, 1 exponential): the fee after all `numberOfPeriod` periods, rounded down; rate limiter (2): the cliff.
+ * Throws `EpochMathError` for another mode (the program refuses the config: `UnsupportedVenueFee`).
+ */
+export function dbcMinBaseFeeNumerator(
+  mode: number,
+  cliffFeeNumerator: bigint,
+  numberOfPeriod: number,
+  reductionFactor: bigint,
+): bigint {
+  uint(mode, 8, 'mode');
+  const cliff = u64(cliffFeeNumerator, 'cliffFeeNumerator');
+  const periods = uint(numberOfPeriod, 16, 'numberOfPeriod');
+  const reduction = u64(reductionFactor, 'reductionFactor');
+  switch (mode) {
+    case 0: {
+      const cut = min(periods * reduction, U64_MAX);
+      return cliff > cut ? cliff - cut : 0n;
+    }
+    case 1: {
+      if (periods === 0n || reduction === 0n) return cliff;
+      if (reduction >= BPS) return 0n;
+      const base = ONE_Q64 - (reduction << 64n) / BPS;
+      let result = ONE_Q64;
+      let b = base;
+      for (let n = periods; n > 0n; n >>= 1n) {
+        if ((n & 1n) === 1n) result = (result * b) >> 64n;
+        b = (b * b) >> 64n;
+      }
+      return (cliff * result) >> 64n;
+    }
+    case 2:
+      return cliff;
+    default:
+      throw new EpochMathError('dbcMinBaseFeeNumerator');
+  }
+}
+
+/**
+ * `dbc_migrated_fee_bps`: the graduated DAMM v2 pool's base fee from a DBC config: options 0–5 are 25, 30, 100, 200,
+ * 400 and 600 bps; option 6 (customizable) is `customFeeBps` when its base fee mode is a time scheduler (0 or 1).
+ * Throws `EpochMathError` for a market-cap scheduler or an unknown option (`UnsupportedVenueFee`).
+ */
+export function dbcMigratedFeeBps(option: number, customFeeBps: number, customMode: number): number {
+  uint(option, 8, 'option');
+  uint(customFeeBps, 16, 'customFeeBps');
+  uint(customMode, 8, 'customMode');
+  const tiers = [25, 30, 100, 200, 400, 600];
+  if (option < tiers.length) return tiers[option];
+  if (option === 6 && customMode <= 1) return customFeeBps;
+  throw new EpochMathError('dbcMigratedFeeBps');
+}
+
+/** `venue_fee_floor_bps`: the lower of the curve's lowest fee (whole bps, rounded down) and the graduated pool's. */
+export function venueFeeFloorBps(curveMinFeeNumerator: bigint, migratedFeeBps: number): number {
+  const curve = u64(curveMinFeeNumerator, 'curveMinFeeNumerator') / FEE_NUMERATOR_PER_BPS;
+  const pool = uint(migratedFeeBps, 16, 'migratedFeeBps');
+  return Number(curve < pool ? curve : pool);
+}
+
+/**
+ * `max_impact_bound`: the largest `max_impact_bps` that keeps a sandwich unprofitable, twice the fee floor (the
+ * attacker pays the fee in and out), capped at `MAX_MAX_IMPACT_BPS`.
+ */
+export function maxImpactBound(feeFloorBps: number): number {
+  return Math.min(Number(uint(feeFloorBps, 16, 'feeFloorBps')) * 2, PROGRAM_CONSTANTS.MAX_MAX_IMPACT_BPS);
+}
+
 // ─── Meteora buy quotes (`math/amm.rs`) ───────────────────────────────────
 
 const U256_MAX = (1n << 256n) - 1n;

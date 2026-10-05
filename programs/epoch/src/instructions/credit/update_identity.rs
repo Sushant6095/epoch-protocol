@@ -33,9 +33,12 @@ pub struct UpdateIdentity<'info> {
     pub vote_program: UncheckedAccount<'info>,
 }
 
-/// Rotate the validator identity. Blocked while an advance is open because
-/// the runtime resets the block revenue collector to the new identity.
-/// Call `set_collectors` afterwards to point it back at the escrow.
+/// Rotate the validator identity. Blocked while an advance is open. A block
+/// revenue collector that is not the identity (the escrow, once
+/// `set_collectors` ran) stays where it is: the vote program moves only a
+/// collector that was the old identity (probed on Agave 4.3 localnet by the
+/// revenue-token integration test). `set_collectors` re-asserts the escrow
+/// either way.
 pub fn update_identity(ctx: Context<UpdateIdentity>) -> Result<()> {
     let position = &mut ctx.accounts.position;
     require!(

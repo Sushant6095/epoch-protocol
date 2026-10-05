@@ -2,7 +2,7 @@
   "name": "@epoch/operator_cli",
   "version": "0.1.0",
   "private": true,
-  "description": "Epoch's operator script for onboarded validators: status, commission, identity, bond, release",
+  "description": "Epoch operator script: pool admin (init, roles, pause) and onboarded validators (onboarding, commission, identity, bond, revenue token, release)",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

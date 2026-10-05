@@ -323,6 +323,10 @@ pub struct RevenueTokenClosed {
     pub total_spent: u64,
     pub total_burned: u64,
     pub total_redeemed: u64,
+    /// Escrow left unclaimed after the redemption grace period, booked as
+    /// pool income (0 when the escrow was spent). Appended: older decoders
+    /// that ignore trailing bytes still read the fields above.
+    pub lamports_to_pool: u64,
 }
 
 // ── Partner treasury claims ────────────────────────────────────────────────

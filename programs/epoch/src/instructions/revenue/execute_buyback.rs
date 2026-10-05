@@ -22,9 +22,12 @@
 //!
 //! Residual risk: the floor is computed from the state the transaction sees,
 //! so it does not detect a front-run inside the same block; bound 2 is what
-//! makes one unprofitable, and it assumes the pool fee is at least half of
-//! `max_impact_bps`. The admin should lower `max_impact_bps` for a pool with
-//! a lower fee (DBC's minimum is 0.25%).
+//! makes one unprofitable, and it needs the pool fee to be at least half of
+//! `max_impact_bps`. The program enforces that: registration records the
+//! lowest fee the curve and the graduated pool can charge (`fee_floor_bps`,
+//! from the DBC config) and `max_impact_bps` can never exceed twice it. It
+//! assumes Meteora's operator does not lower a live pool's fee below its
+//! config's.
 
 use anchor_lang::prelude::*;
 use solana_sysvar::epoch_schedule::EpochSchedule;
@@ -51,10 +54,15 @@ pub struct ExecuteBuyback<'info> {
     #[account(mut)]
     pub cranker: Signer<'info>,
 
+    /// The lending pool: pausing it stops buybacks too.
+    #[account(seeds = [POOL_SEED], bump = pool.bump)]
+    pub pool: Box<Account<'info, Pool>>,
+
     #[account(
         mut,
         seeds = [REVENUE_TOKEN_SEED, revenue_token.vote.as_ref()],
         bump = revenue_token.bump,
+        has_one = pool,
     )]
     pub revenue_token: Account<'info, RevenueToken>,
 
@@ -125,7 +133,8 @@ pub struct ExecuteBuyback<'info> {
 
 /// Run buyback slice `slice` of the current epoch with the cranker's
 /// `min_amount_out` (from a fresh quote). See the module docs for the
-/// protocol-side bounds.
+/// protocol-side bounds. Stopped by the pool's pause (`Paused`) as well as
+/// the token's own `FLAG_BUYBACKS_PAUSED`.
 pub fn execute_buyback<'info>(
     ctx: Context<'info, ExecuteBuyback<'info>>,
     slice: u8,
@@ -137,6 +146,7 @@ pub fn execute_buyback<'info>(
 
     // ── Schedule ──
     {
+        require!(!ctx.accounts.pool.paused, EpochError::Paused);
         let rt = &ctx.accounts.revenue_token;
         require!(!rt.buybacks_paused(), EpochError::BuybacksPaused);
         require!(min_amount_out > 0, EpochError::MinOutTooLow);

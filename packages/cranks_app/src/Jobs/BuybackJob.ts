@@ -3,11 +3,10 @@ import {
   executeBuyback,
   findBuybackEscrowPda,
   planBuybackSlice,
-  PROGRAM_CONSTANTS,
   type RevenueTokenAccount,
   revenueTokenBuybacksPaused,
+  revenueTokenCloseMode,
   revenueTokenInTerm,
-  revenueTokenTermActive,
   sliceTiming,
   syncRevenueTokenPool,
 } from '@epoch/epoch-sdk';
@@ -37,8 +36,8 @@ export const DEFAULT_BUYBACK_OPTIONS: BuybackJobOptions = {
 
 /** Program errors that end a slice for this epoch (re-sending cannot change them). */
 const SLICE_OVER = new Set(['SliceAlreadyExecuted', 'NothingToBuy', 'OutsideBuybackWindow', 'BuybacksPaused']);
-/** Program errors that mean "not yet": the next tick looks again, without spending an attempt. */
-const NOT_YET = new Set(['SliceNotDue', 'SweepPending', 'VenueNotTrading', 'PoolNotSynced']);
+/** Program errors that mean "not yet": the next tick looks again, without spending an attempt (`Paused`: the pool). */
+const NOT_YET = new Set(['SliceNotDue', 'SweepPending', 'VenueNotTrading', 'PoolNotSynced', 'Paused']);
 
 /**
  * Revenue-token buybacks (ADR 0006): every tick, for each token, at most one `execute_buyback` — the earliest slice
@@ -50,7 +49,8 @@ const NOT_YET = new Set(['SliceNotDue', 'SweepPending', 'VenueNotTrading', 'Pool
  * attempts is not sent again.
  *
  * Also, permissionlessly: `sync_revenue_token_pool` once the curve migrated (buybacks then move to DAMM v2), and
- * `close_revenue_token` after the term once the escrow is spent (the rent goes back to the operator).
+ * `close_revenue_token` after the term once the escrow is spent (the rent goes back to the operator) or, whatever it
+ * holds, once the redemption grace period is over (the rest becomes pool income).
  *
  * Runs after the epoch's sweep (a steady job), since slices in the term wait for this epoch's share.
  */
@@ -95,7 +95,7 @@ export class BuybackJob implements Job {
     const escrowLamports = await this.chain.lamports(escrow);
     const escrowAvailable = escrowLamports > rent ? escrowLamports - rent : 0n;
 
-    if (!revenueTokenTermActive(token, epoch) && escrowAvailable <= PROGRAM_CONSTANTS.MAX_CLOSE_DUST_LAMPORTS) {
+    if (revenueTokenCloseMode(token, epoch, escrowAvailable) !== null) {
       await this.close(token, cranker);
       return;
     }

@@ -1,0 +1,8067 @@
+{
+  "address": "11111111111111111111111111111111",
+  "metadata": {
+    "name": "epoch",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Epoch: revenue-based credit and fee swaps for Solana validators"
+  },
+  "instructions": [
+    {
+      "name": "accrue",
+      "discriminator": [
+        23,
+        76,
+        128,
+        149,
+        229,
+        247,
+        72,
+        228
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may run the epoch accrual."
+          ],
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "burn_leftover",
+      "discriminator": [
+        58,
+        137,
+        245,
+        55,
+        2,
+        29,
+        142,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may run it. Pays the transaction fee and fronts the rent of the",
+            "treasury's token account when it has to be created (refunded when the",
+            "instruction closes it again)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "the token account and signs the burn."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_tokens",
+          "docs": [
+            "DBC sends the leftover (checked in the handler)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "dbc_pool",
+          "writable": true
+        },
+        {
+          "name": "dbc_config"
+        },
+        {
+          "name": "base_vault",
+          "writable": true
+        },
+        {
+          "name": "base_mint",
+          "writable": true
+        },
+        {
+          "name": "dbc_pool_authority",
+          "address": "FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM"
+        },
+        {
+          "name": "dbc_event_authority",
+          "address": "8Ks12pbrD6PXxfty1hVQiE9sc289zgU1zHkvXhrSdriF"
+        },
+        {
+          "name": "dbc_program",
+          "address": "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_withdraw",
+      "discriminator": [
+        112,
+        53,
+        226,
+        58,
+        158,
+        30,
+        37,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "lender",
+            "request"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "lender",
+            "request"
+          ]
+        },
+        {
+          "name": "lender",
+          "writable": true
+        },
+        {
+          "name": "request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  116,
+                  104,
+                  100,
+                  114,
+                  97,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "request.seq",
+                "account": "WithdrawRequest"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_partner_migration_fee",
+      "discriminator": [
+        5,
+        91,
+        233,
+        246,
+        90,
+        63,
+        86,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may claim. Pays the transaction fee and fronts the rent of the",
+            "claim's wrapped-SOL account, refunded before the instruction ends."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Receives the SOL as pool cash."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_wsol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  119,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dbc_pool",
+          "writable": true
+        },
+        {
+          "name": "dbc_config"
+        },
+        {
+          "name": "quote_vault",
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "dbc_pool_authority",
+          "address": "FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM"
+        },
+        {
+          "name": "dbc_event_authority",
+          "address": "8Ks12pbrD6PXxfty1hVQiE9sc289zgU1zHkvXhrSdriF"
+        },
+        {
+          "name": "dbc_program",
+          "address": "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_partner_surplus",
+      "discriminator": [
+        88,
+        48,
+        210,
+        241,
+        182,
+        188,
+        75,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may claim. Pays the transaction fee and fronts the rent of the",
+            "claim's wrapped-SOL account, refunded before the instruction ends."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Receives the SOL as pool cash."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_wsol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  119,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dbc_pool",
+          "writable": true
+        },
+        {
+          "name": "dbc_config"
+        },
+        {
+          "name": "quote_vault",
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "dbc_pool_authority",
+          "address": "FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM"
+        },
+        {
+          "name": "dbc_event_authority",
+          "address": "8Ks12pbrD6PXxfty1hVQiE9sc289zgU1zHkvXhrSdriF"
+        },
+        {
+          "name": "dbc_program",
+          "address": "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_partner_trading_fee",
+      "discriminator": [
+        123,
+        126,
+        241,
+        171,
+        152,
+        241,
+        18,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may claim. Pays the transaction fee and fronts the rent of the",
+            "claim's token accounts, refunded before the instruction ends."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Receives the SOL side as pool cash."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_wsol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  119,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_tokens",
+          "docs": [
+            "(checked in the handler; created when missing and then closed again)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "dbc_pool",
+          "writable": true
+        },
+        {
+          "name": "dbc_config"
+        },
+        {
+          "name": "base_vault",
+          "writable": true
+        },
+        {
+          "name": "quote_vault",
+          "writable": true
+        },
+        {
+          "name": "base_mint",
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "dbc_pool_authority",
+          "address": "FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM"
+        },
+        {
+          "name": "dbc_event_authority",
+          "address": "8Ks12pbrD6PXxfty1hVQiE9sc289zgU1zHkvXhrSdriF"
+        },
+        {
+          "name": "dbc_program",
+          "address": "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_treasury_lp_fee",
+      "discriminator": [
+        120,
+        183,
+        249,
+        249,
+        185,
+        84,
+        122,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may claim. Pays the transaction fee and fronts the rent of the",
+            "claim's token accounts, refunded before the instruction ends."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Receives the SOL side as pool cash."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_wsol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  119,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_tokens",
+          "docs": [
+            "the handler; created when missing and then closed again)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "damm_pool"
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "position_nft_account",
+          "docs": [
+            "must own it (checked in the handler)."
+          ]
+        },
+        {
+          "name": "token_a_vault",
+          "writable": true
+        },
+        {
+          "name": "token_b_vault",
+          "writable": true
+        },
+        {
+          "name": "token_a_mint",
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "damm_pool_authority",
+          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+        },
+        {
+          "name": "damm_event_authority",
+          "address": "3rmHSu74h1ZcmAisVcWerTCiRDQbUrBKmcwptYGjHfet"
+        },
+        {
+          "name": "damm_program",
+          "address": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_revenue_token",
+      "discriminator": [
+        250,
+        78,
+        2,
+        43,
+        3,
+        113,
+        229,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may close a finished revenue token."
+          ],
+          "signer": true
+        },
+        {
+          "name": "operator",
+          "docs": [
+            "the dust of a spent escrow)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "docs": [
+            "Books an escrow left unclaimed after the grace period as income."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "revenue_token"
+          ]
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Receives an escrow left unclaimed after the grace period."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revenue_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_tokens",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "docs": [
+            "this revenue token, the pointer is cleared so later sweeps do not ask",
+            "for the closed account; a released (closed) position is left alone."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "configure_index",
+      "discriminator": [
+        167,
+        89,
+        14,
+        253,
+        110,
+        85,
+        166,
+        9
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "publisher"
+        }
+      ],
+      "args": [
+        {
+          "name": "dispute_window_slots",
+          "type": "u64"
+        },
+        {
+          "name": "max_move_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "configure_revenue_token",
+      "discriminator": [
+        57,
+        116,
+        133,
+        153,
+        50,
+        219,
+        215,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "revenue_token"
+          ]
+        },
+        {
+          "name": "revenue_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "BuybackParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lender",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "tranche",
+          "type": {
+            "defined": {
+              "name": "Tranche"
+            }
+          }
+        },
+        {
+          "name": "assets",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "execute_buyback",
+      "discriminator": [
+        47,
+        32,
+        19,
+        100,
+        184,
+        96,
+        144,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may run a due slice. Fronts the rent of the slice's wrapped-SOL",
+            "account and gets it back in the same instruction."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "docs": [
+            "The lending pool: pausing it stops buybacks too."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "revenue_token"
+          ]
+        },
+        {
+          "name": "revenue_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_escrow",
+          "docs": [
+            "Pays the swap (its `payer`) and owns both token accounts."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_wsol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  119,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_tokens",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "dbc_config"
+        },
+        {
+          "name": "venue_pool",
+          "writable": true
+        },
+        {
+          "name": "venue_token_vault",
+          "writable": true
+        },
+        {
+          "name": "venue_quote_vault",
+          "writable": true
+        },
+        {
+          "name": "venue_pool_authority"
+        },
+        {
+          "name": "venue_event_authority"
+        },
+        {
+          "name": "venue_program"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "slice",
+          "type": "u8"
+        },
+        {
+          "name": "min_amount_out",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "finalize_index",
+      "discriminator": [
+        216,
+        244,
+        132,
+        90,
+        253,
+        137,
+        153,
+        204
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may finalize once the window has passed."
+          ],
+          "signer": true
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index.pool",
+                "account": "FeeIndex"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_index",
+      "discriminator": [
+        204,
+        67,
+        3,
+        74,
+        139,
+        139,
+        233,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "publisher"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "dispute_window_slots",
+          "type": "u64"
+        },
+        {
+          "name": "max_move_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "initialize_pool",
+      "discriminator": [
+        95,
+        180,
+        10,
+        172,
+        84,
+        174,
+        232,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "The pool's SOL vault: a system-owned PDA with no data, so it can be a",
+            "SIMD-0232 commission collector and the program can sign transfers out",
+            "of it. Funded with the rent-exempt minimum here so it can never be",
+            "garbage-collected."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "scorer"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "PoolParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "mark_default",
+      "discriminator": [
+        182,
+        231,
+        123,
+        132,
+        66,
+        208,
+        137,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may mark a default once the conditions are met."
+          ],
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "advance"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          },
+          "relations": [
+            "advance"
+          ]
+        },
+        {
+          "name": "advance",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "onboard_validator",
+      "discriminator": [
+        236,
+        33,
+        253,
+        101,
+        46,
+        150,
+        97,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "docs": [
+            "Pays rent and becomes the position's operator."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "current_withdrawer",
+          "docs": [
+            "The vote account's withdraw authority today. Often the same key as",
+            "`operator`; a multisig can pass both."
+          ],
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_auth",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "System-owned, rent-exempt: the account both commission collectors",
+            "will point at, and where every sweep lands first."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payout"
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        },
+        {
+          "name": "vote_program",
+          "address": "Vote111111111111111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "open_swap",
+      "discriminator": [
+        109,
+        109,
+        21,
+        132,
+        201,
+        76,
+        67,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index",
+            "quote"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "quote.maker",
+                "account": "FeeQuote"
+              },
+              {
+                "kind": "account",
+                "path": "quote.epoch",
+                "account": "FeeQuote"
+              }
+            ]
+          }
+        },
+        {
+          "name": "swap",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  119,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "quote"
+              },
+              {
+                "kind": "account",
+                "path": "taker"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "notional",
+          "type": "u64"
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "Side"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "post_bond",
+      "discriminator": [
+        168,
+        151,
+        202,
+        119,
+        163,
+        58,
+        147,
+        247
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "post_index",
+      "discriminator": [
+        221,
+        162,
+        38,
+        53,
+        98,
+        77,
+        183,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "publisher",
+          "signer": true,
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index.pool",
+                "account": "FeeIndex"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "value",
+          "type": "u64"
+        },
+        {
+          "name": "inputs_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "post_quote",
+      "discriminator": [
+        68,
+        231,
+        88,
+        224,
+        13,
+        116,
+        27,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "maker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "maker"
+              },
+              {
+                "kind": "arg",
+                "path": "epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "fixed_rate",
+          "type": "u64"
+        },
+        {
+          "name": "max_notional",
+          "type": "u64"
+        },
+        {
+          "name": "max_move_bps",
+          "type": "u16"
+        },
+        {
+          "name": "expiry_slot",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "process_withdrawal",
+      "discriminator": [
+        51,
+        97,
+        236,
+        17,
+        37,
+        33,
+        196,
+        64
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may crank the queue."
+          ],
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "lender",
+            "request"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true
+        },
+        {
+          "name": "lender",
+          "writable": true
+        },
+        {
+          "name": "request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  116,
+                  104,
+                  100,
+                  114,
+                  97,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "request.seq",
+                "account": "WithdrawRequest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "redeem",
+      "discriminator": [
+        184,
+        12,
+        86,
+        149,
+        70,
+        196,
+        97,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "docs": [
+            "Burns its tokens (signs the burn) and receives the SOL."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "holder_tokens",
+          "docs": [
+            "checks mint and authority on the burn."
+          ],
+          "writable": true
+        },
+        {
+          "name": "revenue_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_tokens",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "treasury_tokens",
+          "docs": [
+            "mint (a DBC leftover waiting to be burned); checked in the handler.",
+            "Leaving it out only lowers the payout."
+          ],
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "register_revenue_token",
+      "discriminator": [
+        212,
+        153,
+        133,
+        48,
+        164,
+        75,
+        131,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "docs": [
+            "Signs and pays the rent of the revenue token, its escrow and its token account."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "vote_auth",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revenue_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_escrow",
+          "docs": [
+            "System-owned and rent-exempt from here on: every sweep's share lands here."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyback_tokens",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "dbc_pool"
+        },
+        {
+          "name": "dbc_config"
+        },
+        {
+          "name": "partner_treasury",
+          "docs": [
+            "config's fee claimer must be this key."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "share_bps",
+          "type": "u16"
+        },
+        {
+          "name": "term_epochs",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "release_validator",
+      "discriminator": [
+        99,
+        120,
+        136,
+        121,
+        26,
+        43,
+        230,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "docs": [
+            "Receives the escrow balance, the bond and the position's rent."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account",
+          "writable": true
+        },
+        {
+          "name": "vote_auth",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_withdrawer",
+          "docs": [
+            "position's `original_withdrawer`; the operator may choose another."
+          ]
+        },
+        {
+          "name": "identity",
+          "docs": [
+            "revenue collector on v4 vote accounts. Writable: the vote program's",
+            "`UpdateCommissionCollector` takes the new collector writable, so a",
+            "read-only identity fails the CPI with a privilege escalation once",
+            "`set_collectors` pointed the collector at the escrow."
+          ],
+          "writable": true
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        },
+        {
+          "name": "vote_program",
+          "address": "Vote111111111111111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "revenue_token",
+          "docs": [
+            "Required when the position has a revenue token: release waits for the",
+            "end of its term. Pass the program id (Anchor's `None`) otherwise."
+          ],
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "request_advance",
+      "discriminator": [
+        30,
+        94,
+        222,
+        131,
+        223,
+        83,
+        0,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
+        },
+        {
+          "name": "advance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  118,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              },
+              {
+                "kind": "account",
+                "path": "position.advance_seq",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payout",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "request_withdraw",
+      "discriminator": [
+        137,
+        95,
+        187,
+        96,
+        250,
+        138,
+        31,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "lender"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "lender"
+          ]
+        },
+        {
+          "name": "lender",
+          "writable": true
+        },
+        {
+          "name": "request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  116,
+                  104,
+                  100,
+                  114,
+                  97,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.withdraw_tail",
+                "account": "Pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "shares",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_collectors",
+      "discriminator": [
+        159,
+        203,
+        245,
+        22,
+        221,
+        225,
+        135,
+        63
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may re-assert the collectors; the program signs."
+          ],
+          "signer": true
+        },
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account",
+          "writable": true
+        },
+        {
+          "name": "vote_auth",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_program",
+          "address": "Vote111111111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_paused",
+      "discriminator": [
+        91,
+        60,
+        125,
+        192,
+        176,
+        225,
+        166,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_roles",
+      "discriminator": [
+        119,
+        86,
+        129,
+        161,
+        55,
+        23,
+        250,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "scorer"
+        },
+        {
+          "name": "new_admin"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "settle_swap",
+      "discriminator": [
+        3,
+        130,
+        133,
+        180,
+        251,
+        87,
+        242,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may settle once the index for the epoch is final."
+          ],
+          "signer": true
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "quote.pool",
+                "account": "FeeQuote"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "quote.maker",
+                "account": "FeeQuote"
+              },
+              {
+                "kind": "account",
+                "path": "quote.epoch",
+                "account": "FeeQuote"
+              }
+            ]
+          },
+          "relations": [
+            "swap"
+          ]
+        },
+        {
+          "name": "taker",
+          "writable": true
+        },
+        {
+          "name": "swap",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  119,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "quote"
+              },
+              {
+                "kind": "account",
+                "path": "taker"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sweep",
+      "discriminator": [
+        40,
+        23,
+        234,
+        175,
+        14,
+        61,
+        154,
+        177
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may sweep; the keeper does it every epoch."
+          ],
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account",
+          "writable": true
+        },
+        {
+          "name": "vote_auth",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payout",
+          "writable": true
+        },
+        {
+          "name": "advance",
+          "docs": [
+            "Required when the position has an open advance."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vote_program",
+          "address": "Vote111111111111111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "revenue_token",
+          "docs": [
+            "Required when the position has a revenue token (`position.revenue_token`):",
+            "its `RevenueToken`. Pass the program id (Anchor's `None`) otherwise."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "buyback_escrow",
+          "docs": [
+            "`[\"buyback\", vote]` (checked against the recorded bump in the handler)."
+          ],
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sync_revenue_token_pool",
+      "discriminator": [
+        177,
+        191,
+        191,
+        37,
+        193,
+        225,
+        157,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone may sync once the curve has graduated."
+          ],
+          "signer": true
+        },
+        {
+          "name": "revenue_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "revenue_token.vote",
+                "account": "RevenueToken"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dbc_pool"
+        },
+        {
+          "name": "damm_config"
+        },
+        {
+          "name": "damm_pool"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_commission",
+      "discriminator": [
+        2,
+        202,
+        72,
+        156,
+        19,
+        253,
+        91,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account",
+          "writable": true
+        },
+        {
+          "name": "vote_auth",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_program",
+          "address": "Vote111111111111111111111111111111111111111"
+        },
+        {
+          "name": "revenue_token",
+          "docs": [
+            "Required when the position has a revenue token (its commission floor",
+            "applies until the term ends). Pass the program id (`None`) otherwise."
+          ],
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "commission_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "update_identity",
+      "discriminator": [
+        130,
+        54,
+        88,
+        104,
+        222,
+        124,
+        238,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "new_identity",
+          "docs": [
+            "The new identity must co-sign, as the vote program requires."
+          ],
+          "signer": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account",
+          "writable": true
+        },
+        {
+          "name": "vote_auth",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_program",
+          "address": "Vote111111111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_params",
+      "discriminator": [
+        108,
+        178,
+        190,
+        95,
+        94,
+        203,
+        116,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "PoolParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_score",
+      "discriminator": [
+        188,
+        226,
+        238,
+        41,
+        14,
+        241,
+        105,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "scorer",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "update",
+          "type": {
+            "defined": {
+              "name": "ScoreUpdate"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "veto_index",
+      "discriminator": [
+        105,
+        183,
+        218,
+        116,
+        209,
+        85,
+        47,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_bond",
+      "discriminator": [
+        222,
+        199,
+        141,
+        31,
+        188,
+        93,
+        155,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_quote",
+      "discriminator": [
+        209,
+        209,
+        177,
+        248,
+        7,
+        105,
+        157,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "maker",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "quote"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "quote.pool",
+                "account": "FeeQuote"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "maker"
+              },
+              {
+                "kind": "account",
+                "path": "quote.epoch",
+                "account": "FeeQuote"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Advance",
+      "discriminator": [
+        66,
+        25,
+        217,
+        133,
+        38,
+        192,
+        224,
+        218
+      ]
+    },
+    {
+      "name": "FeeIndex",
+      "discriminator": [
+        120,
+        150,
+        229,
+        157,
+        248,
+        45,
+        110,
+        249
+      ]
+    },
+    {
+      "name": "FeeQuote",
+      "discriminator": [
+        228,
+        252,
+        197,
+        237,
+        1,
+        50,
+        181,
+        20
+      ]
+    },
+    {
+      "name": "LenderShares",
+      "discriminator": [
+        92,
+        229,
+        21,
+        194,
+        30,
+        129,
+        37,
+        139
+      ]
+    },
+    {
+      "name": "Pool",
+      "discriminator": [
+        241,
+        154,
+        109,
+        4,
+        17,
+        177,
+        109,
+        188
+      ]
+    },
+    {
+      "name": "RevenueToken",
+      "discriminator": [
+        123,
+        71,
+        28,
+        221,
+        233,
+        129,
+        80,
+        207
+      ]
+    },
+    {
+      "name": "SwapPosition",
+      "discriminator": [
+        65,
+        203,
+        85,
+        175,
+        129,
+        154,
+        6,
+        152
+      ]
+    },
+    {
+      "name": "ValidatorPosition",
+      "discriminator": [
+        149,
+        243,
+        231,
+        113,
+        234,
+        221,
+        177,
+        221
+      ]
+    },
+    {
+      "name": "WithdrawRequest",
+      "discriminator": [
+        186,
+        239,
+        174,
+        191,
+        189,
+        13,
+        47,
+        196
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Accrued",
+      "discriminator": [
+        207,
+        152,
+        166,
+        145,
+        189,
+        39,
+        33,
+        167
+      ]
+    },
+    {
+      "name": "AdvanceDefaulted",
+      "discriminator": [
+        225,
+        99,
+        203,
+        24,
+        229,
+        27,
+        26,
+        186
+      ]
+    },
+    {
+      "name": "AdvanceOpened",
+      "discriminator": [
+        186,
+        136,
+        85,
+        49,
+        255,
+        147,
+        220,
+        30
+      ]
+    },
+    {
+      "name": "AdvanceRepaid",
+      "discriminator": [
+        185,
+        191,
+        136,
+        90,
+        224,
+        95,
+        1,
+        197
+      ]
+    },
+    {
+      "name": "BondPosted",
+      "discriminator": [
+        39,
+        196,
+        2,
+        142,
+        202,
+        74,
+        107,
+        205
+      ]
+    },
+    {
+      "name": "BondWithdrawn",
+      "discriminator": [
+        111,
+        192,
+        154,
+        231,
+        58,
+        115,
+        130,
+        103
+      ]
+    },
+    {
+      "name": "BuybackExecuted",
+      "discriminator": [
+        150,
+        109,
+        157,
+        10,
+        124,
+        24,
+        38,
+        189
+      ]
+    },
+    {
+      "name": "CollectorsSet",
+      "discriminator": [
+        38,
+        70,
+        161,
+        35,
+        230,
+        192,
+        41,
+        21
+      ]
+    },
+    {
+      "name": "CommissionUpdated",
+      "discriminator": [
+        107,
+        183,
+        135,
+        132,
+        231,
+        24,
+        226,
+        183
+      ]
+    },
+    {
+      "name": "Deposited",
+      "discriminator": [
+        111,
+        141,
+        26,
+        45,
+        161,
+        35,
+        100,
+        57
+      ]
+    },
+    {
+      "name": "IdentityUpdated",
+      "discriminator": [
+        93,
+        70,
+        231,
+        144,
+        0,
+        172,
+        155,
+        159
+      ]
+    },
+    {
+      "name": "IndexFinalized",
+      "discriminator": [
+        220,
+        108,
+        152,
+        84,
+        157,
+        165,
+        201,
+        162
+      ]
+    },
+    {
+      "name": "IndexProposed",
+      "discriminator": [
+        34,
+        205,
+        59,
+        177,
+        150,
+        79,
+        9,
+        185
+      ]
+    },
+    {
+      "name": "IndexVetoed",
+      "discriminator": [
+        79,
+        144,
+        93,
+        156,
+        122,
+        24,
+        194,
+        132
+      ]
+    },
+    {
+      "name": "ParamsUpdated",
+      "discriminator": [
+        2,
+        163,
+        138,
+        99,
+        135,
+        11,
+        136,
+        169
+      ]
+    },
+    {
+      "name": "PauseToggled",
+      "discriminator": [
+        105,
+        215,
+        89,
+        53,
+        198,
+        232,
+        136,
+        161
+      ]
+    },
+    {
+      "name": "PoolInitialized",
+      "discriminator": [
+        100,
+        118,
+        173,
+        87,
+        12,
+        198,
+        254,
+        229
+      ]
+    },
+    {
+      "name": "QuotePosted",
+      "discriminator": [
+        130,
+        69,
+        35,
+        209,
+        183,
+        130,
+        239,
+        156
+      ]
+    },
+    {
+      "name": "RevenueShareSwept",
+      "discriminator": [
+        72,
+        98,
+        155,
+        56,
+        89,
+        44,
+        3,
+        197
+      ]
+    },
+    {
+      "name": "RevenueTokenClosed",
+      "discriminator": [
+        138,
+        210,
+        233,
+        69,
+        76,
+        119,
+        152,
+        53
+      ]
+    },
+    {
+      "name": "RevenueTokenConfigured",
+      "discriminator": [
+        248,
+        253,
+        70,
+        189,
+        104,
+        149,
+        85,
+        34
+      ]
+    },
+    {
+      "name": "RevenueTokenPoolSynced",
+      "discriminator": [
+        174,
+        77,
+        19,
+        3,
+        191,
+        201,
+        129,
+        151
+      ]
+    },
+    {
+      "name": "RevenueTokenRedeemed",
+      "discriminator": [
+        141,
+        111,
+        135,
+        82,
+        133,
+        221,
+        9,
+        69
+      ]
+    },
+    {
+      "name": "RevenueTokenRegistered",
+      "discriminator": [
+        10,
+        214,
+        138,
+        160,
+        177,
+        211,
+        87,
+        12
+      ]
+    },
+    {
+      "name": "ScoreUpdated",
+      "discriminator": [
+        175,
+        144,
+        206,
+        62,
+        108,
+        213,
+        230,
+        183
+      ]
+    },
+    {
+      "name": "SwapOpened",
+      "discriminator": [
+        31,
+        172,
+        136,
+        212,
+        249,
+        139,
+        42,
+        67
+      ]
+    },
+    {
+      "name": "SwapSettled",
+      "discriminator": [
+        104,
+        192,
+        63,
+        194,
+        238,
+        236,
+        149,
+        85
+      ]
+    },
+    {
+      "name": "Swept",
+      "discriminator": [
+        254,
+        138,
+        9,
+        198,
+        192,
+        61,
+        165,
+        135
+      ]
+    },
+    {
+      "name": "TreasuryClaimed",
+      "discriminator": [
+        59,
+        99,
+        64,
+        13,
+        118,
+        14,
+        251,
+        106
+      ]
+    },
+    {
+      "name": "ValidatorOnboarded",
+      "discriminator": [
+        160,
+        198,
+        146,
+        91,
+        138,
+        245,
+        189,
+        71
+      ]
+    },
+    {
+      "name": "ValidatorReleased",
+      "discriminator": [
+        249,
+        168,
+        48,
+        45,
+        217,
+        240,
+        96,
+        159
+      ]
+    },
+    {
+      "name": "WithdrawCancelled",
+      "discriminator": [
+        162,
+        153,
+        181,
+        47,
+        154,
+        132,
+        183,
+        117
+      ]
+    },
+    {
+      "name": "WithdrawProcessed",
+      "discriminator": [
+        234,
+        53,
+        39,
+        68,
+        158,
+        177,
+        195,
+        13
+      ]
+    },
+    {
+      "name": "WithdrawRequested",
+      "discriminator": [
+        114,
+        16,
+        240,
+        206,
+        93,
+        128,
+        151,
+        39
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Paused",
+      "msg": "Pool is paused"
+    },
+    {
+      "code": 6001,
+      "name": "NotAdmin",
+      "msg": "Signer is not the pool admin"
+    },
+    {
+      "code": 6002,
+      "name": "NotScorer",
+      "msg": "Signer is not the scorer authority"
+    },
+    {
+      "code": 6003,
+      "name": "NotPublisher",
+      "msg": "Signer is not the index publisher"
+    },
+    {
+      "code": 6004,
+      "name": "BpsOutOfRange",
+      "msg": "A basis-point parameter is above 10,000"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidParams",
+      "msg": "Pool parameters are inconsistent"
+    },
+    {
+      "code": 6006,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6007,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6008,
+      "name": "PoolCapExceeded",
+      "msg": "Deposit would push the pool above its asset cap"
+    },
+    {
+      "code": 6009,
+      "name": "InsufficientShares",
+      "msg": "Not enough shares"
+    },
+    {
+      "code": 6010,
+      "name": "InsufficientLiquidity",
+      "msg": "Not enough cash in the vault; try again after the next sweep"
+    },
+    {
+      "code": 6011,
+      "name": "JuniorLocked",
+      "msg": "Junior tranche is still locked"
+    },
+    {
+      "code": 6012,
+      "name": "JuniorFloorBreached",
+      "msg": "Withdrawal would push the junior tranche below its floor"
+    },
+    {
+      "code": 6013,
+      "name": "NotHeadOfQueue",
+      "msg": "Withdrawal requests are processed in order; this one is not next"
+    },
+    {
+      "code": 6014,
+      "name": "RequestCancelled",
+      "msg": "Withdrawal request was already cancelled"
+    },
+    {
+      "code": 6015,
+      "name": "AlreadyAccrued",
+      "msg": "Accrual already ran for this epoch"
+    },
+    {
+      "code": 6016,
+      "name": "VaultLedgerMismatch",
+      "msg": "Vault balance does not cover the pool's ledger; refusing to proceed"
+    },
+    {
+      "code": 6017,
+      "name": "NotAVoteAccount",
+      "msg": "Account is not owned by the vote program or is not a vote account"
+    },
+    {
+      "code": 6018,
+      "name": "UnsupportedVoteState",
+      "msg": "Vote account data is not a supported vote state version"
+    },
+    {
+      "code": 6019,
+      "name": "NotWithdrawAuthority",
+      "msg": "Signer is not the vote account's current withdraw authority"
+    },
+    {
+      "code": 6020,
+      "name": "ProgramNotWithdrawAuthority",
+      "msg": "The program is not the vote account's withdraw authority"
+    },
+    {
+      "code": 6021,
+      "name": "IdentityMismatch",
+      "msg": "Vote account identity changed outside the program"
+    },
+    {
+      "code": 6022,
+      "name": "NotOperator",
+      "msg": "Signer is not the position's operator"
+    },
+    {
+      "code": 6023,
+      "name": "PayoutMismatch",
+      "msg": "Payout account does not match the position"
+    },
+    {
+      "code": 6024,
+      "name": "PositionNotActive",
+      "msg": "Validator position is not active"
+    },
+    {
+      "code": 6025,
+      "name": "AdvanceAlreadyOpen",
+      "msg": "Validator already has an open advance"
+    },
+    {
+      "code": 6026,
+      "name": "AdvanceMismatch",
+      "msg": "Advance account does not match the position's open advance"
+    },
+    {
+      "code": 6027,
+      "name": "AdvanceOpen",
+      "msg": "Cannot do this while an advance is open"
+    },
+    {
+      "code": 6028,
+      "name": "NoOpenAdvance",
+      "msg": "No open advance"
+    },
+    {
+      "code": 6029,
+      "name": "AdvanceStateInvalid",
+      "msg": "Advance is not in the expected state"
+    },
+    {
+      "code": 6030,
+      "name": "ScoreTooLow",
+      "msg": "Score is too low to borrow"
+    },
+    {
+      "code": 6031,
+      "name": "ScoreStale",
+      "msg": "Score is stale; update it first"
+    },
+    {
+      "code": 6032,
+      "name": "OverLimit",
+      "msg": "Requested amount exceeds the credit limit"
+    },
+    {
+      "code": 6033,
+      "name": "BelowMinimum",
+      "msg": "Amount is below the minimum advance"
+    },
+    {
+      "code": 6034,
+      "name": "UtilizationCapExceeded",
+      "msg": "Advance would push utilisation above the cap"
+    },
+    {
+      "code": 6035,
+      "name": "InsufficientHistory",
+      "msg": "Not enough revenue history yet"
+    },
+    {
+      "code": 6036,
+      "name": "AlreadySweptThisEpoch",
+      "msg": "Already swept this epoch"
+    },
+    {
+      "code": 6037,
+      "name": "RewardsInProgress",
+      "msg": "Epoch rewards are still being distributed; sweep after they finish"
+    },
+    {
+      "code": 6038,
+      "name": "NotDefaultable",
+      "msg": "Advance is not eligible for default yet"
+    },
+    {
+      "code": 6039,
+      "name": "CommissionTooLow",
+      "msg": "Commission below the pool minimum"
+    },
+    {
+      "code": 6040,
+      "name": "CommissionChangeBlocked",
+      "msg": "Commission changes are limited while an advance is open"
+    },
+    {
+      "code": 6041,
+      "name": "BondLocked",
+      "msg": "Bond cannot be withdrawn while an advance is open"
+    },
+    {
+      "code": 6042,
+      "name": "IndexEpochNotNewer",
+      "msg": "Fee index epoch must be greater than the last finalized epoch"
+    },
+    {
+      "code": 6043,
+      "name": "IndexMoveTooLarge",
+      "msg": "Index move exceeds the per-epoch bound"
+    },
+    {
+      "code": 6044,
+      "name": "NoProposal",
+      "msg": "No index proposal pending"
+    },
+    {
+      "code": 6045,
+      "name": "DisputeWindowOpen",
+      "msg": "Dispute window has not elapsed"
+    },
+    {
+      "code": 6046,
+      "name": "DisputeWindowClosed",
+      "msg": "Dispute window has elapsed; the proposal can no longer be vetoed"
+    },
+    {
+      "code": 6047,
+      "name": "IndexMissing",
+      "msg": "Fee index for this epoch has not been finalized"
+    },
+    {
+      "code": 6048,
+      "name": "QuoteExpired",
+      "msg": "Quote has expired"
+    },
+    {
+      "code": 6049,
+      "name": "QuoteEpochMismatch",
+      "msg": "Quote is for a different epoch"
+    },
+    {
+      "code": 6050,
+      "name": "QuoteCapacityExceeded",
+      "msg": "Notional exceeds what the quote has left"
+    },
+    {
+      "code": 6051,
+      "name": "QuoteHasOpenSwaps",
+      "msg": "Quote still has open swaps"
+    },
+    {
+      "code": 6052,
+      "name": "AlreadySettled",
+      "msg": "Swap already settled"
+    },
+    {
+      "code": 6053,
+      "name": "NotMaker",
+      "msg": "Signer is not the quote maker"
+    },
+    {
+      "code": 6054,
+      "name": "RevenueTokenExists",
+      "msg": "Validator already has a revenue token"
+    },
+    {
+      "code": 6055,
+      "name": "ShareOutOfRange",
+      "msg": "Revenue share must be 1 to 5,000 bps"
+    },
+    {
+      "code": 6056,
+      "name": "TermOutOfRange",
+      "msg": "Revenue token term must be 10 to 1,000 epochs"
+    },
+    {
+      "code": 6057,
+      "name": "InvalidRevenueMint",
+      "msg": "Mint must be an SPL Token mint with a fixed supply and no mint or freeze authority"
+    },
+    {
+      "code": 6058,
+      "name": "InvalidDbcPool",
+      "msg": "Not a Meteora DBC pool for this mint"
+    },
+    {
+      "code": 6059,
+      "name": "InvalidDbcConfig",
+      "msg": "DBC config must quote SOL, graduate to DAMM v2 and name the Epoch treasury as fee claimer"
+    },
+    {
+      "code": 6060,
+      "name": "RevenueTokenMismatch",
+      "msg": "Revenue token account does not match the position"
+    },
+    {
+      "code": 6061,
+      "name": "RevenueTokenAccountsMissing",
+      "msg": "This position has a revenue token: pass its revenue token and buyback escrow accounts"
+    },
+    {
+      "code": 6062,
+      "name": "RevenueTokenTermActive",
+      "msg": "Not allowed before the revenue token's term ends"
+    },
+    {
+      "code": 6063,
+      "name": "CommissionBelowSnapshot",
+      "msg": "Commission cannot go below its level when the revenue token was registered"
+    },
+    {
+      "code": 6064,
+      "name": "PoolNotMigrated",
+      "msg": "The DBC pool has not graduated to DAMM v2 yet"
+    },
+    {
+      "code": 6065,
+      "name": "InvalidDammPool",
+      "msg": "Not the DAMM v2 pool this DBC pool graduated to"
+    },
+    {
+      "code": 6066,
+      "name": "PoolNotSynced",
+      "msg": "The DBC pool graduated: sync its DAMM v2 pool first"
+    },
+    {
+      "code": 6067,
+      "name": "VenueNotTrading",
+      "msg": "The curve is complete and waits for migration; buybacks resume on DAMM v2"
+    },
+    {
+      "code": 6068,
+      "name": "InvalidVenueAccount",
+      "msg": "A Meteora account does not match the revenue token's pool"
+    },
+    {
+      "code": 6069,
+      "name": "OutsideBuybackWindow",
+      "msg": "Outside this epoch's buyback window"
+    },
+    {
+      "code": 6070,
+      "name": "SliceNotDue",
+      "msg": "This buyback slice is not due yet"
+    },
+    {
+      "code": 6071,
+      "name": "SliceAlreadyExecuted",
+      "msg": "This buyback slice already ran this epoch"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidSlice",
+      "msg": "Slice index is out of range"
+    },
+    {
+      "code": 6073,
+      "name": "SweepPending",
+      "msg": "Sweep this epoch's revenue share before buying back"
+    },
+    {
+      "code": 6074,
+      "name": "NothingToBuy",
+      "msg": "Nothing to buy back this slice"
+    },
+    {
+      "code": 6075,
+      "name": "MinOutTooLow",
+      "msg": "min_amount_out is below the floor computed from the pool price"
+    },
+    {
+      "code": 6076,
+      "name": "BuybackOutputTooLow",
+      "msg": "The swap returned less than min_amount_out"
+    },
+    {
+      "code": 6077,
+      "name": "BuybacksPaused",
+      "msg": "Buybacks are paused for this revenue token"
+    },
+    {
+      "code": 6078,
+      "name": "RedeemNotAllowed",
+      "msg": "Redemptions open when the term ends"
+    },
+    {
+      "code": 6079,
+      "name": "RedeemTooLarge",
+      "msg": "Amount exceeds the circulating supply"
+    },
+    {
+      "code": 6080,
+      "name": "EscrowNotEmpty",
+      "msg": "The buyback escrow still holds SOL"
+    },
+    {
+      "code": 6081,
+      "name": "InvalidBuybackParams",
+      "msg": "Buyback parameters are out of range"
+    },
+    {
+      "code": 6082,
+      "name": "NotTreasuryFeeClaimer",
+      "msg": "The DBC config's fee claimer is not the Epoch treasury"
+    },
+    {
+      "code": 6083,
+      "name": "NotTreasuryLeftoverReceiver",
+      "msg": "The DBC config's leftover receiver is not the Epoch treasury"
+    },
+    {
+      "code": 6084,
+      "name": "NotTreasuryPosition",
+      "msg": "The Epoch treasury does not own this DAMM v2 position"
+    },
+    {
+      "code": 6085,
+      "name": "NothingToClaim",
+      "msg": "Nothing to claim"
+    },
+    {
+      "code": 6086,
+      "name": "ClaimNotReady",
+      "msg": "Not claimable yet: the curve is not complete or the DAMM v2 pool does not exist yet"
+    },
+    {
+      "code": 6087,
+      "name": "AlreadyClaimed",
+      "msg": "The treasury already claimed this"
+    },
+    {
+      "code": 6088,
+      "name": "UnsupportedClaimPool",
+      "msg": "Only SPL Token pools that quote wrapped SOL are supported (and a fixed supply for leftover)"
+    },
+    {
+      "code": 6089,
+      "name": "InvalidClaimAccount",
+      "msg": "A Meteora account does not match the pool being claimed"
+    },
+    {
+      "code": 6090,
+      "name": "LiquidityNotLocked",
+      "msg": "The DBC config must lock all of the graduated pool's liquidity permanently"
+    },
+    {
+      "code": 6091,
+      "name": "UnsupportedVenueFee",
+      "msg": "The venue's fee is too low, or can fall too low, for sandwich-proof buybacks"
+    },
+    {
+      "code": 6092,
+      "name": "ImpactAboveFeeBound",
+      "msg": "max_impact_bps may be at most twice the venue's lowest fee"
+    }
+  ],
+  "types": [
+    {
+      "name": "Accrued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "income",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fee",
+            "type": "u64"
+          },
+          {
+            "name": "senior_gain",
+            "type": "u64"
+          },
+          {
+            "name": "junior_gain",
+            "type": "u64"
+          },
+          {
+            "name": "senior_price_e9",
+            "type": "u64"
+          },
+          {
+            "name": "junior_price_e9",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Advance",
+      "docs": [
+        "One advance to one validator (seeds: `[\"advance\", vote, seq]`).",
+        "",
+        "Repayment is a flat fee, not interest: `total_due = principal + fee`, and",
+        "every sweep remits `remit_bps` of gross revenue until `repaid == total_due`.",
+        "Each remittance is attributed to principal and fee pro rata so the pool's",
+        "receivable and income ledgers stay exact."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "seq",
+            "type": "u64"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "total_due",
+            "type": "u64"
+          },
+          {
+            "name": "repaid",
+            "type": "u64"
+          },
+          {
+            "name": "principal_repaid",
+            "type": "u64"
+          },
+          {
+            "name": "fee_repaid",
+            "type": "u64"
+          },
+          {
+            "name": "remit_bps",
+            "type": "u16"
+          },
+          {
+            "name": "opened_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "closed_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "AdvanceState"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdvanceDefaulted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "advance",
+            "type": "pubkey"
+          },
+          {
+            "name": "principal_lost",
+            "type": "u64"
+          },
+          {
+            "name": "bond_applied",
+            "type": "u64"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdvanceOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "advance",
+            "type": "pubkey"
+          },
+          {
+            "name": "seq",
+            "type": "u64"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "remit_bps",
+            "type": "u16"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdvanceRepaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "advance",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdvanceState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Repaid"
+          },
+          {
+            "name": "Defaulted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BondPosted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports",
+            "type": "u64"
+          },
+          {
+            "name": "bond_total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BondWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports",
+            "type": "u64"
+          },
+          {
+            "name": "bond_total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuybackExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "venue",
+            "type": {
+              "defined": {
+                "name": "BuybackVenue"
+              }
+            }
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "slice",
+            "type": "u8"
+          },
+          {
+            "name": "lamports_in",
+            "docs": [
+              "SOL the swap used (a partial fill returns the rest to the escrow)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_bought",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_burned",
+            "type": "u64"
+          },
+          {
+            "name": "min_amount_out",
+            "type": "u64"
+          },
+          {
+            "name": "fee_free_out",
+            "docs": [
+              "The pool's output for `lamports_in` before fees, from its state at",
+              "execution: the protocol's reference for the min-out floor."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "escrow_balance",
+            "docs": [
+              "Escrow balance above rent after the slice."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuybackParams",
+      "docs": [
+        "Buyback parameters the pool admin may change (never the share or the term)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "slices_per_epoch",
+            "type": "u8"
+          },
+          {
+            "name": "window_slots",
+            "type": "u32"
+          },
+          {
+            "name": "max_slippage_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_impact_bps",
+            "type": "u16"
+          },
+          {
+            "name": "flags",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuybackVenue",
+      "docs": [
+        "Which Meteora program a buyback slice swapped on (`BuybackExecuted.venue`)."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Dbc"
+          },
+          {
+            "name": "DammV2"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollectorsSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "collector",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommissionUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "commission_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Deposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tranche",
+            "type": {
+              "defined": {
+                "name": "Tranche"
+              }
+            }
+          },
+          {
+            "name": "assets",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          },
+          {
+            "name": "share_price_e9",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeIndex",
+      "docs": [
+        "The Solana Fee Index (seeds: `[\"fee_index\", pool]`).",
+        "",
+        "The program is its own oracle: the publisher proposes a value with the",
+        "hash of its inputs, anyone can finalize it after `dispute_window_slots`,",
+        "and the admin can veto inside the window. A proposal that moves more than",
+        "`max_move_bps` from the last finalized value is rejected outright.",
+        "Readers take `value`/`epoch` directly; a CPI read is `get_sfi`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "publisher",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Last finalized point."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          },
+          {
+            "name": "inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "finalized_slot",
+            "type": "u64"
+          },
+          {
+            "name": "has_proposal",
+            "docs": [
+              "Pending proposal, valid when `has_proposal`."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "proposed_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "proposed_value",
+            "type": "u64"
+          },
+          {
+            "name": "proposed_inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "proposed_slot",
+            "type": "u64"
+          },
+          {
+            "name": "dispute_window_slots",
+            "type": "u64"
+          },
+          {
+            "name": "max_move_bps",
+            "type": "u16"
+          },
+          {
+            "name": "history",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "IndexPoint"
+                  }
+                },
+                16
+              ]
+            }
+          },
+          {
+            "name": "history_head",
+            "type": "u8"
+          },
+          {
+            "name": "history_count",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeQuote",
+      "docs": [
+        "A market maker's fixed-rate quote for one epoch of the Fee Index",
+        "(seeds: `[\"quote\", maker, epoch]`). The maker's collateral sits on this",
+        "account above its rent; each open swap locks the maker's maximum loss."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "maker",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "fixed_rate",
+            "docs": [
+              "Fixed index level the maker will settle against."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_notional",
+            "type": "u64"
+          },
+          {
+            "name": "filled_notional",
+            "type": "u64"
+          },
+          {
+            "name": "max_move_bps",
+            "docs": [
+              "Payoff is clipped to ±`max_move_bps` of notional, so collateral on",
+              "both sides is exactly `notional × max_move_bps / 10_000`."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "expiry_slot",
+            "type": "u64"
+          },
+          {
+            "name": "collateral",
+            "docs": [
+              "Maker collateral held on this account (lamports above rent)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "docs": [
+              "Part of `collateral` locked by open swaps."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "open_swaps",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_identity",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          },
+          {
+            "name": "inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexPoint",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "value",
+            "docs": [
+              "Stake-weighted median priority fee, micro-lamports per compute unit."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          },
+          {
+            "name": "inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexVetoed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LenderShares",
+      "docs": [
+        "A lender's share balance in one tranche (seeds: `[\"lender\", pool, owner, tranche]`).",
+        "Shares are an internal ledger, not SPL tokens, so no token program is",
+        "involved and a transfer of shares is not possible without going through",
+        "the withdrawal queue."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tranche",
+            "type": {
+              "defined": {
+                "name": "Tranche"
+              }
+            }
+          },
+          {
+            "name": "shares",
+            "docs": [
+              "Shares the lender can request to withdraw."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pending_shares",
+            "docs": [
+              "Shares locked in open withdrawal requests."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_deposit_epoch",
+            "docs": [
+              "Epoch of the most recent deposit; junior lock counts from here."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          },
+          {
+            "name": "total_withdrawn",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParamsUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PauseToggled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pool",
+      "docs": [
+        "The lending pool. One per deployment (seeds: `[\"pool\"]`).",
+        "",
+        "Ledger invariant, checked by `assert_ledger`:",
+        "`senior_assets + junior_assets + income_unallocated == cash + outstanding_principal`",
+        "and the vault holds at least `cash + bond_total + rent`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "docs": [
+              "Receives the protocol fee."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "scorer",
+            "docs": [
+              "May post Epoch Scores."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "params",
+            "type": {
+              "defined": {
+                "name": "PoolParams"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "cash",
+            "docs": [
+              "Lamports in the vault that belong to lenders (excludes bonds and rent)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "outstanding_principal",
+            "docs": [
+              "Principal lent out and not yet repaid."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "expected_fees",
+            "docs": [
+              "Fees contracted on open advances and not yet received."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "income_unallocated",
+            "docs": [
+              "Fee income received and not yet split between tranches."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bond_total",
+            "docs": [
+              "Validator bonds held in the vault (not lender money)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "senior_assets",
+            "type": "u64"
+          },
+          {
+            "name": "senior_shares",
+            "type": "u64"
+          },
+          {
+            "name": "junior_assets",
+            "type": "u64"
+          },
+          {
+            "name": "junior_shares",
+            "type": "u64"
+          },
+          {
+            "name": "senior_pending_shares",
+            "docs": [
+              "Shares queued for withdrawal, per tranche, so new advances do not",
+              "starve queued withdrawals."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "junior_pending_shares",
+            "type": "u64"
+          },
+          {
+            "name": "withdraw_head",
+            "type": "u64"
+          },
+          {
+            "name": "withdraw_tail",
+            "type": "u64"
+          },
+          {
+            "name": "last_accrued_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "validators",
+            "type": "u32"
+          },
+          {
+            "name": "open_advances",
+            "type": "u32"
+          },
+          {
+            "name": "total_advanced",
+            "type": "u64"
+          },
+          {
+            "name": "total_repaid",
+            "type": "u64"
+          },
+          {
+            "name": "total_defaulted",
+            "type": "u64"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "scorer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolParams",
+      "docs": [
+        "Governance-set parameters. Every rate is in basis points."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "senior_rate_bps_per_epoch",
+            "docs": [
+              "Senior tranche target coupon per epoch (4 = 0.04%/epoch ≈ 7.5%/yr at ~182 epochs)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "protocol_fee_bps",
+            "docs": [
+              "Share of realised income (fees and recoveries) paid to the treasury."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "advance_bps_unhedged",
+            "docs": [
+              "Credit limit as a share of trailing-window revenue, unhedged validators."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "advance_bps_hedged",
+            "docs": [
+              "Same, for validators hedged on the Fee Market."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bond_multiplier",
+            "docs": [
+              "Credit limit cap as a multiple of the posted bond. 0 disables the bond cap."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "Flat fee on principal charged at origination (200 = 2%)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "remit_bps",
+            "docs": [
+              "Share of each epoch's swept revenue that goes to repayment."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_score",
+            "docs": [
+              "Minimum Epoch Score to borrow (0..=10,000)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "score_ttl_epochs",
+            "docs": [
+              "A score older than this many epochs is stale."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_advance_lamports",
+            "docs": [
+              "Smallest advance, lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_advance_lamports",
+            "docs": [
+              "Largest advance per validator, lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_pool_assets",
+            "docs": [
+              "Cap on total lender assets, lamports. 0 = uncapped."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_utilization_bps",
+            "docs": [
+              "Outstanding principal may not exceed this share of total assets."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_junior_bps",
+            "docs": [
+              "Junior assets must stay at or above this share of total assets."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "junior_lock_epochs",
+            "docs": [
+              "Epochs a junior deposit is locked before it can be withdrawn."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_advance_epochs",
+            "docs": [
+              "An advance older than this is defaultable even if revenue keeps arriving."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "vote_reserve_lamports",
+            "docs": [
+              "Lamports left in the vote account on every sweep for the admission",
+              "ticket and vote fees (SIMD-0357 VAT)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "min_commission_bps",
+            "docs": [
+              "Validators may not set commission below this while onboarded."
+            ],
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Late"
+          },
+          {
+            "name": "Defaulted"
+          },
+          {
+            "name": "Released"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuotePosted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quote",
+            "type": "pubkey"
+          },
+          {
+            "name": "maker",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "fixed_rate",
+            "type": "u64"
+          },
+          {
+            "name": "max_notional",
+            "type": "u64"
+          },
+          {
+            "name": "max_move_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueShareSwept",
+      "docs": [
+        "The revenue share a sweep moved into the buyback escrow (emitted next to",
+        "`Swept`, whose `gross` includes it)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "gross",
+            "type": "u64"
+          },
+          {
+            "name": "share",
+            "type": "u64"
+          },
+          {
+            "name": "after_senior_advance",
+            "docs": [
+              "The share came after a pre-registration advance's remittance."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "escrow_balance",
+            "docs": [
+              "Escrow balance above rent after the sweep."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueToken",
+      "docs": [
+        "A validator's revenue token (seeds: `[\"revenue_token\", vote]`).",
+        "",
+        "The validator sold `share_bps` of its gross revenue for `term_epochs`",
+        "epochs as an SPL token launched on a Meteora DBC curve. Every sweep in the",
+        "term moves the share into the buyback escrow `[\"buyback\", vote]`; buyback",
+        "slices swap it for the token and burn what they buy; after the term (or",
+        "during it, when the admin allows), holders can `redeem` tokens for a",
+        "pro-rata share of whatever the escrow still holds."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "position",
+            "docs": [
+              "The `ValidatorPosition` it was registered on (may be closed after the term)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "docs": [
+              "Paid the rent at registration; receives it back from `close_revenue_token`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "docs": [
+              "Always SPL Token in v1 (Token-2022 mints are rejected at registration)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dbc_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "dbc_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "damm_pool",
+            "docs": [
+              "The DAMM v2 pool the curve graduated to; all zeros until",
+              "`sync_revenue_token_pool` verifies and records it."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "term_epochs",
+            "type": "u16"
+          },
+          {
+            "name": "registered_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "start_epoch",
+            "docs": [
+              "First epoch whose sweep pays the share (the epoch after registration)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "term_end_epoch",
+            "docs": [
+              "`start_epoch + term_epochs`: the first epoch after the term. Release and",
+              "commission cuts are blocked until then."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "advance_seq_at_registration",
+            "docs": [
+              "`position.advance_seq` at registration. An advance with a lower `seq`",
+              "predates the token and keeps its claim on gross revenue: while it is",
+              "open the share is taken after its remittance, not before."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "inflation_commission_bps",
+            "docs": [
+              "Vote-account commission at registration; neither may go lower during the term."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "block_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "escrow_bump",
+            "type": "u8"
+          },
+          {
+            "name": "tokens_bump",
+            "type": "u8"
+          },
+          {
+            "name": "wsol_bump",
+            "type": "u8"
+          },
+          {
+            "name": "slices_per_epoch",
+            "type": "u8"
+          },
+          {
+            "name": "window_slots",
+            "docs": [
+              "Slots from the start of the epoch during which slices may run."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "max_slippage_bps",
+            "docs": [
+              "`min_amount_out` must be at least the pool's fee-free output minus this."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_impact_bps",
+            "docs": [
+              "One slice may move the pool price by at most this much."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "flags",
+            "docs": [
+              "`FLAG_BUYBACKS_PAUSED | FLAG_REDEEM_DURING_TERM`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "RevenueTokenStatus"
+              }
+            }
+          },
+          {
+            "name": "buyback_epoch",
+            "docs": [
+              "Epoch the fields below belong to."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "epoch_budget",
+            "docs": [
+              "Escrow balance (above rent) when the epoch's first slice ran."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "epoch_spent",
+            "type": "u64"
+          },
+          {
+            "name": "slices_done",
+            "docs": [
+              "Bit `i` set = slice `i` ran in `buyback_epoch`."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "last_share_epoch",
+            "docs": [
+              "Epoch of the last sweep that ran with this token attached."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_escrowed",
+            "docs": [
+              "Shares swept into the escrow."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_spent",
+            "docs": [
+              "SOL spent on buybacks."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_bought",
+            "docs": [
+              "Tokens the buybacks received."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_burned",
+            "docs": [
+              "Tokens burned by the buybacks (what they bought plus anything else",
+              "sent to the buyback token account)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_redeemed",
+            "docs": [
+              "Tokens burned by `redeem`, and the SOL paid for them."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_redeemed_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_count",
+            "type": "u32"
+          },
+          {
+            "name": "fee_floor_bps",
+            "docs": [
+              "The lowest fee, bps, the token's venues can charge (the DBC curve's",
+              "floor or the graduated DAMM v2 pool's fee, from the DBC config at",
+              "registration). `max_impact_bps` may not exceed twice it."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                62
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueTokenClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_escrowed",
+            "type": "u64"
+          },
+          {
+            "name": "total_spent",
+            "type": "u64"
+          },
+          {
+            "name": "total_burned",
+            "type": "u64"
+          },
+          {
+            "name": "total_redeemed",
+            "type": "u64"
+          },
+          {
+            "name": "lamports_to_pool",
+            "docs": [
+              "Escrow left unclaimed after the redemption grace period, booked as",
+              "pool income (0 when the escrow was spent). Appended: older decoders",
+              "that ignore trailing bytes still read the fields above."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueTokenConfigured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "slices_per_epoch",
+            "type": "u8"
+          },
+          {
+            "name": "window_slots",
+            "type": "u32"
+          },
+          {
+            "name": "max_slippage_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_impact_bps",
+            "type": "u16"
+          },
+          {
+            "name": "flags",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueTokenPoolSynced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "dbc_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "damm_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "damm_config",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueTokenRedeemed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens_burned",
+            "type": "u64"
+          },
+          {
+            "name": "lamports_out",
+            "type": "u64"
+          },
+          {
+            "name": "circulating_supply",
+            "type": "u64"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueTokenRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "revenue_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "dbc_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "term_epochs",
+            "type": "u16"
+          },
+          {
+            "name": "start_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "term_end_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "inflation_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "block_commission_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevenueTokenStatus",
+      "docs": [
+        "Where the token trades, so where buybacks swap."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Curve"
+          },
+          {
+            "name": "Graduated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreUpdate",
+      "docs": [
+        "Inputs the scorer posts each epoch. The formula is on-chain",
+        "(`math::score`), so the score is reproducible from these numbers."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "credits_ratio_bps",
+            "docs": [
+              "Vote credits as a share of the cluster average, bps."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "commission_bps",
+            "docs": [
+              "The higher of inflation and MEV commission, bps."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "epochs_active",
+            "type": "u16"
+          },
+          {
+            "name": "delinquent",
+            "type": "bool"
+          },
+          {
+            "name": "superminority",
+            "type": "bool"
+          },
+          {
+            "name": "hedged",
+            "docs": [
+              "The validator holds a Fee Market hedge for the coming epoch."
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "score",
+            "type": "u16"
+          },
+          {
+            "name": "hedged",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "PayFixed"
+          },
+          {
+            "name": "ReceiveFixed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quote",
+            "type": "pubkey"
+          },
+          {
+            "name": "swap",
+            "type": "pubkey"
+          },
+          {
+            "name": "taker",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "notional",
+            "type": "u64"
+          },
+          {
+            "name": "fixed_rate",
+            "type": "u64"
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapPosition",
+      "docs": [
+        "A taker's side of one quote (seeds: `[\"swap\", quote, taker]`). The taker's",
+        "collateral sits on this account above its rent until settlement."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quote",
+            "type": "pubkey"
+          },
+          {
+            "name": "taker",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "notional",
+            "type": "u64"
+          },
+          {
+            "name": "fixed_rate",
+            "type": "u64"
+          },
+          {
+            "name": "max_move_bps",
+            "type": "u16"
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          },
+          {
+            "name": "settled",
+            "type": "bool"
+          },
+          {
+            "name": "pnl",
+            "docs": [
+              "Taker's realised profit (positive) or loss (negative), lamports."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapSettled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "swap",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "index_value",
+            "type": "u64"
+          },
+          {
+            "name": "taker_pnl",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Swept",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "from_vote",
+            "docs": [
+              "Withdrawn from the vote account this sweep."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "gross",
+            "docs": [
+              "Total gross revenue processed (vote withdrawal + collector deposits)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "remitted",
+            "type": "u64"
+          },
+          {
+            "name": "to_operator",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Tranche",
+      "docs": [
+        "The two lender tranches. Senior is paid first and takes losses last."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Senior"
+          },
+          {
+            "name": "Junior"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryClaimKind",
+      "docs": [
+        "What a treasury claim collected (`TreasuryClaimed.kind`)."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "TradingFee"
+          },
+          {
+            "name": "Surplus"
+          },
+          {
+            "name": "MigrationFee"
+          },
+          {
+            "name": "Leftover"
+          },
+          {
+            "name": "LpFee"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryClaimed",
+      "docs": [
+        "The partner treasury claimed from Meteora. SOL went to the vault as pool",
+        "income (`income_unallocated`, paid out at the next `accrue`: protocol fee,",
+        "senior coupon, then junior); tokens were burned."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "TreasuryClaimKind"
+              }
+            }
+          },
+          {
+            "name": "mint",
+            "docs": [
+              "The token (DBC base mint / DAMM v2 token A)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "source",
+            "docs": [
+              "The DBC pool, or the DAMM v2 pool for `LpFee`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "position",
+            "docs": [
+              "The DAMM v2 position for `LpFee`, the default key otherwise."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "cranker",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports_claimed",
+            "docs": [
+              "Wrapped SOL Meteora paid to the treasury."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "lamports_to_pool",
+            "docs": [
+              "Lamports added to the pool's cash and income (the claim plus anything",
+              "already sitting on the claim account's address)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_claimed",
+            "docs": [
+              "Tokens Meteora paid to the treasury."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_burned",
+            "docs": [
+              "Tokens burned: the claim plus anything already in the treasury's",
+              "token account."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pool_cash",
+            "docs": [
+              "The pool's cash and undistributed income after the claim."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "income_unallocated",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorOnboarded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "original_withdrawer",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorPosition",
+      "docs": [
+        "One onboarded validator (seeds: `[\"position\", vote]`).",
+        "",
+        "The program's PDA `[\"vote_auth\", vote]` is the vote account's withdraw",
+        "authority for as long as this position exists, and `[\"escrow\", vote]` is",
+        "the system-owned account both commission collectors point at."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "docs": [
+              "Validator identity (node pubkey) at onboarding. Locked while an",
+              "advance is open because `UpdateValidatorIdentity` resets the block",
+              "revenue collector."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "docs": [
+              "Signs operator actions: advances, commission changes, release."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "payout",
+            "docs": [
+              "Receives the validator's share of every sweep."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "original_withdrawer",
+            "docs": [
+              "Withdraw authority before onboarding; the default target of `release`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vote_auth_bump",
+            "type": "u8"
+          },
+          {
+            "name": "escrow_bump",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PositionStatus"
+              }
+            }
+          },
+          {
+            "name": "hedged",
+            "docs": [
+              "Set by the scorer when the validator holds a fee hedge for the epoch."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "score",
+            "docs": [
+              "0..=10,000."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "last_scored_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "revenue",
+            "type": {
+              "array": [
+                "u64",
+                10
+              ]
+            }
+          },
+          {
+            "name": "revenue_head",
+            "type": "u8"
+          },
+          {
+            "name": "revenue_count",
+            "docs": [
+              "Number of filled slots, capped at `REVENUE_WINDOW`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "last_swept_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "total_swept",
+            "type": "u64"
+          },
+          {
+            "name": "total_remitted",
+            "type": "u64"
+          },
+          {
+            "name": "bond_lamports",
+            "docs": [
+              "Lamports the operator posted as a bond; held in the pool vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "open_advance",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "advance_seq",
+            "docs": [
+              "Monotonic; part of every advance's seeds."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "late_epochs",
+            "docs": [
+              "Consecutive swept epochs with zero revenue while an advance is open."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "inflation_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "block_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "onboarded_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "revenue_token",
+            "docs": [
+              "The validator's `RevenueToken` (`[\"revenue_token\", vote]`), or all",
+              "zeros for none. Takes the 32 bytes that were `_reserved`, so the",
+              "account size (415) and every other field are unchanged, and positions",
+              "onboarded before revenue tokens existed read as \"none\"."
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorReleased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_withdrawer",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawCancelled",
+      "docs": [
+        "`reason`: 0 = cancelled by the owner, 1 = bounced by the junior floor",
+        "when it reached the head of the queue (shares returned to the owner)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "seq",
+            "type": "u64"
+          },
+          {
+            "name": "reason",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawProcessed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tranche",
+            "type": {
+              "defined": {
+                "name": "Tranche"
+              }
+            }
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          },
+          {
+            "name": "assets",
+            "type": "u64"
+          },
+          {
+            "name": "seq",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawRequest",
+      "docs": [
+        "A queued withdrawal (seeds: `[\"withdraw\", pool, seq]`). Requests are paid",
+        "strictly in `seq` order, whole-or-nothing, at the share price on the day",
+        "they are processed. That keeps a run fair: nobody jumps the queue and the",
+        "queue never pays out cash that an earlier request is waiting for."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tranche",
+            "type": {
+              "defined": {
+                "name": "Tranche"
+              }
+            }
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          },
+          {
+            "name": "seq",
+            "type": "u64"
+          },
+          {
+            "name": "requested_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "cancelled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tranche",
+            "type": {
+              "defined": {
+                "name": "Tranche"
+              }
+            }
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          },
+          {
+            "name": "seq",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

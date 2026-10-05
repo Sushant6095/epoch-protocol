@@ -255,6 +255,8 @@ export interface RevenueTokenAccount {
   totalRedeemed: bigint;
   totalRedeemedLamports: bigint;
   buybackCount: number;
+  /** The lowest fee, bps, the token's venues can charge (from its DBC config); `maxImpactBps` ≤ twice it. */
+  feeFloorBps: number;
 }
 
 /** Account name → decoded type. */
@@ -308,7 +310,8 @@ const RESERVED: Readonly<Record<AccountName, number>> = {
   FeeIndex: 32,
   FeeQuote: 16,
   SwapPosition: 16,
-  RevenueToken: 64,
+  // Its first 2 reserved bytes are `fee_floor_bps` now.
+  RevenueToken: 62,
 };
 
 // ─── Field codecs ──────────────────────────────────────────────────────────
@@ -517,6 +520,7 @@ export function decodeRevenueToken(data: Uint8Array): RevenueTokenAccount {
     totalRedeemed: r.u64('totalRedeemed'),
     totalRedeemedLamports: r.u64('totalRedeemedLamports'),
     buybackCount: r.u32('buybackCount'),
+    feeFloorBps: r.u16('feeFloorBps'),
   };
   r.skip(RESERVED.RevenueToken, '_reserved');
   return account;
@@ -532,6 +536,24 @@ export const revenueTokenTermActive = (rt: RevenueTokenAccount, epoch: bigint): 
 /** `redeem` is open: after the term, or during it when the admin set `redeemDuringTerm`. */
 export const revenueTokenRedeemOpen = (rt: RevenueTokenAccount, epoch: bigint): boolean =>
   !revenueTokenTermActive(rt, epoch) || (rt.flags & REVENUE_TOKEN_FLAGS.redeemDuringTerm) !== 0;
+
+/** The highest `maxImpactBps` `configure_revenue_token` accepts: twice the fee floor, capped at 1,000 bps. */
+export const revenueTokenMaxImpactBound = (rt: RevenueTokenAccount): number => Math.min(rt.feeFloorBps * 2, 1_000);
+
+/**
+ * Whether `close_revenue_token` may run (`RevenueToken::close_mode`): `'spent'` after the term once at most
+ * `MAX_CLOSE_DUST_LAMPORTS` remain (all to the operator); `'unclaimed'` once `REDEEM_GRACE_EPOCHS` passed after the
+ * term, whatever the escrow holds (the rest becomes pool income); null otherwise.
+ */
+export function revenueTokenCloseMode(
+  rt: RevenueTokenAccount,
+  epoch: bigint,
+  escrowAvailable: bigint,
+): 'spent' | 'unclaimed' | null {
+  if (revenueTokenTermActive(rt, epoch)) return null;
+  if (escrowAvailable <= PROGRAM_CONSTANTS.MAX_CLOSE_DUST_LAMPORTS) return 'spent';
+  return epoch >= rt.termEndEpoch + PROGRAM_CONSTANTS.REDEEM_GRACE_EPOCHS ? 'unclaimed' : null;
+}
 
 /** Buybacks paused by the pool admin. */
 export const revenueTokenBuybacksPaused = (rt: RevenueTokenAccount): boolean =>

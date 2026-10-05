@@ -40,3 +40,21 @@ What the program does, and where it differs from the decision above.
 - **No revenue token needed.** Claims read only the Meteora accounts, so they work after `close_revenue_token` and for launches that never registered. Every Meteora account is checked: program ids, pool and event authorities, the pool against its config or position, vaults and mints, SPL Token on both sides, wrapped SOL as the quote, and the position NFT's owner. Errors 6082–6089 are appended.
 - **Surplus.** DBC's current swaps stop at the migration price, so a completed curve's surplus is a rounding lamport and the partner's 80% of it rounds to zero. The instruction is there for older pools and future DBC versions.
 - **Proven on localnet** against the real DBC, DAMM v2 and Metaplex mainnet binaries: every claim with exact amounts against the SDK mirrors and the `@epoch/meteora` reader, the burns against the mint supply, the pool credit against the vault, and `accrue` paying the senior coupon first. See `programs/epoch/README.md`.
+
+## Amendment, 5 Oct 2026: security review
+
+The pre-mainnet review (`docs/security/revenue-tokens-review.md`) changed the program in five places.
+
+- **Redeem counts pool tokens.** Circulating supply is the mint supply less the buyback and treasury token accounts
+  only. Leaving pool balances out let a holder sell into the pool, redeem at the inflated rate and buy back for the
+  price of the pool fee. Tokens in a pool now claim their share of the escrow by being bought; every token redeems at
+  the same rate in any order.
+- **Registration checks the whole launch.** A fixed-supply config must name the treasury as leftover receiver, the
+  graduated liquidity must be 100% permanently locked, and the venues' lowest fee (curve schedule and graduated pool)
+  is recorded as `fee_floor_bps`.
+- **The sandwich bound is enforced.** `max_impact_bps` is capped at twice `fee_floor_bps` at registration and in
+  `configure_revenue_token`, instead of relying on the admin.
+- **The pool's pause stops buybacks.**
+- **Closing cannot be blocked.** 30 epochs after the term (`REDEEM_GRACE_EPOCHS`) a token closes whatever its escrow
+  holds; what holders left unclaimed becomes pool income, like the treasury's fees.
+

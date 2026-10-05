@@ -109,7 +109,11 @@ pub struct RevenueToken {
     pub total_redeemed: u64,
     pub total_redeemed_lamports: u64,
     pub buyback_count: u32,
-    pub _reserved: [u8; 64],
+    /// The lowest fee, bps, the token's venues can charge (the DBC curve's
+    /// floor or the graduated DAMM v2 pool's fee, from the DBC config at
+    /// registration). `max_impact_bps` may not exceed twice it.
+    pub fee_floor_bps: u16,
+    pub _reserved: [u8; 62],
 }
 
 impl RevenueToken {
@@ -160,6 +164,30 @@ impl RevenueToken {
         !self.term_active(epoch) || self.flags & FLAG_REDEEM_DURING_TERM != 0
     }
 
+    /// The highest `max_impact_bps` `configure_revenue_token` accepts.
+    pub fn max_impact_bound(&self) -> u16 {
+        crate::math::max_impact_bound(self.fee_floor_bps)
+    }
+
+    /// Whether `close_revenue_token` may run, and where the escrow goes. After
+    /// the term, once at most `MAX_CLOSE_DUST_LAMPORTS` remain, everything
+    /// returns to the operator. Holders get `REDEEM_GRACE_EPOCHS` after the
+    /// term to redeem; after that the token closes whatever the escrow holds,
+    /// so a donation cannot keep it open, and the unclaimed SOL becomes pool
+    /// income (the operator still gets the rent).
+    pub fn close_mode(&self, epoch: u64, escrow_available: u64) -> Option<CloseMode> {
+        use crate::constants::{MAX_CLOSE_DUST_LAMPORTS, REDEEM_GRACE_EPOCHS};
+        if self.term_active(epoch) {
+            None
+        } else if escrow_available <= MAX_CLOSE_DUST_LAMPORTS {
+            Some(CloseMode::Spent)
+        } else if epoch >= self.term_end_epoch.saturating_add(REDEEM_GRACE_EPOCHS) {
+            Some(CloseMode::Unclaimed)
+        } else {
+            None
+        }
+    }
+
     /// The commission snapshot for `kind` (0 = inflation rewards, 1 = block revenue).
     pub fn commission_floor(&self, block_revenue: bool) -> u16 {
         if block_revenue {
@@ -168,6 +196,16 @@ impl RevenueToken {
             self.inflation_commission_bps
         }
     }
+}
+
+/// How `close_revenue_token` empties the escrow.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CloseMode {
+    /// Spent down to dust: every lamport to the operator.
+    Spent,
+    /// The redemption grace period is over: rent to the operator, the rest
+    /// to the pool as income.
+    Unclaimed,
 }
 
 /// Buyback parameters the pool admin may change (never the share or the term).
@@ -252,7 +290,8 @@ mod tests {
             total_redeemed: 0,
             total_redeemed_lamports: 0,
             buyback_count: 0,
-            _reserved: [0; 64],
+            fee_floor_bps: 100,
+            _reserved: [0; 62],
         }
     }
 
@@ -303,6 +342,44 @@ mod tests {
         assert!(!rt.graduated());
         rt.damm_pool = Pubkey::new_from_array([1; 32]);
         assert!(rt.graduated());
+    }
+
+    #[test]
+    fn close_waits_for_the_spend_or_the_grace_period() {
+        use crate::constants::{MAX_CLOSE_DUST_LAMPORTS, REDEEM_GRACE_EPOCHS};
+        // Term covers 100..=109.
+        let rt = token(100, 10);
+        // Never during the term, however empty.
+        assert_eq!(rt.close_mode(109, 0), None);
+        // After it: dust closes to the operator.
+        assert_eq!(
+            rt.close_mode(110, MAX_CLOSE_DUST_LAMPORTS),
+            Some(CloseMode::Spent)
+        );
+        // More than dust waits for holders to redeem...
+        assert_eq!(rt.close_mode(110, MAX_CLOSE_DUST_LAMPORTS + 1), None);
+        assert_eq!(
+            rt.close_mode(110 + REDEEM_GRACE_EPOCHS - 1, 5_000_000_000),
+            None
+        );
+        // ...until the grace period ends: a donation cannot keep it open.
+        assert_eq!(
+            rt.close_mode(110 + REDEEM_GRACE_EPOCHS, 5_000_000_000),
+            Some(CloseMode::Unclaimed)
+        );
+        assert_eq!(
+            rt.close_mode(110 + REDEEM_GRACE_EPOCHS, 0),
+            Some(CloseMode::Spent)
+        );
+    }
+
+    #[test]
+    fn the_impact_bound_follows_the_fee_floor() {
+        let mut rt = token(100, 10);
+        rt.fee_floor_bps = 100;
+        assert_eq!(rt.max_impact_bound(), 200);
+        rt.fee_floor_bps = 10;
+        assert_eq!(rt.max_impact_bound(), 20);
     }
 
     #[test]

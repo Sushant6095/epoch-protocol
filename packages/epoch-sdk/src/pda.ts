@@ -10,6 +10,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   CP_AMM_POSITION_NFT_ACCOUNT_SEED,
   METEORA,
+  NATIVE_MINT,
   SEEDS,
   TOKEN_PROGRAM_ID,
   TRANCHES,
@@ -159,6 +160,28 @@ export function findAssociatedTokenAddress(wallet: PublicKey, mint: PublicKey): 
 export function findTreasuryTokensAddress(programId: PublicKey, mint: PublicKey): PublicKey {
   const [pool] = findPoolPda(programId);
   return findAssociatedTokenAddress(findPartnerTreasuryPda(programId, pool)[0], mint);
+}
+
+const DBC_POOL_SEED = ascii('pool');
+
+/** Byte-wise comparison of two keys, as Rust orders `Pubkey`s. */
+function compareKeys(a: PublicKey, b: PublicKey): number {
+  const x = a.toBytes();
+  const y = b.toBytes();
+  for (let i = 0; i < 32; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return 0;
+}
+
+/**
+ * A DBC curve's pool: `["pool", config, max(base, quote), min(base, quote)]` under the DBC program, so a launch's pool
+ * follows from its mint and config (wrapped SOL is the quote of every revenue token).
+ */
+export function findDbcPoolPda(config: PublicKey, baseMint: PublicKey, quoteMint: PublicKey = NATIVE_MINT): PublicKey {
+  const [hi, lo] = compareKeys(baseMint, quoteMint) > 0 ? [baseMint, quoteMint] : [quoteMint, baseMint];
+  return PublicKey.findProgramAddressSync(
+    [DBC_POOL_SEED, config.toBytes(), hi.toBytes(), lo.toBytes()],
+    METEORA.DBC_PROGRAM_ID,
+  )[0];
 }
 
 const POSITION_NFT_ACCOUNT_SEED = ascii(CP_AMM_POSITION_NFT_ACCOUNT_SEED);

@@ -21,12 +21,15 @@ import {
   fieldFilter,
   revenueHistory,
   revenueTokenBuybacksPaused,
+  revenueTokenCloseMode,
   revenueTokenInTerm,
+  revenueTokenMaxImpactBound,
   revenueTokenRedeemOpen,
   revenueTokenTermActive,
   trailingRevenue,
   type ValidatorPositionAccount,
 } from './accounts';
+import { PROGRAM_CONSTANTS } from './constants';
 import { ACCOUNT_DISCRIMINATORS, ACCOUNT_NAMES, type AccountName } from './discriminators';
 import { base58Decode } from './encoding';
 
@@ -172,6 +175,24 @@ describe('RevenueToken', () => {
     expect(revenueTokenRedeemOpen(graduated, graduated.startEpoch)).toBe(true);
     expect(revenueTokenBuybacksPaused(graduated)).toBe(true);
     expect(revenueTokenBuybacksPaused(curve)).toBe(false);
+    // The fee floor (from the Rust examples: 100 bps on the curve, 25 graduated) bounds max_impact_bps at twice it.
+    expect([curve.feeFloorBps, graduated.feeFloorBps]).toEqual([100, 25]);
+    expect(revenueTokenMaxImpactBound(curve)).toBe(200);
+    expect(revenueTokenMaxImpactBound(graduated)).toBe(50);
+    expect(revenueTokenMaxImpactBound({ ...curve, feeFloorBps: 600 })).toBe(1_000);
+  });
+
+  it('mirrors close_mode: spent after the term, or anything after the grace period', () => {
+    const rt = decodeRevenueToken(fromHex(vectors.accounts.RevenueToken.examples[0].data));
+    const end = rt.termEndEpoch;
+    const dust = PROGRAM_CONSTANTS.MAX_CLOSE_DUST_LAMPORTS;
+    const grace = PROGRAM_CONSTANTS.REDEEM_GRACE_EPOCHS;
+    expect(revenueTokenCloseMode(rt, end - 1n, 0n)).toBeNull();
+    expect(revenueTokenCloseMode(rt, end, dust)).toBe('spent');
+    expect(revenueTokenCloseMode(rt, end, dust + 1n)).toBeNull();
+    expect(revenueTokenCloseMode(rt, end + grace - 1n, 5n * 10n ** 9n)).toBeNull();
+    expect(revenueTokenCloseMode(rt, end + grace, 5n * 10n ** 9n)).toBe('unclaimed');
+    expect(revenueTokenCloseMode(rt, end + grace, 0n)).toBe('spent');
   });
 });
 

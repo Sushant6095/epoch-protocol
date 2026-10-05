@@ -67,6 +67,7 @@ describe('constants mirror programs/epoch/src/constants.rs', () => {
       expect({ name, value: PROGRAM_CONSTANTS[name] }).toEqual({ name, value: c[name] });
     }
     expect(PROGRAM_CONSTANTS.MAX_CLOSE_DUST_LAMPORTS).toBe(BigInt(c.MAX_CLOSE_DUST_LAMPORTS));
+    expect(PROGRAM_CONSTANTS.REDEEM_GRACE_EPOCHS).toBe(BigInt(c.REDEEM_GRACE_EPOCHS));
     expect(REVENUE_TOKEN_FLAGS).toEqual({
       buybacksPaused: c.FLAG_BUYBACKS_PAUSED,
       redeemDuringTerm: c.FLAG_REDEEM_DURING_TERM,

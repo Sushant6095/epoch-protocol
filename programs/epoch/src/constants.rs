@@ -97,6 +97,10 @@ pub const MAX_MAX_IMPACT_BPS: u16 = 1_000;
 /// (what a last slice or redemption can leave behind); it goes to the operator
 /// with the rent.
 pub const MAX_CLOSE_DUST_LAMPORTS: u64 = 100_000;
+/// Epochs after the term during which holders can redeem before
+/// `close_revenue_token` may close a token whose escrow still holds more than
+/// dust (the rest then becomes pool income). About two months on mainnet.
+pub const REDEEM_GRACE_EPOCHS: u64 = 30;
 
 // ── Meteora (verified against the deployed programs and mainnet swaps) ─────
 /// Dynamic Bonding Curve program.

@@ -63,6 +63,7 @@ export {
   findBuybackWsolPda,
   findDammPositionNftAccount,
   findDammPositionPda,
+  findDbcPoolPda,
   findEscrowPda,
   findFeeIndexPda,
   findLenderPda,
@@ -109,7 +110,9 @@ export {
   revenueHistory,
   type RevenueTokenAccount,
   revenueTokenBuybacksPaused,
+  revenueTokenCloseMode,
   revenueTokenInTerm,
+  revenueTokenMaxImpactBound,
   revenueTokenRedeemOpen,
   revenueTokenTermActive,
   type SwapPositionAccount,
@@ -239,6 +242,7 @@ export {
   type BuybackSlicePlan,
   type BuybackVenueState,
   type BuyFill,
+  circulatingSupply,
   computeScore,
   creditLimit,
   type CreditLimitInput,
@@ -250,6 +254,8 @@ export {
   dbcBuy,
   dbcLeftover,
   dbcMaxQuoteIn,
+  dbcMigratedFeeBps,
+  dbcMinBaseFeeNumerator,
   dbcPartnerMigrationFee,
   dbcPartnerPart,
   dbcPartnerSurplus,
@@ -257,8 +263,10 @@ export {
   deltaQuote,
   distributeIncome,
   EpochMathError,
+  FEE_NUMERATOR_PER_BPS,
   impactTargetSqrtPrice,
   juniorRatioBps,
+  maxImpactBound,
   minOutFloor,
   mulDiv,
   nextSqrtFromQuoteIn,
@@ -276,7 +284,23 @@ export {
   splitSweepWithShare,
   swapCollateral,
   takerPnl,
+  venueFeeFloorBps,
 } from './math';
+
+// DBC launch configs: register_revenue_token's checks, for a pre-flight
+export {
+  checkLaunchConfig,
+  DBC_POOL_CONFIG_DISCRIMINATOR,
+  DBC_POOL_CONFIG_LEN,
+  DBC_VIRTUAL_POOL_DISCRIMINATOR,
+  DBC_VIRTUAL_POOL_LEN,
+  type DbcLaunchConfig,
+  type DbcPoolHead,
+  decodeDbcLaunchConfig,
+  decodeDbcPoolHead,
+  type LaunchConfigCheck,
+  type LaunchConfigError,
+} from './launchConfig';
 
 // Encodings
 export { base58Decode, base58Encode, base64Decode, base64Encode, bytesToHex, hexToBytes } from './encoding';

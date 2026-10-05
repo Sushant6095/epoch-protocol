@@ -209,6 +209,7 @@ export const revenueToken = (overrides: Partial<RevenueTokenAccount> = {}): Reve
   totalRedeemed: 0n,
   totalRedeemedLamports: 0n,
   buybackCount: 0,
+  feeFloorBps: 100,
   ...overrides,
 });
 

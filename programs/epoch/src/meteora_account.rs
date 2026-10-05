@@ -18,10 +18,18 @@
 //!                         migration_fee_withdraw_status 311 · creator_base_fee 352 ·
 //!                         protocol_migration_base_fee_amount 384
 //! DBC PoolConfig (1048)   quote_mint 8 · fee_claimer 40 · leftover_receiver 72 ·
+//!                         base fee 104 {cliff_fee_numerator u64 · second_factor u64 112 ·
+//!                         third_factor u64 120 · first_factor u16 128 · base_fee_mode 130} ·
+//!                         partner vesting_percentage 185 · creator vesting_percentage 201 ·
 //!                         migration_option 233 · token_type 237 · quote_token_flag 238 ·
+//!                         partner_permanent_locked_liquidity_percentage 239 ·
+//!                         partner_liquidity_percentage 240 ·
+//!                         creator_permanent_locked_liquidity_percentage 241 ·
+//!                         creator_liquidity_percentage 242 · migration_fee_option 243 ·
 //!                         fixed_token_supply_flag 244 · creator_trading_fee_percentage 245 ·
 //!                         migration_fee_percentage 247 · creator_migration_fee_percentage 248 ·
 //!                         migration_quote_threshold 264 · migration_sqrt_price 280 ·
+//!                         migrated_pool_fee_bps 362 (u16) · migrated_pool_base_fee_mode 364 ·
 //!                         sqrt_start_price 392 · curve 408 (20 × {u128, u128})
 //! DAMM v2 Pool (1112)     token_a_mint 168 · token_b_mint 200 · token_a_vault 232 · token_b_vault 264 ·
 //!                         liquidity 360 · sqrt_max_price 440 · sqrt_price 456 · pool_status 481 ·
@@ -99,6 +107,47 @@ fn u128_at(d: &[u8], at: usize) -> u128 {
     u128::from_le_bytes(b)
 }
 
+fn u16_at(d: &[u8], at: usize) -> u16 {
+    u16::from_le_bytes([d[at], d[at + 1]])
+}
+
+/// A DBC config's base fee (`BaseFeeConfig`), numerators over 10⁹. Fee
+/// scheduler modes (0 linear, 1 exponential): `first_factor` is the number of
+/// periods, `second_factor` the period length, `third_factor` the reduction
+/// per period. Rate limiter (2): the fee starts at the cliff and only rises
+/// with the trade size.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DbcBaseFee {
+    pub cliff_fee_numerator: u64,
+    pub first_factor: u16,
+    pub second_factor: u64,
+    pub third_factor: u64,
+    pub mode: u8,
+}
+
+/// How a DBC config splits the graduated pool's liquidity, percent.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DbcLiquiditySplit {
+    pub partner_permanent_locked: u8,
+    pub partner_unlocked: u8,
+    pub partner_vesting: u8,
+    pub creator_permanent_locked: u8,
+    pub creator_unlocked: u8,
+    pub creator_vesting: u8,
+}
+
+impl DbcLiquiditySplit {
+    /// All of the liquidity is locked forever (DBC makes the six parts add
+    /// up to 100, so the others are zero).
+    pub fn fully_locked(&self) -> bool {
+        u16::from(self.partner_permanent_locked) + u16::from(self.creator_permanent_locked) == 100
+            && self.partner_unlocked == 0
+            && self.partner_vesting == 0
+            && self.creator_unlocked == 0
+            && self.creator_vesting == 0
+    }
+}
+
 /// The fields of a DBC `VirtualPool` that revenue tokens use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DbcPool {
@@ -167,8 +216,19 @@ pub struct DbcConfig {
     pub quote_mint: Pubkey,
     pub fee_claimer: Pubkey,
     pub leftover_receiver: Pubkey,
+    pub base_fee: DbcBaseFee,
+    pub liquidity: DbcLiquiditySplit,
     pub migration_option: u8,
     pub token_type: u8,
+    /// The graduated DAMM v2 pool's fee: 0–5 = 25, 30, 100, 200, 400, 600
+    /// bps; 6 = customizable (`migrated_pool_fee_bps`).
+    pub migration_fee_option: u8,
+    /// 1 = fixed supply: the leftover goes to `leftover_receiver` (otherwise
+    /// DBC burns it at migration).
+    pub fixed_token_supply_flag: u8,
+    pub migrated_pool_fee_bps: u16,
+    /// DAMM v2 base fee mode of a customizable migrated pool (0/1 = fixed fee).
+    pub migrated_pool_base_fee_mode: u8,
     pub migration_quote_threshold: u64,
     pub migration_sqrt_price: u128,
     pub sqrt_start_price: u128,
@@ -192,8 +252,27 @@ impl DbcConfig {
             quote_mint: key(d, 8),
             fee_claimer: key(d, 40),
             leftover_receiver: key(d, 72),
+            base_fee: DbcBaseFee {
+                cliff_fee_numerator: u64_at(d, 104),
+                second_factor: u64_at(d, 112),
+                third_factor: u64_at(d, 120),
+                first_factor: u16_at(d, 128),
+                mode: d[130],
+            },
+            liquidity: DbcLiquiditySplit {
+                partner_permanent_locked: d[239],
+                partner_unlocked: d[240],
+                partner_vesting: d[185],
+                creator_permanent_locked: d[241],
+                creator_unlocked: d[242],
+                creator_vesting: d[201],
+            },
             migration_option: d[233],
             token_type: d[237],
+            migration_fee_option: d[243],
+            fixed_token_supply_flag: d[244],
+            migrated_pool_fee_bps: u16_at(d, 362),
+            migrated_pool_base_fee_mode: d[364],
             migration_quote_threshold: u64_at(d, 264),
             migration_sqrt_price: u128_at(d, 280),
             sqrt_start_price: u128_at(d, 392),
@@ -551,6 +630,35 @@ mod tests {
             }
         );
         assert_eq!(config.curve[2], CurvePoint::default());
+        // Fees and the liquidity split (the security-review checks read these).
+        assert_eq!(
+            config.base_fee,
+            DbcBaseFee {
+                cliff_fee_numerator: 2_500_000,
+                first_factor: 0,
+                second_factor: 0,
+                third_factor: 0,
+                mode: 0
+            }
+        );
+        assert_eq!(
+            (
+                config.migration_fee_option,
+                config.migrated_pool_fee_bps,
+                config.migrated_pool_base_fee_mode
+            ),
+            (6, 10, 0)
+        );
+        assert_eq!(config.fixed_token_supply_flag, 1);
+        assert_eq!(
+            config.liquidity,
+            DbcLiquiditySplit {
+                creator_unlocked: 89,
+                creator_vesting: 11,
+                ..DbcLiquiditySplit::default()
+            }
+        );
+        assert!(!config.liquidity.fully_locked());
         // The curve's quote reserve at the migration price equals the threshold
         // (the pool completed): Δquote from start to migration with curve[0]'s L.
         let raised = crate::math::delta_quote(

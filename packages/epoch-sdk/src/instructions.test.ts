@@ -310,8 +310,6 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
       holderTokens: acc(v, 'holder_tokens'),
       vote: ctxKey(v, 'vote'),
       mint: acc(v, 'mint'),
-      dbcPool: acc(v, 'dbc_pool'),
-      dammPool: optional(v, 'damm_pool'),
       treasuryTokens: optional(v, 'treasury_tokens'),
       amount: big(v.args.amount),
     }),
@@ -506,7 +504,7 @@ describe('revenue tokens', () => {
   it('execute_buyback forwards the instructions sysvar only on request, as the one remaining account', () => {
     const v = vectors.instructions.find((i) => i.name === 'execute_buyback')!;
     const [plain] = BUILDERS.execute_buyback(v, key(v.programId));
-    expect(plain.keys).toHaveLength(16);
+    expect(plain.keys).toHaveLength(17);
     const [withSysvar] = executeBuyback({
       programId: key(v.programId),
       cranker: acc(v, 'cranker'),
@@ -523,8 +521,8 @@ describe('revenue tokens', () => {
       minAmountOut: 1n,
       withInstructionsSysvar: true,
     });
-    expect(metas(withSysvar).slice(0, 16)).toEqual(v.metas);
-    expect(metas(withSysvar)[16]).toEqual({
+    expect(metas(withSysvar).slice(0, 17)).toEqual(v.metas);
+    expect(metas(withSysvar)[17]).toEqual({
       pubkey: INSTRUCTIONS_SYSVAR_ID.toBase58(),
       isSigner: false,
       isWritable: false,

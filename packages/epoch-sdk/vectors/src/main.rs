@@ -876,7 +876,7 @@ fn revenue_token_json(a: &RevenueToken) -> J {
         escrow_bump, tokens_bump, wsol_bump, slices_per_epoch, window_slots, max_slippage_bps,
         max_impact_bps, flags, status, buyback_epoch, epoch_budget, epoch_spent, slices_done,
         last_share_epoch, total_escrowed, total_spent, total_bought, total_burned, total_redeemed,
-        total_redeemed_lamports, buyback_count, _reserved,
+        total_redeemed_lamports, buyback_count, fee_floor_bps, _reserved,
     });
     let rest = fields!(a, RevenueToken {
         share_bps, term_epochs, registered_epoch, start_epoch, term_end_epoch,
@@ -884,7 +884,7 @@ fn revenue_token_json(a: &RevenueToken) -> J {
         escrow_bump, tokens_bump, wsol_bump, slices_per_epoch, window_slots, max_slippage_bps,
         max_impact_bps, flags, status, buyback_epoch, epoch_budget, epoch_spent, slices_done,
         last_share_epoch, total_escrowed, total_spent, total_bought, total_burned, total_redeemed,
-        total_redeemed_lamports, buyback_count,
+        total_redeemed_lamports, buyback_count, fee_floor_bps,
     } skip {
         pool, position, vote, operator, mint, token_program, dbc_pool, dbc_config, damm_pool,
         _reserved,
@@ -960,7 +960,9 @@ fn revenue_token_examples(g: &mut Gen) -> Vec<J> {
             total_redeemed: g.u64(),
             total_redeemed_lamports: g.u64(),
             buyback_count: g.u32(),
-            _reserved: [0; 64],
+            // Fixed values: the generator's sequence (and older vectors) stay put.
+            fee_floor_bps: if graduated { 25 } else { 100 },
+            _reserved: [0; 62],
         };
         let (data, len) = account_bytes(&a, None);
         out.push(example(label, &data, len, revenue_token_json(&a), vec![]));
@@ -1407,6 +1409,7 @@ fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen) -> J {
                 total_spent: g.u64(),
                 total_burned: g.u64(),
                 total_redeemed: g.sized(),
+                lamports_to_pool: 4_200_000_017,
             }
         );
     }
@@ -2296,6 +2299,7 @@ fn revenue_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
             },
             ExecuteBuyback {
                 cranker,
+                pool,
                 revenue_token,
                 buyback_escrow,
                 buyback_wsol,
@@ -2315,7 +2319,7 @@ fn revenue_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
             context { vote, venue }
         );
     }
-    for (label, graduated, amount) in [("curve", false, g.u64()), ("graduated", true, 1u64)] {
+    for (label, with_treasury, amount) in [("curve", false, g.u64()), ("graduated", true, 1u64)] {
         ix!(
             out,
             pid,
@@ -2329,15 +2333,7 @@ fn revenue_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
                 buyback_escrow,
                 buyback_tokens,
                 mint,
-                dbc_pool,
-                dbc_base_vault: vault_of(&DBC_PROGRAM_ID, &mint, &dbc_pool),
-                damm_pool: graduated.then_some(damm_pool),
-                damm_token_vault: graduated.then(|| vault_of(
-                    &CP_AMM_PROGRAM_ID,
-                    &mint,
-                    &damm_pool
-                )),
-                treasury_tokens: graduated.then_some(treasury_tokens),
+                treasury_tokens: with_treasury.then_some(treasury_tokens),
                 token_program: TOKEN_PROGRAM_ID,
                 system_program: system,
             },
@@ -2380,6 +2376,8 @@ fn revenue_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
         CloseRevenueToken {
             cranker,
             operator,
+            pool,
+            vault: addr(&[VAULT_SEED, pool.as_ref()], &pid),
             revenue_token,
             buyback_escrow,
             buyback_tokens,
@@ -2776,6 +2774,9 @@ fn errors() -> J {
         AlreadyClaimed,
         UnsupportedClaimPool,
         InvalidClaimAccount,
+        LiquidityNotLocked,
+        UnsupportedVenueFee,
+        ImpactAboveFeeBound,
     ))
 }
 
@@ -3679,7 +3680,343 @@ fn revenue_math(g: &mut Gen) -> Vec<(&'static str, J)> {
         }
     }
     out.push(("min_out_floor", J::Arr(floor)));
+
+    // Security review (added later): fixed grids, so the earlier vectors keep their values.
+    let mut circulating = Vec::new();
+    for (supply, held) in [
+        (0u64, 0u64),
+        (1, 0),
+        (0, 1),
+        (1_000, 300),
+        (1_000, 1_000),
+        (1_000, 5_000),
+        (1 << 53, 7),
+        (999_999_999_999, 123_456_789),
+        (u64::MAX, 0),
+        (u64::MAX, 1),
+        (u64::MAX, u64::MAX),
+    ] {
+        circulating.push(case(
+            vec![supply.j(), held.j()],
+            math::circulating_supply(supply, held).j(),
+        ));
+    }
+    out.push(("circulating_supply", J::Arr(circulating)));
+    let mut fee_floor = Vec::new();
+    for mode in [0u8, 1, 2, 3] {
+        for (cliff, periods, reduction) in [
+            (10_000_000u64, 0u16, 0u64),
+            (50_000_000, 40, 1_000_000),
+            (5_000_000, 10, 1_000_000),
+            (500_000_000, 10, 1_000),
+            (500_000_000, 3, 10_000),
+            (990_000_000, u16::MAX, 1),
+            (990_000_000, 1_000, 37),
+            (2_500_000, 7, 9),
+            (0, 5, 5),
+            (u64::MAX, 1, 1),
+            (u64::MAX, u16::MAX, u64::MAX),
+        ] {
+            fee_floor.push(case(
+                vec![mode.j(), cliff.j(), periods.j(), reduction.j()],
+                math::dbc_min_base_fee_numerator(mode, cliff, periods, reduction).j(),
+            ));
+        }
+    }
+    out.push(("dbc_min_base_fee_numerator", J::Arr(fee_floor)));
+    let mut migrated = Vec::new();
+    for option in 0u8..=7 {
+        for (bps, mode) in [(0u16, 0u8), (10, 0), (250, 1), (250, 3), (u16::MAX, 4)] {
+            migrated.push(case(
+                vec![option.j(), bps.j(), mode.j()],
+                math::dbc_migrated_fee_bps(option, bps, mode).j(),
+            ));
+        }
+    }
+    out.push(("dbc_migrated_fee_bps", J::Arr(migrated)));
+    let mut venue_floor = Vec::new();
+    for curve in [
+        0u64,
+        99_999,
+        100_000,
+        2_500_000,
+        2_599_999,
+        10_000_000,
+        u64::MAX,
+    ] {
+        for pool_bps in [0u16, 10, 25, 100, u16::MAX] {
+            venue_floor.push(case(
+                vec![curve.j(), pool_bps.j()],
+                math::venue_fee_floor_bps(curve, pool_bps).j(),
+            ));
+        }
+    }
+    out.push(("venue_fee_floor_bps", J::Arr(venue_floor)));
+    let mut bound = Vec::new();
+    for floor in [
+        0u16,
+        1,
+        4,
+        5,
+        25,
+        30,
+        100,
+        499,
+        500,
+        501,
+        600,
+        1_000,
+        u16::MAX,
+    ] {
+        bound.push(case(vec![floor.j()], math::max_impact_bound(floor).j()));
+    }
+    out.push(("max_impact_bound", J::Arr(bound)));
     out
+}
+
+// ─── DBC launch configs (register_revenue_token's config checks) ───────────
+
+/// A DBC `PoolConfig` buffer with only the fields `check_launch_config` reads set.
+fn dbc_config_bytes(c: &LaunchConfig) -> Vec<u8> {
+    let mut d = vec![0u8; epoch::meteora_account::DBC_POOL_CONFIG_LEN];
+    d[..8].copy_from_slice(&epoch::meteora_account::DBC_POOL_CONFIG_DISCRIMINATOR);
+    d[8..40].copy_from_slice(c.quote_mint.as_ref());
+    d[40..72].copy_from_slice(c.fee_claimer.as_ref());
+    d[72..104].copy_from_slice(c.leftover_receiver.as_ref());
+    d[104..112].copy_from_slice(&c.cliff.to_le_bytes());
+    d[112..120].copy_from_slice(&c.period_frequency.to_le_bytes());
+    d[120..128].copy_from_slice(&c.reduction.to_le_bytes());
+    d[128..130].copy_from_slice(&c.periods.to_le_bytes());
+    d[130] = c.fee_mode;
+    d[185] = c.lp[2];
+    d[201] = c.lp[5];
+    d[233] = c.migration_option;
+    d[237] = c.token_type;
+    d[239] = c.lp[0];
+    d[240] = c.lp[1];
+    d[241] = c.lp[3];
+    d[242] = c.lp[4];
+    d[243] = c.migration_fee_option;
+    d[244] = c.fixed_supply;
+    d[362..364].copy_from_slice(&c.migrated_bps.to_le_bytes());
+    d[364] = c.migrated_mode;
+    d
+}
+
+#[derive(Clone, Copy)]
+struct LaunchConfig {
+    quote_mint: Pubkey,
+    fee_claimer: Pubkey,
+    leftover_receiver: Pubkey,
+    cliff: u64,
+    period_frequency: u64,
+    reduction: u64,
+    periods: u16,
+    fee_mode: u8,
+    /// partner permanent, partner unlocked, partner vesting, creator permanent, creator unlocked, creator vesting
+    lp: [u8; 6],
+    migration_option: u8,
+    token_type: u8,
+    migration_fee_option: u8,
+    fixed_supply: u8,
+    migrated_bps: u16,
+    migrated_mode: u8,
+}
+
+fn launch_configs(program_id: &Pubkey) -> J {
+    let pool = addr(&[POOL_SEED], program_id);
+    let treasury = addr(&[PARTNER_TREASURY_SEED, pool.as_ref()], program_id);
+    let other = k(77);
+    let base = LaunchConfig {
+        quote_mint: NATIVE_MINT,
+        fee_claimer: treasury,
+        leftover_receiver: treasury,
+        cliff: 10_000_000,
+        period_frequency: 0,
+        reduction: 0,
+        periods: 0,
+        fee_mode: 0,
+        lp: [100, 0, 0, 0, 0, 0],
+        migration_option: 1,
+        token_type: 0,
+        migration_fee_option: 2,
+        fixed_supply: 1,
+        migrated_bps: 0,
+        migrated_mode: 0,
+    };
+    let cases: Vec<(&str, LaunchConfig)> = vec![
+        ("epoch_preset", base),
+        (
+            "split_locked_lp",
+            LaunchConfig {
+                lp: [60, 0, 0, 40, 0, 0],
+                ..base
+            },
+        ),
+        (
+            "low_fees_customizable",
+            LaunchConfig {
+                cliff: 2_500_000,
+                migration_fee_option: 6,
+                migrated_bps: 10,
+                ..base
+            },
+        ),
+        (
+            "decaying_curve_fee_ok",
+            LaunchConfig {
+                cliff: 50_000_000,
+                periods: 10,
+                period_frequency: 60,
+                reduction: 4_950_000,
+                ..base
+            },
+        ),
+        (
+            "exponential_curve_fee",
+            LaunchConfig {
+                cliff: 500_000_000,
+                periods: 10,
+                period_frequency: 60,
+                reduction: 1_000,
+                fee_mode: 1,
+                ..base
+            },
+        ),
+        (
+            "rate_limiter",
+            LaunchConfig {
+                cliff: 2_500_000,
+                fee_mode: 2,
+                periods: 50,
+                reduction: 1_000_000_000,
+                ..base
+            },
+        ),
+        (
+            "not_fixed_supply_any_receiver",
+            LaunchConfig {
+                fixed_supply: 0,
+                leftover_receiver: other,
+                ..base
+            },
+        ),
+        (
+            "quote_not_sol",
+            LaunchConfig {
+                quote_mint: other,
+                ..base
+            },
+        ),
+        (
+            "damm_v1",
+            LaunchConfig {
+                migration_option: 0,
+                ..base
+            },
+        ),
+        (
+            "token_2022",
+            LaunchConfig {
+                token_type: 1,
+                ..base
+            },
+        ),
+        (
+            "foreign_fee_claimer",
+            LaunchConfig {
+                fee_claimer: other,
+                ..base
+            },
+        ),
+        (
+            "foreign_leftover_receiver",
+            LaunchConfig {
+                leftover_receiver: other,
+                ..base
+            },
+        ),
+        (
+            "creator_lp_unlocked",
+            LaunchConfig {
+                lp: [50, 0, 0, 0, 50, 0],
+                ..base
+            },
+        ),
+        (
+            "partner_lp_vesting",
+            LaunchConfig {
+                lp: [90, 0, 10, 0, 0, 0],
+                ..base
+            },
+        ),
+        (
+            "curve_fee_decays_too_low",
+            LaunchConfig {
+                cliff: 50_000_000,
+                periods: 10,
+                period_frequency: 60,
+                reduction: 4_960_000,
+                ..base
+            },
+        ),
+        (
+            "unknown_fee_mode",
+            LaunchConfig {
+                fee_mode: 9,
+                ..base
+            },
+        ),
+        (
+            "market_cap_scheduler",
+            LaunchConfig {
+                migration_fee_option: 6,
+                migrated_bps: 100,
+                migrated_mode: 3,
+                ..base
+            },
+        ),
+        (
+            "customizable_too_low",
+            LaunchConfig {
+                migration_fee_option: 6,
+                migrated_bps: 4,
+                ..base
+            },
+        ),
+        (
+            "unknown_migration_option",
+            LaunchConfig {
+                migration_fee_option: 7,
+                ..base
+            },
+        ),
+    ];
+    J::Arr(
+        cases
+            .into_iter()
+            .map(|(label, c)| {
+                let bytes = dbc_config_bytes(&c);
+                let parsed = epoch::meteora_account::DbcConfig::parse(&bytes).expect("parses");
+                let result = match epoch::instructions::check_launch_config(&parsed, &treasury) {
+                    Ok(floor) => obj(vec![
+                        ("feeFloorBps", floor.j()),
+                        ("maxImpactBound", math::max_impact_bound(floor).j()),
+                    ]),
+                    Err(anchor_lang::error::Error::AnchorError(e)) => {
+                        obj(vec![("error", s(e.error_name))])
+                    }
+                    Err(e) => panic!("{e:?}"),
+                };
+                obj(vec![
+                    ("label", s(label)),
+                    ("treasury", treasury.j()),
+                    ("data", hex(&bytes)),
+                    ("result", result),
+                ])
+            })
+            .collect(),
+    )
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -3772,6 +4109,7 @@ fn main() {
                 ("MIN_MAX_IMPACT_BPS", MIN_MAX_IMPACT_BPS.j()),
                 ("MAX_MAX_IMPACT_BPS", MAX_MAX_IMPACT_BPS.j()),
                 ("MAX_CLOSE_DUST_LAMPORTS", MAX_CLOSE_DUST_LAMPORTS.j()),
+                ("REDEEM_GRACE_EPOCHS", REDEEM_GRACE_EPOCHS.j()),
                 ("FLAG_BUYBACKS_PAUSED", FLAG_BUYBACKS_PAUSED.j()),
                 ("FLAG_REDEEM_DURING_TERM", FLAG_REDEEM_DURING_TERM.j()),
                 ("DBC_PROGRAM_ID", DBC_PROGRAM_ID.j()),
@@ -3797,6 +4135,7 @@ fn main() {
         ("pdas", pdas(&program_id)),
         ("errors", errors()),
         ("math", math(&mut g, &mut g2, &mut g3)),
+        ("launchConfigs", launch_configs(&program_id)),
     ]);
 
     let mut text = String::new();

@@ -27,6 +27,11 @@ import {
   impactTargetSqrtPrice,
   juniorRatioBps,
   minOutFloor,
+  maxImpactBound,
+  circulatingSupply,
+  dbcMigratedFeeBps,
+  dbcMinBaseFeeNumerator,
+  venueFeeFloorBps,
   mulDiv,
   nextSqrtFromQuoteIn,
   planBuybackSlice,
@@ -144,6 +149,12 @@ const MIRRORS: Record<string, (args: Args) => unknown> = {
   slice_budget: ([budget, spent, slices, done, escrow]) =>
     str(sliceBudget(big(budget), big(spent), num(slices), num(done), big(escrow))),
   redeem_payout: ([escrow, amount, circulating]) => str(redeemPayout(big(escrow), big(amount), big(circulating))),
+  circulating_supply: ([supply, held]) => str(circulatingSupply(big(supply), big(held))),
+  dbc_min_base_fee_numerator: ([mode, cliff, periods, reduction]) =>
+    str(dbcMinBaseFeeNumerator(num(mode), big(cliff), num(periods), big(reduction))),
+  dbc_migrated_fee_bps: ([option, bps, mode]) => dbcMigratedFeeBps(num(option), num(bps), num(mode)),
+  venue_fee_floor_bps: ([curve, pool]) => venueFeeFloorBps(big(curve), num(pool)),
+  max_impact_bound: ([floor]) => maxImpactBound(num(floor)),
   // Meteora quotes
   delta_base: ([lower, upper, l, up]) => str(deltaBase(big(lower), big(upper), big(l), up as boolean)),
   delta_quote: ([lower, upper, l, up]) => str(deltaQuote(big(lower), big(upper), big(l), up as boolean)),
@@ -198,6 +209,8 @@ describe('math mirrors programs/epoch/src/math and swap.rs exactly', () => {
       'dbc_partner_surplus',
       'dbc_partner_migration_fee',
       'dbc_leftover',
+      'dbc_min_base_fee_numerator',
+      'dbc_migrated_fee_bps',
     ]) {
       expect(vectors.math[name].some((c) => c.result === null)).toBe(true);
     }

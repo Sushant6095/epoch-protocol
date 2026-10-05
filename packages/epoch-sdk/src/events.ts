@@ -192,6 +192,8 @@ export interface EpochEventMap {
     totalSpent: bigint;
     totalBurned: bigint;
     totalRedeemed: bigint;
+    /** Escrow left unclaimed after the redemption grace period, booked as pool income (0 when spent). */
+    lamportsToPool: bigint;
   };
   /** The partner treasury claimed from Meteora: SOL to the pool as income, tokens burned. */
   TreasuryClaimed: {
@@ -391,6 +393,7 @@ const DECODERS: { [K in EventName]: (r: BorshReader) => EpochEventMap[K] } = {
     totalSpent: r.u64(),
     totalBurned: r.u64(),
     totalRedeemed: r.u64(),
+    lamportsToPool: r.u64(),
   }),
   TreasuryClaimed: (r) => ({
     pool: r.pubkey(),

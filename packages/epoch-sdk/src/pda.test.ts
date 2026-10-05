@@ -1,12 +1,13 @@
 import { type PublicKey } from '@solana/web3.js';
 
 import { key, type RustPda, sdkEnum, vectors } from './__fixtures__/vectors';
-import { type Tranche } from './constants';
+import { NATIVE_MINT, type Tranche } from './constants';
 import {
   findAdvancePda,
   findBuybackEscrowPda,
   findBuybackTokensPda,
   findBuybackWsolPda,
+  findDbcPoolPda,
   findEscrowPda,
   findFeeIndexPda,
   findLenderPda,
@@ -117,6 +118,14 @@ describe('PDA inputs', () => {
     expect(() => findWithdrawRequestPda(programId, pool, -1n)).toThrow(RangeError);
     expect(() => findAdvancePda(programId, vote, 2 ** 64)).toThrow(RangeError);
     expect(() => findQuotePda(programId, vote, 1n << 64n)).toThrow(RangeError);
+  });
+
+  it('derives a DBC pool from its config and mint (mainnet pool 2k7BV8…, config 6m7XSK…)', () => {
+    const config = key('6m7XSKNZtiMz3yXfAk8QK5dejQb4aMHjc4bQrqi8h4VD');
+    const mint = key('3SLNKtp6yyumAcKEZ5SvA92vF76boHQKMnjKqLCiTUNd');
+    expect(findDbcPoolPda(config, mint).toBase58()).toBe('2k7BV8AJ2SdAVK6ePyCRVre6Y4NuNLQHUiAUgZ8BRwtt');
+    // The seeds order the two mints, so swapping base and quote derives the same pool.
+    expect(findDbcPoolPda(config, NATIVE_MINT, mint).equals(findDbcPoolPda(config, mint))).toBe(true);
   });
 
   it('separates the tranches and programs', () => {

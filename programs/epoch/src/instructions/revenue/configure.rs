@@ -22,13 +22,18 @@ pub struct ConfigureRevenueToken<'info> {
 /// buybacks, or open redemptions during the term (the fallback when buybacks
 /// cannot run). Never touches the share, the term or the commission floor.
 /// Changing the number of slices restarts the current epoch's schedule from
-/// what the escrow holds.
+/// what the escrow holds. `max_impact_bps` may be at most twice the venue's
+/// lowest fee (`ImpactAboveFeeBound`), so a slice is never worth sandwiching.
 pub fn configure_revenue_token(
     ctx: Context<ConfigureRevenueToken>,
     params: BuybackParams,
 ) -> Result<()> {
     require!(params.is_valid(), EpochError::InvalidBuybackParams);
     let rt = &mut ctx.accounts.revenue_token;
+    require!(
+        params.max_impact_bps <= rt.max_impact_bound(),
+        EpochError::ImpactAboveFeeBound
+    );
     if params.slices_per_epoch != rt.slices_per_epoch {
         rt.buyback_epoch = 0;
         rt.slices_done = 0;

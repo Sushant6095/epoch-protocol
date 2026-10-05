@@ -52,13 +52,13 @@ partner) into the pool as lender income (ADR 0006).
 
 | Instruction | Signer | What it does |
 | --- | --- | --- |
-| `register_revenue_token(share_bps, term_epochs)` | operator | Checks the mint (classic SPL, fixed supply, no mint or freeze authority), its DBC pool and config (quotes SOL, graduates to DAMM v2, fee claimer = `["treasury", pool]`), snapshots both commissions, creates the escrow and its token account, and points the position at the token. Share 1–5,000 bps, term 10–1,000 epochs, starting next epoch. |
+| `register_revenue_token(share_bps, term_epochs)` | operator | Checks the mint (classic SPL, fixed supply, no mint or freeze authority), its DBC pool and config (quotes SOL, graduates to DAMM v2, fee claimer = `["treasury", pool]` and, for a fixed supply, leftover receiver too; 100% of the graduated liquidity locked forever; venue fees that allow sandwich-proof slices: records `fee_floor_bps` and caps `max_impact_bps` at twice it), snapshots both commissions, creates the escrow and its token account, and points the position at the token. Share 1–5,000 bps, term 10–1,000 epochs, starting next epoch. |
 | `sweep` | anyone | Requires the token and escrow when the position has one (`RevenueTokenAccountsMissing` otherwise); moves the share first. |
-| `execute_buyback(slice, min_amount_out)` | anyone | One slice on the current venue: wrap, swap, check output ≥ min-out, unwrap, refund the cranker's rent, burn. |
+| `execute_buyback(slice, min_amount_out)` | anyone | One slice on the current venue: wrap, swap, check output ≥ min-out, unwrap, refund the cranker's rent, burn. Stopped by the pool's pause and by the token's own flag. |
 | `sync_revenue_token_pool` | anyone | After DBC migrated: verifies the DAMM v2 pool (`["pool", config, max(mint, wsol), min(mint, wsol)]`, config created for DBC's pool authority) and moves buybacks there. |
-| `redeem(amount)` | holder | Burns `amount` for its pro-rata share of the escrow, after the term (or during it with `FLAG_REDEEM_DURING_TERM`). |
-| `configure_revenue_token(params)` | pool admin | Slices, window, slippage and impact bounds, and the pause and redeem-during-term flags. Never the share or the term. |
-| `close_revenue_token` | anyone | After the term, once at most 100,000 lamports above rent remain: returns all rent to the operator and clears the position's pointer. |
+| `redeem(amount)` | holder | Burns `amount` for its pro-rata share of the escrow, after the term (or during it with `FLAG_REDEEM_DURING_TERM`). Circulating supply is the supply less the buyback and treasury token accounts; pool balances count, so selling into a pool cannot raise a payout. |
+| `configure_revenue_token(params)` | pool admin | Slices, window, slippage and impact bounds (`max_impact_bps` ≤ twice `fee_floor_bps`), and the pause and redeem-during-term flags. Never the share or the term. |
+| `close_revenue_token` | anyone | After the term, once at most 100,000 lamports above rent remain (all to the operator) or, whatever the escrow holds, 30 epochs after it (`REDEEM_GRACE_EPOCHS`; the rest becomes pool income): returns the rent to the operator and clears the position's pointer. |
 
 `release_validator` and `update_commission` take the revenue token as an optional trailing account and refuse a release or a commission cut while the term runs. Seeds: `["revenue_token", vote]`, `["buyback", vote]`, `["buyback_wsol", vote]`, `["buyback_tokens", vote]`, `["treasury", pool]`.
 

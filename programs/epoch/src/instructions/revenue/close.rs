@@ -8,6 +8,7 @@ use crate::{
     },
     errors::EpochError,
     events::RevenueTokenClosed,
+    instructions::treasury::common::credit_pool_income,
     meteora_account::SplTokenAccount,
     state::*,
 };
@@ -17,15 +18,25 @@ pub struct CloseRevenueToken<'info> {
     /// Anyone may close a finished revenue token.
     pub cranker: Signer<'info>,
 
-    /// CHECK: the operator that paid the rent; receives every lamport back.
+    /// CHECK: the operator that paid the rent; receives the rent back (and
+    /// the dust of a spent escrow).
     #[account(mut, address = revenue_token.operator @ EpochError::PayoutMismatch)]
     pub operator: UncheckedAccount<'info>,
+
+    /// Books an escrow left unclaimed after the grace period as income.
+    #[account(mut, seeds = [POOL_SEED], bump = pool.bump)]
+    pub pool: Box<Account<'info, Pool>>,
+
+    /// Receives an escrow left unclaimed after the grace period.
+    #[account(mut, seeds = [VAULT_SEED, pool.key().as_ref()], bump = pool.vault_bump)]
+    pub vault: SystemAccount<'info>,
 
     #[account(
         mut,
         close = operator,
         seeds = [REVENUE_TOKEN_SEED, revenue_token.vote.as_ref()],
         bump = revenue_token.bump,
+        has_one = pool,
     )]
     pub revenue_token: Account<'info, RevenueToken>,
 
@@ -61,20 +72,23 @@ pub struct CloseRevenueToken<'info> {
 }
 
 /// Close a revenue token after its term, once the escrow is spent (at most
-/// `MAX_CLOSE_DUST_LAMPORTS` above rent may remain). Burns anything left in the
-/// buyback token account, returns every rent and dust lamport to the operator
-/// and clears `position.revenue_token`, which lets the position register a
-/// new token.
+/// `MAX_CLOSE_DUST_LAMPORTS` above rent may remain; it goes to the operator
+/// with the rent) or, whatever it holds, once holders had
+/// `REDEEM_GRACE_EPOCHS` after the term to redeem (the unclaimed SOL becomes
+/// pool income, so a donation to the escrow cannot keep a token open).
+/// Burns anything left in the buyback token account, returns the rent to the
+/// operator and clears `position.revenue_token`, which lets the position
+/// register a new token.
 pub fn close_revenue_token(ctx: Context<CloseRevenueToken>) -> Result<()> {
     let epoch = Clock::get()?.epoch;
     let rt = &ctx.accounts.revenue_token;
     require!(!rt.term_active(epoch), EpochError::RevenueTokenTermActive);
     let escrow_info = ctx.accounts.buyback_escrow.to_account_info();
     let rent_min = Rent::get()?.minimum_balance(0);
-    require!(
-        escrow_info.lamports().saturating_sub(rent_min) <= MAX_CLOSE_DUST_LAMPORTS,
-        EpochError::EscrowNotEmpty
-    );
+    let escrow_available = escrow_info.lamports().saturating_sub(rent_min);
+    let mode = rt
+        .close_mode(epoch, escrow_available)
+        .ok_or(EpochError::EscrowNotEmpty)?;
 
     let vote = rt.vote;
     let escrow_seeds: &[&[u8]] = &[BUYBACK_SEED, vote.as_ref(), &[rt.escrow_bump]];
@@ -100,10 +114,25 @@ pub fn close_revenue_token(ctx: Context<CloseRevenueToken>) -> Result<()> {
             &[escrow_seeds],
         )?;
     }
+    let system_program = ctx.accounts.system_program.to_account_info();
+    let lamports_to_pool = match mode {
+        CloseMode::Spent => 0,
+        CloseMode::Unclaimed => escrow_available,
+    };
+    if lamports_to_pool > 0 {
+        transfer_from_pda(
+            &escrow_info,
+            &ctx.accounts.vault.to_account_info(),
+            &system_program,
+            lamports_to_pool,
+            &[escrow_seeds],
+        )?;
+        credit_pool_income(&mut ctx.accounts.pool, lamports_to_pool)?;
+    }
     transfer_from_pda(
         &escrow_info,
         &operator,
-        &ctx.accounts.system_program.to_account_info(),
+        &system_program,
         escrow_info.lamports(),
         &[escrow_seeds],
     )?;
@@ -120,6 +149,7 @@ pub fn close_revenue_token(ctx: Context<CloseRevenueToken>) -> Result<()> {
         }
     }
 
+    let rt = &ctx.accounts.revenue_token;
     emit!(RevenueTokenClosed {
         vote,
         mint: rt.mint,
@@ -127,6 +157,7 @@ pub fn close_revenue_token(ctx: Context<CloseRevenueToken>) -> Result<()> {
         total_spent: rt.total_spent,
         total_burned: rt.total_burned.saturating_add(burned),
         total_redeemed: rt.total_redeemed,
+        lamports_to_pool,
     });
     Ok(())
 }

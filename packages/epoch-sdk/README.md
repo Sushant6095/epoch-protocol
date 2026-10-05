@@ -97,10 +97,13 @@ escrow at `["buyback", vote]`; `ValidatorPosition.revenueToken` points at the to
   to the min-out floor (slice budget, the `max_impact_bps` cap, the fee-free fill) from the raw pool state the program
   reads (`BuybackVenueState`); a cranker takes a fee-aware quote for `plan.amount`, applies its slippage and checks the
   result is at least `plan.floor`. `sliceTiming(slotIndex, …)` says whether a slice is due.
-- **Redeem.** `redeem({ …, amount })` burns tokens for `amount / circulating` of the escrow (`redeemPayout`); pass
-  `dammPool` once the token graduated and `treasuryTokens` when the treasury holds a leftover balance.
+- **Redeem.** `redeem({ …, amount })` burns tokens for `amount / circulating` of the escrow (`redeemPayout`), where
+  circulating is the supply less the buyback and treasury token accounts (`circulatingSupply`; pool balances count);
+  pass `treasuryTokens` when the treasury holds a leftover balance.
 - `registerRevenueToken` (operator), `syncRevenueTokenPool` (anyone, after graduation), `configureRevenueToken`
-  (pool admin) and `closeRevenueToken` (anyone, after the term with an empty escrow) complete the set.
+  (pool admin) and `closeRevenueToken` (anyone, after the term once the escrow is spent or the redemption grace period is
+  over: `revenueTokenCloseMode`) complete the set. `checkLaunchConfig(decodeDbcLaunchConfig(data), treasury)` runs
+  registration's DBC config checks before anyone signs and returns the venue fee floor (`maxImpactBound`).
 - `splitSweepWithShare` mirrors the sweep waterfall with a share: off the top, unless the open advance predates the
   token, in which case the advance is repaid first and the share comes out of the validator's part.
 

@@ -51,6 +51,8 @@ export const PROGRAM_CONSTANTS = {
   MIN_MAX_IMPACT_BPS: 10,
   MAX_MAX_IMPACT_BPS: 1000,
   MAX_CLOSE_DUST_LAMPORTS: 100_000n,
+  /** Epochs after the term for holders to redeem before a token closes whatever its escrow holds (rest: pool income). */
+  REDEEM_GRACE_EPOCHS: 30n,
   // Treasury claims: DBC values the program checks before claiming
   /** DBC `migration_progress` once the DAMM v2 pool exists (`withdraw_leftover` needs it). */
   DBC_MIGRATION_PROGRESS_CREATED_POOL: 3,

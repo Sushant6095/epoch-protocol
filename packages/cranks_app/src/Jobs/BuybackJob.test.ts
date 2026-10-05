@@ -2,7 +2,9 @@ import {
   type BuybackVenueState,
   dbcBuy,
   findBuybackEscrowPda,
+  findPoolPda,
   findRevenueTokenPda,
+  findVaultPda,
   METEORA,
   minOutFloor,
   REVENUE_TOKEN_FLAGS,
@@ -17,7 +19,7 @@ import {
   type SliceQuote,
 } from '../Chain/BuybackMarket';
 import { key, PROGRAM_ID, revenueToken, SOL } from '../__fixtures__/accounts';
-import { atAddress, FakeChain, programFailure, transientFailure } from '../__fixtures__/FakeChain';
+import { atAddress, FakeChain, programFailure, sent, transientFailure } from '../__fixtures__/FakeChain';
 import { BuybackJob } from './BuybackJob';
 
 const Q64 = 1n << 64n;
@@ -97,10 +99,11 @@ describe('BuybackJob', () => {
     expect(minOutOf(ix.data)).toBe((amountOut * 9_900n) / 10_000n);
     expect(minOutOf(ix.data) >= FLOOR).toBe(true);
     expect(call.options).toEqual({ computeUnitLimit: 300_000 });
-    // Accounts: cranker, revenue token, escrow, … venue pool at 8, venue program at 13.
-    expect(ix.keys[1].pubkey.equals(findRevenueTokenPda(PROGRAM_ID, key(20))[0])).toBe(true);
-    expect(ix.keys[8].pubkey.equals(key(101))).toBe(true);
-    expect(ix.keys[13].pubkey.equals(METEORA.DBC_PROGRAM_ID)).toBe(true);
+    // Accounts: cranker, pool (its pause stops buybacks), revenue token, escrow, … venue pool at 9, program at 14.
+    expect(ix.keys[1].pubkey.equals(findPoolPda(PROGRAM_ID)[0])).toBe(true);
+    expect(ix.keys[2].pubkey.equals(findRevenueTokenPda(PROGRAM_ID, key(20))[0])).toBe(true);
+    expect(ix.keys[9].pubkey.equals(key(101))).toBe(true);
+    expect(ix.keys[14].pubkey.equals(METEORA.DBC_PROGRAM_ID)).toBe(true);
   });
 
   it('is idempotent per (epoch, slice): slices done on chain or sent this epoch are not sent again', async () => {
@@ -175,6 +178,16 @@ describe('BuybackJob', () => {
     expect(chain.executed()).toHaveLength(5);
   });
 
+  it('waits out a paused pool without giving up the slice', async () => {
+    chain.onExecute = () => programFailure('Paused', 6000);
+    const runner = job();
+    for (let i = 0; i < 4; i++) await runner.run(100n);
+    expect(chain.executed()).toHaveLength(4);
+    chain.onExecute = () => sent();
+    await runner.run(100n);
+    expect(chain.executed()).toHaveLength(5);
+  });
+
   it('syncs the DAMM v2 pool once the curve migrated, then buys there', async () => {
     market.graduated = { dammConfig: key(103), dammPool: key(104) };
     await job().run(100n);
@@ -196,8 +209,8 @@ describe('BuybackJob', () => {
     chain.revenueTokenAccounts = [atAddress(revenueToken({ dammPool: key(104), status: 'graduated' }), 130)];
     await job().run(100n);
     const ix = chain.calls[1].instructions[0];
-    expect(ix.keys[8].pubkey.equals(key(104))).toBe(true);
-    expect(ix.keys[13].pubkey.equals(METEORA.CP_AMM_PROGRAM_ID)).toBe(true);
+    expect(ix.keys[9].pubkey.equals(key(104))).toBe(true);
+    expect(ix.keys[14].pubkey.equals(METEORA.CP_AMM_PROGRAM_ID)).toBe(true);
   });
 
   it('skips a curve that waits for migration and a paused token', async () => {
@@ -217,6 +230,21 @@ describe('BuybackJob', () => {
     expect(chain.executed()).toEqual(['close_revenue_token']);
     const keys = chain.calls[0].instructions[0].keys;
     expect(keys[1].pubkey.equals(key(22))).toBe(true); // the operator gets the rent
+  });
+
+  it('closes a token whose escrow still holds SOL once the redemption grace period is over', async () => {
+    // Term ends at 142 (fixture); the grace period is 30 epochs.
+    chain.balances.set(escrowOf(key(20)).toBase58(), RENT0 + 3n * SOL);
+    chain.epoch = 171n;
+    await job().run(171n);
+    expect(chain.executed()).not.toContain('close_revenue_token');
+    chain.epoch = 172n;
+    await job().run(172n);
+    expect(chain.executed()).toContain('close_revenue_token');
+    const close = chain.calls.find((c) => c.label.startsWith('close_revenue_token'))!.instructions[0];
+    // cranker, operator, pool, vault: the unclaimed SOL is pool income.
+    expect(close.keys[2].pubkey.equals(findPoolPda(PROGRAM_ID)[0])).toBe(true);
+    expect(close.keys[3].pubkey.equals(findVaultPda(PROGRAM_ID, findPoolPda(PROGRAM_ID)[0])[0])).toBe(true);
   });
 
   it('only simulates under DRY_RUN', async () => {

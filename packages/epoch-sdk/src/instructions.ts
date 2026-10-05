@@ -980,7 +980,10 @@ export interface ExecuteBuybackInput extends WithProgram {
   withInstructionsSysvar?: boolean;
 }
 
-/** `execute_buyback(slice, min_amount_out)`: one slice. Anyone may crank; the cranker fronts ~0.002 SOL of rent. */
+/**
+ * `execute_buyback(slice, min_amount_out)`: one slice. Anyone may crank; the cranker fronts ~0.002 SOL of rent.
+ * Stopped by the pool's pause as well as the token's own flag.
+ */
 export function executeBuyback({
   programId,
   cranker,
@@ -999,6 +1002,7 @@ export function executeBuyback({
   const quoteVault = venue.quoteVault ?? findMeteoraVaultPda(program, NATIVE_MINT, venue.pool);
   const keys = [
     signerWritable(cranker),
+    readonly(poolKeys(programId).pool),
     writable(findRevenueTokenPda(programId, vote)[0]),
     writable(findBuybackEscrowPda(programId, vote)[0]),
     writable(findBuybackWsolPda(programId, vote)[0]),
@@ -1025,34 +1029,29 @@ export interface RedeemInput extends WithProgram {
   holderTokens: PublicKey;
   vote: PublicKey;
   mint: PublicKey;
-  dbcPool: PublicKey;
-  /** The DBC pool's base vault (derived when omitted). */
-  dbcBaseVault?: PublicKey;
-  /** After graduation: the DAMM v2 pool (and its token A vault, derived when omitted). Null before. */
-  dammPool?: PublicKey | null;
-  dammTokenVault?: PublicKey;
-  /** The Epoch treasury's token account for `mint` (DBC leftover), when it exists: excluded from circulation. */
+  /**
+   * The Epoch treasury's token account for `mint` (a DBC leftover waiting to be burned), when it holds tokens: excluded
+   * from circulation. Leaving it out only lowers the payout.
+   */
   treasuryTokens?: PublicKey | null;
   amount: bigint;
 }
 
-/** `redeem(amount)`: burn tokens for a pro-rata share of the buyback escrow. Signer: holder. */
+/**
+ * `redeem(amount)`: burn tokens for a pro-rata share of the buyback escrow. Signer: holder. Circulating supply is the
+ * mint supply less the buyback and treasury token accounts; tokens in the Meteora pools count (excluding them let a
+ * holder sell into the pool, redeem at an inflated rate and buy back).
+ */
 export function redeem({
   programId,
   holder,
   holderTokens,
   vote,
   mint,
-  dbcPool,
-  dbcBaseVault,
-  dammPool,
-  dammTokenVault,
   treasuryTokens,
   amount,
 }: RedeemInput): TransactionInstruction[] {
   checkProgramId(programId);
-  const baseVault = dbcBaseVault ?? findMeteoraVaultPda(METEORA.DBC_PROGRAM_ID, mint, dbcPool);
-  const damm = dammPool ?? null;
   return instruction(
     programId,
     'redeem',
@@ -1063,10 +1062,6 @@ export function redeem({
       writable(findBuybackEscrowPda(programId, vote)[0]),
       readonly(findBuybackTokensPda(programId, vote)[0]),
       writable(mint),
-      readonly(dbcPool),
-      readonly(baseVault),
-      readonly(damm ?? programId),
-      readonly(damm ? (dammTokenVault ?? findMeteoraVaultPda(METEORA.CP_AMM_PROGRAM_ID, mint, damm)) : programId),
       readonly(treasuryTokens ?? programId),
       readonly(TOKEN_PROGRAM_ID),
       readonly(SYSTEM_PROGRAM_ID),
@@ -1125,7 +1120,10 @@ export interface CloseRevenueTokenInput extends WithProgram {
   mint: PublicKey;
 }
 
-/** `close_revenue_token()`: after the term, with an empty escrow. Anyone may crank. */
+/**
+ * `close_revenue_token()`: after the term, once the escrow is spent or, whatever it holds, once the redemption grace
+ * period (`REDEEM_GRACE_EPOCHS`) is over; the unclaimed escrow then becomes pool income. Anyone may crank.
+ */
 export function closeRevenueToken({
   programId,
   cranker,
@@ -1134,9 +1132,12 @@ export function closeRevenueToken({
   mint,
 }: CloseRevenueTokenInput): TransactionInstruction[] {
   checkProgramId(programId);
+  const { pool, vault } = poolKeys(programId);
   return instruction(programId, 'close_revenue_token', [
     signer(cranker),
     writable(operator),
+    writable(pool),
+    writable(vault),
     writable(findRevenueTokenPda(programId, vote)[0]),
     writable(findBuybackEscrowPda(programId, vote)[0]),
     writable(findBuybackTokensPda(programId, vote)[0]),

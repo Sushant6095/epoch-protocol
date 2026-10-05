@@ -1,0 +1,14 @@
+[package]
+name = "epoch-idl-gen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Writes programs/epoch/idl/epoch.json the way `anchor idl build` does (anchor-lang-idl's IdlBuilder), for machines without anchor-cli 1.2"
+
+# Own workspace so the repository's root workspace (programs/*) ignores this crate and its target/ stays here.
+[workspace]
+
+[dependencies]
+anchor-lang-idl = { version = "=0.1.4", features = ["build"] }
+serde_json = "1"
+anyhow = "1"

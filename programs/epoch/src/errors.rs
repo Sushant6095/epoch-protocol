@@ -199,4 +199,12 @@ pub enum EpochError {
     UnsupportedClaimPool,
     #[msg("A Meteora account does not match the pool being claimed")]
     InvalidClaimAccount,
+
+    // ── Security review (appended: earlier codes never move) ─────────────
+    #[msg("The DBC config must lock all of the graduated pool's liquidity permanently")]
+    LiquidityNotLocked,
+    #[msg("The venue's fee is too low, or can fall too low, for sandwich-proof buybacks")]
+    UnsupportedVenueFee,
+    #[msg("max_impact_bps may be at most twice the venue's lowest fee")]
+    ImpactAboveFeeBound,
 }

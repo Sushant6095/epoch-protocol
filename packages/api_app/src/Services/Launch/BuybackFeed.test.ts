@@ -50,6 +50,7 @@ const token = (overrides: Partial<RevenueTokenAccount> = {}): RevenueTokenAccoun
   totalRedeemed: 1_000_000n,
   totalRedeemedLamports: SOL / 10n,
   buybackCount: 14,
+  feeFloorBps: 100,
   ...overrides,
 });
 

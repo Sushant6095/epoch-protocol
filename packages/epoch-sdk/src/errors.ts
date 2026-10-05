@@ -170,6 +170,17 @@ export const EPOCH_ERRORS: readonly EpochErrorInfo[] = Object.freeze(
       message: 'Only SPL Token pools that quote wrapped SOL are supported (and a fixed supply for leftover)',
     },
     { code: 6089, name: 'InvalidClaimAccount', message: 'A Meteora account does not match the pool being claimed' },
+    {
+      code: 6090,
+      name: 'LiquidityNotLocked',
+      message: "The DBC config must lock all of the graduated pool's liquidity permanently",
+    },
+    {
+      code: 6091,
+      name: 'UnsupportedVenueFee',
+      message: "The venue's fee is too low, or can fall too low, for sandwich-proof buybacks",
+    },
+    { code: 6092, name: 'ImpactAboveFeeBound', message: "max_impact_bps may be at most twice the venue's lowest fee" },
   ].map((e) => Object.freeze(e)),
 );
 
