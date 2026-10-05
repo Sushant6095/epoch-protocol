@@ -1,0 +1,12 @@
+{
+ "_about": "Real CoinGecko /simple/price?ids=solana&vs_currencies=inr,usd&include_24hr_change=true&include_last_updated_at=true recorded on 3 Oct 2026 at 18:06 IST (public tier, no key).",
+ "body": {
+  "solana": {
+   "usd": 119.35,
+   "usd_24h_change": -2.3819591196861816,
+   "inr": 11496.63,
+   "inr_24h_change": -2.1066008222794466,
+   "last_updated_at": 1791030910
+  }
+ }
+}

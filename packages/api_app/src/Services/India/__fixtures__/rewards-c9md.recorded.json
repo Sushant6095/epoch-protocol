@@ -1,0 +1,235 @@
+{
+ "_about": "Real getInflationReward on mainnet (public RPC) recorded on 3 Oct 2026 for the five stake accounts of C9MDVY8HjxbsgiEDfPefxTvA63Ps39E5XHxGiZt4PDdd (see Services/Wallet/__fixtures__/wallet-c9md.recorded.json), epochs 946-951. Epoch 948 ended on 31 Mar 2026 (FY 2025-26), 949 on 2 Apr 2026 (FY 2026-27).",
+ "wallet": "C9MDVY8HjxbsgiEDfPefxTvA63Ps39E5XHxGiZt4PDdd",
+ "accounts": [
+  "Kr9xcEYkJpTzBy6mTqqBtzfKtbY2wHnapH1isthUX6U",
+  "cLWyjL9EkHT9V2BusKZVQKPoDchmnmjZW972eXy8o7i",
+  "323Fxjdq4XUKcdcg2DC1qHTNnRyEp7rAHZCwxDVA67Jy",
+  "AxkuKkU3k4GgQyeLCSHq1KdbfzZ62JGFaSR2bqEi33up",
+  "EUReojWRVAmEjaufdUwXLsufxhCxGHhvVHNfcWMs7bmn"
+ ],
+ "byEpoch": {
+  "946": [
+   {
+    "amount": 13818422,
+    "commission": 0,
+    "effectiveSlot": 409104192,
+    "epoch": 946,
+    "postBalance": 43601509196
+   },
+   {
+    "amount": 2657599,
+    "commission": 0,
+    "effectiveSlot": 409104092,
+    "epoch": 946,
+    "postBalance": 8385130613
+   },
+   {
+    "amount": 7008574,
+    "commission": 0,
+    "effectiveSlot": 409104026,
+    "epoch": 946,
+    "postBalance": 22108442054
+   },
+   {
+    "amount": 9857332,
+    "commission": 0,
+    "effectiveSlot": 409104073,
+    "epoch": 946,
+    "postBalance": 31112511190
+   },
+   {
+    "amount": 7805042,
+    "commission": 0,
+    "effectiveSlot": 409104226,
+    "epoch": 946,
+    "postBalance": 24634420192
+   }
+  ],
+  "947": [
+   {
+    "amount": 13713399,
+    "commission": 0,
+    "effectiveSlot": 409536236,
+    "epoch": 947,
+    "postBalance": 43615364166
+   },
+   {
+    "amount": 2637832,
+    "commission": 0,
+    "effectiveSlot": 409536301,
+    "epoch": 947,
+    "postBalance": 8387789062
+   },
+   {
+    "amount": 6956446,
+    "commission": 0,
+    "effectiveSlot": 409536295,
+    "epoch": 947,
+    "postBalance": 22115452872
+   },
+   {
+    "amount": 9784015,
+    "commission": 0,
+    "effectiveSlot": 409536013,
+    "epoch": 947,
+    "postBalance": 31122371678
+   },
+   {
+    "amount": 7746989,
+    "commission": 0,
+    "effectiveSlot": 409536249,
+    "epoch": 947,
+    "postBalance": 24642227732
+   }
+  ],
+  "948": [
+   {
+    "amount": 13703569,
+    "commission": 0,
+    "effectiveSlot": 409968306,
+    "epoch": 948,
+    "postBalance": 43629192999
+   },
+   {
+    "amount": 2636259,
+    "commission": 0,
+    "effectiveSlot": 409968192,
+    "epoch": 948,
+    "postBalance": 8390442247
+   },
+   {
+    "amount": 6952299,
+    "commission": 0,
+    "effectiveSlot": 409968128,
+    "epoch": 948,
+    "postBalance": 22122449808
+   },
+   {
+    "amount": 9778183,
+    "commission": 0,
+    "effectiveSlot": 409968242,
+    "epoch": 948,
+    "postBalance": 31132212642
+   },
+   {
+    "amount": 7742371,
+    "commission": 0,
+    "effectiveSlot": 409968263,
+    "epoch": 948,
+    "postBalance": 24650019813
+   }
+  ],
+  "949": [
+   {
+    "amount": 13748314,
+    "commission": 0,
+    "effectiveSlot": 410400235,
+    "epoch": 949,
+    "postBalance": 43643124441
+   },
+   {
+    "amount": 2644979,
+    "commission": 0,
+    "effectiveSlot": 410400145,
+    "epoch": 949,
+    "postBalance": 8393108792
+   },
+   {
+    "amount": 6975294,
+    "commission": 0,
+    "effectiveSlot": 410400275,
+    "epoch": 949,
+    "postBalance": 22129481977
+   },
+   {
+    "amount": 9810524,
+    "commission": 0,
+    "effectiveSlot": 410400287,
+    "epoch": 949,
+    "postBalance": 31142103159
+   },
+   {
+    "amount": 7767979,
+    "commission": 0,
+    "effectiveSlot": 410400009,
+    "epoch": 949,
+    "postBalance": 24657851130
+   }
+  ],
+  "950": [
+   {
+    "amount": 13833325,
+    "commission": 0,
+    "effectiveSlot": 410832038,
+    "epoch": 950,
+    "postBalance": 43657217718
+   },
+   {
+    "amount": 2660579,
+    "commission": 0,
+    "effectiveSlot": 410832161,
+    "epoch": 950,
+    "postBalance": 8395791063
+   },
+   {
+    "amount": 7016434,
+    "commission": 0,
+    "effectiveSlot": 410832053,
+    "epoch": 950,
+    "postBalance": 22136555617
+   },
+   {
+    "amount": 9868386,
+    "commission": 0,
+    "effectiveSlot": 410832251,
+    "epoch": 950,
+    "postBalance": 31152052004
+   },
+   {
+    "amount": 7813794,
+    "commission": 0,
+    "effectiveSlot": 410832242,
+    "epoch": 950,
+    "postBalance": 24665728632
+   }
+  ],
+  "951": [
+   {
+    "amount": 13804142,
+    "commission": 0,
+    "effectiveSlot": 411264055,
+    "epoch": 951,
+    "postBalance": 43671291911
+   },
+   {
+    "amount": 2654762,
+    "commission": 0,
+    "effectiveSlot": 411264202,
+    "epoch": 951,
+    "postBalance": 8398467240
+   },
+   {
+    "amount": 7001093,
+    "commission": 0,
+    "effectiveSlot": 411264198,
+    "epoch": 951,
+    "postBalance": 22143613187
+   },
+   {
+    "amount": 9846810,
+    "commission": 0,
+    "effectiveSlot": 411264111,
+    "epoch": 951,
+    "postBalance": 31161978248
+   },
+   {
+    "amount": 7796710,
+    "commission": 0,
+    "effectiveSlot": 411264089,
+    "epoch": 951,
+    "postBalance": 24673588238
+   }
+  ]
+ }
+}
