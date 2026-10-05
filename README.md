@@ -93,7 +93,7 @@ packages/
   indexer_app/                Yellowstone gRPC → Solana Fee Index + revenue → Postgres
   cranks_app/                 Epoch-boundary jobs: claim, score, sweep, settle, accrue
   publisher_app/              Posts the Solana Fee Index on-chain (self-published oracle)
-  panta_bot_app/              Parimutuel markets on the fee index
+  panta_bot_app/              Creates real-money (USDC) Panta markets on the fee index
   api_app/                    REST API for the Terminal
   common/ logger/ exceptions/ config-sdk/ common_http_server/ pg_models/ solana/
                               Shared libraries every app is built from
@@ -127,7 +127,9 @@ Before a PR: `pnpm lint && pnpm test && pnpm ccd`. Conventions: [`docs/REPO_STRU
 ## Roadmap
 
 - [x] Monorepo scaffold, program skeleton, CI
-- [x] Program phases 1–4: pool, credit, Fee Index, fee swaps (29 instructions, 41 unit tests)
+- [x] Program phases 1–4: pool, credit, Fee Index, fee swaps (29 instructions)
+- [x] Revenue tokens on Meteora: register, buyback at source on DBC and DAMM v2, redeem, treasury fee claims to lenders (11 more instructions, 82 unit tests; end to end on a local validator running Meteora's mainnet programs)
+- [x] Side-track backends: Live (Solami), Predict with real USDC (Panta), Launch (Meteora), India (Superteam India)
 - [ ] Mechanism proof on testnet: PDA as vote-account withdrawer
 - [ ] Credit: onboard → advance → sweep → release on devnet
 - [ ] Indexer + Terminal live on mainnet (Solami gRPC)
@@ -140,11 +142,37 @@ Full plan with checkpoints: [`docs/PLAN.md`](docs/PLAN.md) · Implementation pla
 
 ## Side-track integrations
 
-| Track | Integration |
-| --- | --- |
-| Solami | Indexer and Terminal stream live mainnet data via Solami Yellowstone gRPC |
-| RPC Fast | Crank transactions land through RPC Fast; failover data stream |
-| Panta | A parimutuel market each epoch on the Solana Fee Index |
+| Track | Integration | Page |
+| --- | --- | --- |
+| Meteora | Validators sell a fixed share of their revenue as a token launched on a DBC curve (Epoch is the partner); every epoch the program buys it back on the curve or its DAMM v2 pool and burns it; Epoch's partner and LP fees are claimed on-chain into the lending pool | Launch |
+| Panta | Real-money (USDC, mainnet) markets each epoch on the Solana Fee Index, created by our bot and traded from the Predict page; every trade attributed to Epoch | Predict |
+| Solami | The Fee Index computed live from mainnet through Solami's Yellowstone gRPC and RPC; Beam for the index's on-chain post | Live |
+| Superteam India | SOL in ₹, validators hosted in India, and a wallet's staking rewards in ₹ per Indian financial year with a CSV | India |
+| RPC Fast | Crank transactions land through RPC Fast; failover data stream | — |
+
+Page contracts for the frontend: [`docs/pages/`](docs/pages/README.md) · What is left to go live with real money:
+[`docs/GO_LIVE_SIDE_TRACKS.md`](docs/GO_LIVE_SIDE_TRACKS.md) · Track rules: [`docs/SIDE_TRACKS.md`](docs/SIDE_TRACKS.md)
+
+### Solami: the Fee Index, live from mainnet
+
+The Solana Fee Index is computed live from mainnet blocks streamed through [Solami](https://solami.dev)'s Yellowstone
+gRPC: every non-vote transaction's priority fee (legacy and v0 `SetComputeUnitPrice`, and the inline fee of SIMD-0385
+v1 transactions), each slot's median with leader-paid transactions left out, and the stake-weighted median across
+leaders, updated every 2 seconds and settled into `epoch_index` when the epoch ends. Solami RPC fills gaps and snapshots
+the leader schedule and stakes; Solami Beam can land the `post_index` transaction on mainnet. The Terminal's Live page
+shows it slot by slot (`GET /v1/live/*`, WS `slots` and `index:live`).
+
+```bash
+# .env: SOLAMI_TOKEN=<key>  SOLAMI_RPC_URL=https://rpc.solami.dev/sol?api_key=<key>  DATABASE_URL=…
+pnpm install && pnpm build && pnpm db:migrate
+pnpm solami:check                                  # read-only check of your key: RPC, gRPC, firehose cost, Beam
+node packages/indexer_app/dist/index.js            # SLOT_SOURCE=auto: gRPC firehose, or hybrid on a plan stream
+node packages/api_app/dist/index.js                # GET /v1/live/summary
+```
+
+Get a key at <https://solami.dev/signup?ref=st-earn-sep-26> (Pro trial: 7 days). Setup, every variable, the methodology,
+bandwidth costs and the fallback modes: [`packages/indexer_app/README.md`](packages/indexer_app/README.md). Page
+contract for the frontend: [`docs/pages/live.md`](docs/pages/live.md).
 
 ## Contributing
 

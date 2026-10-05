@@ -89,6 +89,20 @@ export {
   type TradeVenue,
 } from './trade';
 
+// Buyback quotes (the revenue-token crank)
+export {
+  buybackGraduation,
+  type BuybackQuote,
+  buybackMinimumOut,
+  type BuybackVenueAccounts,
+  type BuybackVenueKind,
+  buybackVenueState,
+  type BuybackVenueState,
+  quoteBuyback,
+  type RawCurvePoint,
+  readBuybackVenue,
+} from './buyback';
+
 // Token reads
 export {
   countTokenHolders,
@@ -109,6 +123,9 @@ export {
   type LaunchConfigInput,
   LaunchConfigError,
   type LaunchPlan,
+  type LaunchReceipt,
+  launchRecordFor,
+  withRegistration,
   parseLaunchConfig,
   planLaunch,
   registryEntryFor,
@@ -117,3 +134,115 @@ export { appendRegistryEntry, type LaunchCluster, type LaunchRegistryEntry } fro
 
 // Units
 export { type ExactDecimal, fromBaseUnits, parseDecimal, toBaseUnits, toBigInt, toBN } from './units';
+
+// Events: trades, fee claims and graduation decoded from DBC / DAMM v2 CPI events (the Launch page's live feed)
+export { base58Decode, base58Encode } from './base58';
+export {
+  DAMM_V2_PROGRAM,
+  DBC_PROGRAM,
+  decodeMeteoraEvents,
+  EVENT_IX_TAG,
+  launchFeeEventsFromTransaction,
+  type LaunchFeeEvent,
+  type LaunchFeeEventKind,
+  type LaunchTradeEvent,
+  launchTradesFromTransaction,
+  type MeteoraEvent,
+  type MeteoraProgram,
+  type NormalizedInstruction,
+  type NormalizedTransaction,
+  normalizeTransaction,
+  type TradePoolInfo,
+} from './events';
+export { type DecodedStruct, type DecodedValue, IdlCoder, type IdlLike } from './idlCoder';
+
+// Candles
+export {
+  buildCandles,
+  type BuildCandlesOptions,
+  type Candle,
+  CANDLE_INTERVAL_SECONDS,
+  CANDLE_INTERVALS,
+  type CandleInterval,
+  fillCandles,
+  MAX_CANDLES,
+  type PricePoint,
+} from './candles';
+
+// Claims: partner and creator fees, surplus, leftover, DAMM v2 LP fees
+export {
+  buildClaimTx,
+  claimAmountsUi,
+  type ClaimableItem,
+  type ClaimKind,
+  CREATOR_MIGRATION_FEE_MASK,
+  type DammPositionClaim,
+  dammPositionClaim,
+  isSolQuoted,
+  launchClaimsFromState,
+  type LaunchClaimsState,
+  migrationFeeSplit,
+  PARTNER_AND_CREATOR_SURPLUS_SHARE,
+  PARTNER_MIGRATION_FEE_MASK,
+  readDammPositions,
+  readLaunchClaims,
+  surplusSplit,
+} from './claims';
+
+// Graduation
+export { buildMigrateToDammV2Tx, type MigrationReadiness, migrationReadiness } from './migration';
+
+// Holders
+export { type HolderLabels, mapTopHolders, readTopHolders, type TopHolder } from './holders';
+
+// Revenue history (the curve's input)
+export {
+  type EpochRevenue,
+  estimateBlockRevenue,
+  readRevenueHistory,
+  type RevenueHistoryOptions,
+  readVoteIdentity,
+  retryRateLimited,
+  type RevenueSummary,
+  spreadSample,
+  summarizeRevenue,
+} from './revenue';
+
+// The launch script's pure parts: cost, pre-flight checks, the plan's math, token metadata
+export {
+  estimateLaunchCost,
+  LAUNCH_ACCOUNT_BYTES,
+  type LaunchCost,
+  type LaunchCostInput,
+  type LaunchCostItem,
+  METAPLEX_CREATE_FEE_LAMPORTS,
+  rentExemptLamports,
+  SIGNATURE_FEE_LAMPORTS,
+} from './launchCost';
+export {
+  checkAccount,
+  checkCluster,
+  checkEpochPool,
+  checkExistingConfig,
+  checkInitialBuy,
+  checkLeftoverReceiver,
+  checkMetadataJson,
+  checkPayerBalance,
+  checkProgram,
+  checkRegistrableConfig,
+  checkRegistrableMint,
+  checkRegistry,
+  checkRevenueTokenTerms,
+  checkStartEpoch,
+  type CheckStatus,
+  checkValidatorPosition,
+  GENESIS_HASH,
+  type PreflightCheck,
+  type PreflightSummary,
+  type RevenueTokenLimits,
+  summarizePreflight,
+  treasuryMismatch,
+  type ValidatorPositionState,
+} from './launchPreflight';
+export { formatSol, launchPlanLines, revenueTableLines } from './launchReport';
+export { decodeTokenMetadata, readTokenMetadata, type TokenMetadata } from './tokenMetadata';

@@ -26,6 +26,8 @@ known yet" and the app shows "—".
 | `GET /v1/market`                                                                           | `FeeMarketSnapshot`             | 5 s   | the Epoch program                                             |
 | `GET /v1/launches`                                                                         | `LaunchList`                    | 60 s  | launch registry, DBC and DAMM v2 pools on devnet (see Launch) |
 | `GET /v1/launches/:mint`                                                                   | `LaunchDetail`                  | 60 s  | as `/v1/launches`, plus `launch_price_samples`                |
+| `GET /v1/launches/:mint/page` · `/market` · `/trades` · `/candles` · `/holders` · `/fees` | the Launch page (see below)     | 0–60 s | the pools, `launch_trades`, `launch_fee_events` (plan F13)   |
+| `POST /v1/launches/:mint/quote` · `POST /v1/launches/:mint/build`                          | `LaunchQuoteResponse`, `LaunchBuildResponse` | — | Meteora DBC / DAMM v2 via `@epoch/meteora`; unsigned transactions |
 | `POST /v1/auth/siws/nonce` · `POST /v1/auth/siws/verify` · `POST /v1/auth/logout` · `GET /v1/auth/session` | sign-in (SIWS), session cookie | — | Postgres `auth_nonces`, `sessions`; roles from mainnet stake accounts and the program |
 | `GET` · `PUT /v1/me/watchlist`, `GET` · `PUT /v1/me/alerts`, `POST /v1/me/alerts/telegram-link`, `POST /v1/me/alerts/test` | `Watchlist`, `AlertPrefs` | — | Postgres `watchlists`, `alert_prefs` |
 | `GET /v1/predict/markets` · `POST /v1/predict/calls` · `GET /v1/predict/leaderboard?epochs=30` | `PredictSnapshot`, `PredictLeaderboard` | — | Postgres `predict_markets`, `predict_calls`; the Fee Index |
@@ -107,9 +109,20 @@ by vote key, else by short key (`FzUN…AmMk`). `503 PROGRAM_NOT_CONFIGURED` wit
 | `IndexProposed` / `IndexFinalized` / `IndexVetoed` | `index` · "Epoch 1043 Fee Index proposed" (final, vetoed) · `value` in µL/CU                                               |
 | `SwapOpened`                                       | `swap` · "Pay fixed · epoch 1045" (or Receive fixed) · `notional`                                                          |
 | `SwapSettled`                                      | `swap` · "Swap settled · epoch 1042" · the taker's P&L (negative when the taker lost)                                      |
+| `RevenueTokenRegistered`, `RevenueShareSwept`, `BuybackExecuted`, `RevenueTokenPoolSynced`, `RevenueTokenRedeemed`, `RevenueTokenClosed` | `buyback` · "Kestrel Nodes · bought back and burned on the curve" (and the lifecycle's other steps) · the SOL moved |
+| `TreasuryClaimed`                                  | `buyback` · "EUdJ…iDs1 · treasury: curve trading fees to lenders" (surplus, migration fee, DAMM v2 LP fees; "unsold supply burned" for the leftover; ", tokens burned" when it burned some) · `lamportsToPool` |
 | a Predict call                                     | `predict` · "<market label> · YES" · `value` = points, `unit: "points"`, no signature                                      |
 
 Other events (accruals, scores, bonds, quotes, admin) are not shown.
+
+**Revenue-token buybacks and treasury claims** (`GET /v1/launches/:mint/buybacks`, `Services/Launch/BuybackFeed.ts`,
+from the program's cluster). The mint's `RevenueToken` account (escrow, schedule, term, totals), its `BuybackExecuted`
+events newest first (at most 200) and a `treasury` section from its `TreasuryClaimed` events: the partner treasury PDA
+`address`, `totals` and `byKind` (`tradingFee`, `surplus`, `migrationFee`, `leftover`, `lpFee`) of SOL put in the
+lending pool as income (`toLendersSol`) and tokens burned, the newest 200 `claims` (kind, epoch, source pool, LP
+position, `toLendersSol`, `tokensBurned`, signature) and `claimable: "/v1/launches/<mint>/fees"`, where the Launch page
+shows what is still unclaimed on Meteora. Treasury totals add up the newest 10,000 claims. The treasury section is
+there for any mint, registered as a revenue token or not.
 
 **Pool snapshots** (`Services/Program/PoolSnapshotRecorder.ts`, with Postgres and the program). On each new `Accrued`
 event the Pool is read and `pool_snapshots` gets (or replaces) the row of the event's epoch: senior/junior assets and
@@ -135,7 +148,7 @@ Channels can also be given on the URL: `/v1/stream?channels=slot,activity`.
 Server → client:
 
 ```json
-{ "type": "hello", "channels": ["slot", "activity", "feeIndex"] }
+{ "type": "hello", "channels": ["slot", "activity", "feeIndex", "launch:<key>"] }
 { "type": "subscribed", "channels": ["slot", "activity"] }
 { "type": "pong" }
 { "type": "error", "message": "Unknown or unavailable channel: vault (available: slot, activity, feeIndex)" }
@@ -143,7 +156,7 @@ Server → client:
 { "channel": "slot", "data": { "slot": 375840001, "epoch": 870, "slotIndex": 1, "slotsInEpoch": 432000, "leader": "<identity>", "leaderName": "Helius" }, "at": "2026-10-03T01:12:09+05:30" }
 ```
 
-`hello` lists the channels this server can serve; `subscribed` answers every subscribe and unsubscribe with the
+`hello` lists the channels this server can serve (`launch:<key>`: one channel per launch, by mint or symbol); `subscribed` answers every subscribe and unsubscribe with the
 current set; data frames carry `channel`, `data` and `at` (when the data was read, IST).
 
 | Channel    | `data`                                                                                                                                                   | When                                                                                                                                                                                 |
@@ -152,6 +165,7 @@ current set; data frames carry `channel`, `data` and `at` (when the data was rea
 | `activity` | one `ActivityEvent` (as `GET /v1/activity`)                                                                                                              | each new program event the feed shows and each Predict call; events older than 10 minutes (a backfill after downtime) only appear in `GET /v1/activity`                              |
 | `vault`    | the vault provider's snapshot (`VaultSnapshot`)                                                                                                          | on subscribe, then 2 s after the last pool event (`Deposited`, `Withdraw*`, `Accrued`, `AdvanceOpened`, `Swept`, `AdvanceRepaid`, `AdvanceDefaulted`, `BondPosted`, `BondWithdrawn`) |
 | `feeIndex` | `{ points: FeeIndexPoint[16], final, proposed, avg8 }`                                                                                                   | on subscribe, then after `IndexProposed` / `IndexFinalized` / `IndexVetoed`                                                                                                          |
+| `launch:<mint>` | `{ type: 'snapshot' \| 'trade' \| 'market' \| 'fee', … }` (`LaunchStreamMessage`; a symbol subscribes to its mint's channel) | a snapshot on subscribe, then each trade the ingester stores, the market after them, and claim / graduation events; at most 8 keyed channels per socket (docs/pages/launch.md) |
 
 The server pings every 30 s and drops a socket that misses a pong; browsers answer pings by themselves. A dropped
 socket keeps nothing: reconnect, then subscribe again (the `vault` and `feeIndex` channels send their current value).
@@ -497,16 +511,106 @@ netPoints, hitPct, calls }] }`, top 50 over markets settled with an epoch ≥ cu
 | `PREDICT_MARKETS_AHEAD`      | `2`                                        |                                                                                                |
 | `PREDICT_RESOLVE_FROM_DB`    | `false`                                    | Without the program: open and settle markets from `epoch_index` (demo).                        |
 | `PREDICT_REGIONS`            | `where allowed`                            | Shown in `rules.regions`.                                                                      |
-| `PREDICT_REAL_SOL`           | `false`                                    | Ignored: points only.                                                                          |
+| `PREDICT_REAL_SOL`           | `false`                                    | Superseded (3 Oct 2026): real money is USDC through Panta, see `PANTA_TRADING_ENABLED` below.  |
+
+## Real-money Predict through Panta (`/v1/predict/panta`)
+
+Decision of 3 Oct 2026: Predict trades **real USDC** on [Panta](https://docs.panta.market) markets on Solana mainnet;
+points mode (above) stays as the free tier, untouched. Built in `Services/Panta/` on `@epoch/panta`. Epoch's own
+markets ("Will the Solana Fee Index for epoch N close above X µL/CU?") are created by `panta_bot_app` (`panta_markets`);
+every trade made through Epoch is recorded in `panta_trades` and reported to Panta for attribution. The page contract
+for the app is [docs/pages/predict.md](../../docs/pages/predict.md); response types are `src/types/Panta.types.ts`.
+
+| Method and path | Returns | Who | Panta calls |
+| --- | --- | --- | --- |
+| `GET /v1/predict/panta/markets?category=&status=&q=&cursor=&limit=` | `PantaMarketsPage`: `access`, `ours` (our markets with prices and `intelligence`), `discover` (the catalog) | public | `GET /markets/{id}/` per our market, `GET /markets/` (cached) |
+| `GET /v1/predict/panta/markets/:marketId` | `PantaMarketDetail`: the card and its public tape | public | `GET /markets/{id}/`, `GET /markets/{id}/trades/` |
+| `GET /v1/predict/panta/categories` | `PantaCategoriesView` | public | `GET /categories/` (1 h) |
+| `GET /v1/predict/panta/positions?wallet=` | `PantaPositionsView`: shares, `state` (open, claimable, won, lost, claimed, cancelled), display-only value | public | `GET /positions/`, `GET /markets/{id}/` |
+| `GET /v1/predict/panta/stats` | `PantaStatsView`: our trades, wallets, volume, attribution, markets created, fees; Panta's account metrics | public | `GET /account/metrics/` (60 s) |
+| `POST /v1/predict/panta/quote` `{ wallet, marketId, side, amountUsdc }` | `PantaQuoteView` (~90 s quote, summary) | public | `POST /primaryorderquote/` |
+| `POST /v1/predict/panta/build` `{ quoteId, wallet, consent: true, maxSlippageBps? }` | `PantaBuildView`: unsigned v0 transaction (base64), `tradeId`, summary, review | SIWS session of `wallet` | `POST /primaryorderbuild/` |
+| `POST /v1/predict/panta/submit` `{ tradeId, signedTransaction }` or `{ tradeId, signature }` | `PantaSubmitView` | SIWS session of the trade's wallet | `POST /primaryordersubmit/` (buys) |
+| `GET /v1/predict/panta/status/:tradeId` | `PantaTradeStatusView`: chain status, Panta's order status, attribution | public | `POST /primaryorderverify/` (5 s), `POST /trades/` |
+| `POST /v1/predict/panta/claim/build` `{ wallet, marketId, consent: true }` | `PantaBuildView` for a win claim | SIWS session of `wallet` | `POST /claim/build/` |
+| `GET /v1/index/epochs/:epoch` | `FeeIndexEpochView`: one MAINNET epoch's value and `status` (`pending` · `computed` · `proposed` · `final` · `vetoed`) | public | — (the resolution source of our markets) |
+| `WS /v1/stream` channel `predict:panta` | `PantaStreamData`: our markets' prices, implied vs model probability | — | `GET /markets/{id}/` every `PANTA_STREAM_INTERVAL_SECONDS` (≥ 10 s) while someone listens; doubles on failure up to 5 min |
+
+**Attribution and freshness (Panta Terms of Use).** Every Panta-derived payload carries `poweredBy: "Panta"`,
+`poweredByUrl`, `asOf` (when Panta answered, IST), `ageSeconds` and `stale`. Reads are cached `PANTA_CACHE_SECONDS`
+(15 s); past that, one shared reload; only if the reload FAILS is the old answer served, with `stale: true` and its
+original `asOf`, for at most 10 minutes; after that the route fails (`502 PANTA_UNAVAILABLE`). Nothing simulated or
+cached is ever presented as live. The API key stays on the server (never in a response, log or URL).
+
+**Trading flow.** quote → the user confirms the summary → build (`consent: true`; the transaction is compiled from
+Panta's instructions with the wallet as fee payer and only signer; the trade row stores the summary, the consent time,
+the session wallet and the message hash) → the wallet signs → submit: either the signed transaction (Epoch checks it is
+exactly the built message, signed by the trade's wallet, records the signature, then broadcasts on `PANTA_RPC_URL`
+with preflight) or the signature of a transaction the wallet broadcast itself → Panta is told (`primaryordersubmit`)
+→ status / the attribution job follow the signature on chain (`confirmed`, `failed`, or `expired` once the block height
+passed the transaction's last valid height) and report every confirmed trade to Panta (`POST /trades/`, idempotent per
+signature, `clientOrderId` = the trade id) until Panta answers `processed`. Claims are the same without the order
+session. Re-submitting the same trade is harmless; a different signature is `409 TRADE_ALREADY_SUBMITTED`.
+
+**Who needs a session, and why.** Reads and quotes are public (rate-limited per IP): they show public catalog and
+chain data, and the page works before a wallet connects. build, submit and claim/build need the SIWS session of the
+very wallet that trades (`401` signed out, `403 WALLET_MISMATCH` another wallet): a build spends Panta's scarcest
+budget (20 builds a minute for the whole app), so it is tied to a wallet that proved ownership and limited per wallet
+(10/min) as well as per IP (30/min); and every attributed trade is linked to a signed-in Epoch wallet. Points-mode
+players are signed in already. Our limits: reads 120/min per IP, quotes 20/min per IP. Under them, the client's
+`RequestBudget` keeps the whole process within `PANTA_RATE_LIMIT_SHARE` (0.8) of Panta's per-account limits and fails
+fast with `429 PANTA_BUSY` rather than queue.
+
+**Geo and eligibility.** `PANTA_BLOCKED_COUNTRIES` (ISO codes) blocks trading (`403 PANTA_GEO_BLOCKED`, details
+`country`) for visitors whose country the trusted proxy header names (`PANTA_GEO_HEADERS`: `cf-ipcountry`,
+`x-vercel-ip-country`; with any blocklist, Tor exits `T1` too). They can still browse; `access.geoBlocked` tells the
+page. Set the headers only behind a proxy that overwrites them. Panta's own restrictions come back as
+`403 PANTA_FORBIDDEN` (and `PANTA_CREATE_NOT_PERMITTED`) and are never worked around.
+
+**Errors.** `503 PANTA_NOT_CONFIGURED` (no key) · `503 PANTA_TRADING_DISABLED` · `503 PANTA_AUTH_FAILED` (Panta refused
+our key) · `400 CONSENT_REQUIRED` · `400 PANTA_AMOUNT_OUT_OF_RANGE` · `400 TX_INVALID` / `TX_MODIFIED` / `TX_NOT_SIGNED`
+/ `TX_REJECTED` (with `reason`, `logs`) · `404 TRADE_NOT_FOUND` · `409 TRADE_ALREADY_SUBMITTED` · `429 PANTA_BUSY` /
+`PANTA_RATE_LIMITED` (`retryAfterSeconds`) · `502 PANTA_UNAVAILABLE` / `PANTA_BAD_RESPONSE` / `RPC_UNAVAILABLE`, and
+Panta's codes as `PANTA_*`: `AMOUNT_TOO_SMALL`, `INVALID_PARAMS` (details `field`, `fields`), `MARKET_NOT_FOUND`,
+`MARKET_CLOSED` (not in primary), `QUOTE_EXPIRED`, `QUOTE_STALE`, `NOT_CLAIMABLE`, `TX_NOT_FOUND`, `TX_FAILED`,
+`TX_MISMATCH`, `TX_FEE_MISMATCH`, `FORBIDDEN` (details carry `pantaCode` and `pantaMessage`).
+
+**Fee Index intelligence** (on our markets, labelled `informational`): `impliedProbability` = the YES price;
+`modelProbability` = the share of the last `PANTA_MODEL_LOOKBACK_EPOCHS` (30) finished epochs whose index was strictly
+above the threshold; `gapPct`; `index.last` (the newest final value, else the computed one) and `index.running` (the
+running epoch's median of slot medians so far: unofficial).
+
+### Configuration (`PantaTradingConfigSchema`)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PANTA_API_KEY` | — | Secret, `pk_live_…`. Unset: every Panta route answers 503. |
+| `PANTA_API_URL` | `https://live-api.panta.market/api/v1` | |
+| `PANTA_TRADING_ENABLED` | on when `PANTA_API_KEY` is set | Replaces `PREDICT_REAL_SOL`'s "must be false" (3 Oct 2026). `false`: browse only. |
+| `PANTA_BLOCKED_COUNTRIES` | — | e.g. `US,GB` |
+| `PANTA_GEO_HEADERS` | `cf-ipcountry,x-vercel-ip-country` | trusted proxy headers, first present wins |
+| `PANTA_MIN_TRADE_USDC` / `PANTA_MAX_TRADE_USDC` | `1` / `500` | per buy |
+| `PANTA_RPC_URL`, `PANTA_RPC_FALLBACK_URL` | `DATA_RPC_URL`, else public mainnet | broadcast and confirmation |
+| `PANTA_CACHE_SECONDS` | `15` | catalog freshness |
+| `PANTA_STREAM_INTERVAL_SECONDS` | `15` (min 10) | WS polling |
+| `PANTA_MODEL_LOOKBACK_EPOCHS` | `30` | informational model |
+| `PANTA_ATTRIBUTION_INTERVAL_SECONDS` | `30` | the attribution job |
+| `PANTA_RATE_LIMIT_SHARE` | `0.8` | of Panta's per-account limits (the bot takes `PANTA_BOT_RATE_LIMIT_SHARE`, 0.2) |
+| `PANTA_TIMEOUT_MS` | `10000` | per Panta request |
+| `PANTA_METHODOLOGY_URL` | the repo's `docs/FEE_INDEX_METHODOLOGY.md` | in `GET /v1/index/epochs/:epoch` |
+
+Trading needs Postgres (`panta_trades`); without `DATABASE_URL` build, submit, status and stats answer
+`503 DATABASE_NOT_CONFIGURED`.
 
 ## Launch: revenue tokens on Meteora
 
 Request #22 (handover `pages/launch.md`, ADR 0006, plan F13). A validator sells a fixed share of its commission for a
 fixed term as a token on a Meteora Dynamic Bonding Curve with Epoch as the partner; at the raise target it graduates to
-a DAMM v2 pool. The Epoch program does not have `register_revenue_token`, `execute_buyback` or `redeem` yet, so the
-launches come from a **registry file** (`LAUNCHES_PATH`, appended by the launch script in
-[`packages/meteora/scripts`](../meteora/scripts/README.md)) and every chain read goes through
-[`@epoch/meteora`](../meteora/README.md) on the launch cluster (devnet, decision 6). Nothing here is an offer.
+a DAMM v2 pool. The launches come from a **registry file** (`LAUNCHES_PATH`, appended by the launch script in
+[`packages/meteora/scripts`](../meteora/scripts/README.md)), and every pool read goes through
+[`@epoch/meteora`](../meteora/README.md) on the launch cluster. Once the validator's operator registered a token with the
+Epoch program (`register_revenue_token`), its terms, escrow and buybacks are the program's: `page.revenueToken` (below)
+and `GET /v1/launches/:mint/buybacks`. Nothing here is an offer.
 
 - `GET /v1/launches` → `LaunchList`: every registry entry on `LAUNCH_CLUSTER`, in registry order. Without
   `LAUNCHES_PATH` it answers `{ launches: [] }` with a note; a registry that is not valid JSON or does not match the
@@ -542,8 +646,8 @@ for `LAUNCH_HOLDERS_CACHE_MINUTES` (10).
   permanently locked LP (100); `graduatedEpoch` from the registry, else estimated from the curve's finish time.
 - **Fees and graduation:** `partnerFeesToSeniorSol` = the partner's share of the curve's lifetime trading fees
   (`getPoolFeeBreakdown`); `upfrontToValidatorSol` = raise × 70% once graduated.
-- **Escrow:** the SOL balance of the registry's `escrow`; `mode` is `buyback`, 12 slices an epoch. `buybacks` is `[]`
-  until the program's `execute_buyback` ships.
+- **Escrow:** the SOL balance of the registry's `escrow` (the program's escrow PDA, rent included); `mode` is `buyback`,
+  12 slices an epoch. `buybacks` stays `[]`: the program's buybacks are on `GET /v1/launches/:mint/buybacks`.
 - **Price series:** the `LaunchPriceSampler` job stores every priced launch in `launch_price_samples` (mint, time,
   epoch, price) every `LAUNCH_SAMPLE_SECONDS` while the API runs with Postgres and a registry; the detail returns them
   oldest first, thinned in SQL to at most 500 points. Without Postgres the series is empty, with a note.
@@ -562,6 +666,8 @@ JSON array, one object per launch, re-read when the file changes:
 | `supply`, `decimals`                                              | The fixed supply at launch (UI units). `burned` is a fallback when the mint cannot be read.     |
 | `cluster`                                                         | `devnet` or `mainnet`; only `LAUNCH_CLUSTER` entries are served.                                |
 | `avgRevenueSol`, `raiseTargetSol`, `graduatedEpoch`, `launchedAt` | Optional, written by the launch script.                                                         |
+| `creator`, `feeClaimer`, `leftoverReceiver`, `signatures`         | Optional, written by the launch script: the pool creator (validator), the DBC partner (the program's treasury PDA), the leftover receiver, the launch transactions (and `registerRevenueToken`). |
+| `programId`, `revenueToken`, `registeredEpoch`                    | Optional, written by the launch and register scripts: the Epoch program, its `RevenueToken` PDA, and the epoch of `register_revenue_token` (null until registered). |
 
 **Configuration** (`LaunchConfigSchema` in `@epoch/config-sdk`)
 
@@ -575,6 +681,54 @@ JSON array, one object per launch, re-read when the file changes:
 | `LAUNCH_HOLDERS_CACHE_MINUTES` | `10`            |                                                                                                    |
 | `LAUNCH_SAMPLER_ENABLED`       | `true`          | The price sampler also needs `LAUNCHES_PATH` and `DATABASE_URL`.                                   |
 | `LAUNCH_SAMPLE_SECONDS`        | `60`            |                                                                                                    |
+
+### The Launch page (plan F13)
+
+The page's live data, on top of the launch board above; the contract for the frontend, with examples, states and the
+signing flow, is [docs/pages/launch.md](../../docs/pages/launch.md). Code: `Routes/LaunchPageRouters.ts` (mounted on
+`/v1/launches` next to `launchRouter`), `Services/Launch/LaunchPageService.ts`, wiring in `Services/Launch/LaunchLive.ts`.
+
+- **Trade feed.** `LaunchTradeIngester` reads each launch pool's transactions (`getSignaturesForAddress`, then
+  `getTransaction` in JSON encoding, any version) every `LAUNCH_TRADES_POLL_SECONDS`: first the newest
+  `LAUNCH_TRADES_BACKFILL_LIMIT` per pool, then everything after the pool's cursor (`indexer_cursors`,
+  `launch_trades:<pool>`), oldest first. `@epoch/meteora` decodes the Anchor CPI events (DBC `EvtSwap2`, DAMM v2
+  `EvtSwap2`, claims, `EvtCurveComplete`, `EvtInitializePool`) into `launch_trades` and `launch_fee_events` (Postgres;
+  memory without `DATABASE_URL`). A graduation adds the DAMM v2 pool to the watch list. HTTP 429 backs off up to a
+  minute; a transaction the node lists but cannot return holds the cursor for three polls. New rows go out on WS
+  `launch:<mint>`. Run one ingester per database (`LAUNCH_TRADES_INGEST=false` on other replicas).
+- **Market** (`/market`): a fresh read of the curve and the DAMM v2 pool, cached `LAUNCH_MARKET_CACHE_SECONDS` and
+  dropped on every new trade; venue, price (SOL and USD), fully diluted market cap, raise progress, liquidity,
+  graduation state, implied yield per epoch (live share revenue ÷ market cap, never annualised) next to the share
+  revenue the curve was priced at, and 24-hour stats from the feed.
+- **Candles** (`/candles`): OHLC bucketed in SQL from `launch_trades` (1m to 1d, at most 1,000), empty buckets flat at
+  the previous close; `launch_price_samples` before the first trade.
+- **Holders** (`/holders`): `getTokenLargestAccounts` and the accounts' owners, labelled (curve vault, DAMM v2 pool,
+  buyback escrow, Epoch's treasury PDA, leftover receiver, pool creator).
+- **Fees** (`/fees`): partner (the treasury PDA), creator, LP position and leftover from the pools' state
+  (`readLaunchClaims`), what is pending and claimed for lenders, and the claim history from `launch_fee_events`.
+- **Ticket** (`/quote`, `/build`): quotes and unsigned transactions on the curve or, after graduation, DAMM v2;
+  `build` needs `consent: true` and the signing wallet as `owner`; buys above `LAUNCH_TRADE_MAX_SOL` are refused;
+  `LAUNCH_TRADE_REQUESTS_PER_MINUTE` per IP.
+- **Revenue token** (`page.revenueToken`, `Services/Launch/RevenueTokenSource.ts`): the program's `RevenueToken` at
+  `["revenue_token", vote]`, decoded with `@epoch/epoch-sdk`, and the escrow's balance above rent at `["buyback", vote]`,
+  both read on the program's cluster (`EPOCH_PROGRAM_ID`, `EPOCH_CLUSTER`, `EPOCH_RPC_URL`) and reused for 10 s.
+  - `source: "program"` gives the term, the commission floors, the buyback settings and lifetime totals.
+  - Otherwise it is the registry's terms (`source: "registry"`), with a `note`. That happens when no program id is set,
+    the launch has no vote account, the token is not registered (or the vote account registered another mint), or the
+    read fails; a failed read is not cached.
+- Every block says when it was read (`freshness`) and whether that is older than `LAUNCH_STALE_SECONDS`.
+
+**Configuration** (`LaunchPageConfigSchema`; the cluster, RPC and registry come from `LaunchConfigSchema` above)
+
+| Variable                           | Default | Notes                                                                 |
+| ---------------------------------- | ------- | --------------------------------------------------------------------- |
+| `LAUNCH_TRADES_INGEST`             | `true`  | Read the pools into `launch_trades` in this process (needs `LAUNCHES_PATH`). |
+| `LAUNCH_TRADES_POLL_SECONDS`       | `10`    | 2–600.                                                                |
+| `LAUNCH_TRADES_BACKFILL_LIMIT`     | `1000`  | Per pool on a first start; 0 = from the newest transaction on.        |
+| `LAUNCH_MARKET_CACHE_SECONDS`      | `10`    |                                                                       |
+| `LAUNCH_STALE_SECONDS`             | `120`   | Older reads are flagged `stale`.                                      |
+| `LAUNCH_TRADE_MAX_SOL`             | `10`    | Largest buy `/build` and `/quote` accept.                             |
+| `LAUNCH_TRADE_REQUESTS_PER_MINUTE` | `30`    | Quotes and builds per IP.                                             |
 
 ## How the derived figures are computed
 
@@ -642,3 +796,108 @@ JSON array, one object per launch, re-read when the file changes:
 | `STREAM_SLOT_INTERVAL_MS`       | `2000`                          | How often the `slot` channel polls mainnet `getEpochInfo` while someone listens (400–60,000).                    |
 
 `API_PORT`, `API_CORS_ORIGINS` and `API_TRUST_PROXY` come from `ApiConfigSchema` / `AuthConfigSchema`. `DATABASE_URL` turns on sign-in, the watchlist, alerts, Predict, the Fee Index history (`epoch_index`), durable program-event history, `pool_snapshots`, launch price samples and the validator history recorder; without it those answer `503 DATABASE_NOT_CONFIGURED` or keep their data in memory.
+
+## Live: the Fee Index streamed from mainnet (Solami Track)
+
+`indexer_app` computes the Solana Fee Index live from mainnet blocks streamed through Solami and writes it to Postgres
+(`live_slots`, `slot_fees`, `fee_index_live`, `epoch_stakes`, `epoch_index`), announcing each committed write with
+`NOTIFY epoch_live`. The API reads those tables and LISTENs on a dedicated connection (reconnecting with backoff). The
+page contract, with example responses and the loading, empty, stale and error states, is
+[`docs/pages/live.md`](../../docs/pages/live.md); the methodology is in
+[`packages/indexer_app/README.md`](../indexer_app/README.md).
+
+| Endpoint | Query | Returns | Cache |
+| --- | --- | --- | --- |
+| `GET /v1/live/summary` | — | `LiveSummary`: live flag, data source, stream health, tip / processed slot / lag, epoch progress, running estimate, last final value | no-store |
+| `GET /v1/live/slots` | `limit` 1–500 (60) | the newest blocks with median, p25/p75/p90 and priced / unpriced / leader-paid / failed counts | no-store |
+| `GET /v1/live/leaders` | `epoch` (current), `limit` 1–5,000 (200) | per-leader median, slots, stake, weight, rank, and the leader whose median is the index | 5 s (10 s server) |
+| `GET /v1/live/epochs/:epoch/distribution` | — | log-bucket histogram and percentiles of the epoch's slot medians, index marker | 5 s (10 s server) |
+
+All four answer `503 DATABASE_NOT_CONFIGURED` without `DATABASE_URL`. Data is never presented as live when it is not:
+`live` is true only while the indexer has processed a slot within `LIVE_STALE_AFTER_SECONDS` (default 20); otherwise
+the last known state is served with `live: false` and `asOf` = when it was written. Types: `src/types/Live.types.ts`.
+
+WS `/v1/stream` gains two channels, listed in `hello` when the API has a database:
+
+| Channel | `data` | When |
+| --- | --- | --- |
+| `slots` | one `LiveSlot` (as in `/v1/live/slots`, with the leader's name) | each block processed live; nothing on subscribe |
+| `index:live` | the whole `LiveSummary` | on subscribe, on each estimate write (at most 1 per second), at once on an epoch rollup and after a LISTEN reconnect |
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LIVE_STALE_AFTER_SECONDS` | `20` | older data is served with `live: false` |
+| `LIVE_FEED_ENABLED` | `true` | LISTEN for the indexer's feed (needs `DATABASE_URL`) |
+
+## India page (Superteam India track)
+
+Built in `Services/India/` (`getIndiaServices()`) on the mainnet services of `getServices()`, mounted at `/v1/india` in
+`src/index.ts`. Public data, no sign-in, no database. The page contract (example responses, loading / empty / stale /
+error states, copy) is `docs/pages/india.md`; response types are `src/types/India.types.ts`. Rupee amounts come as
+`{ inr, formatted, compact }`: `₹1,23,45,678.90` in the Indian numbering system and `₹1.23 Cr` / `₹45.60 L`
+(`Lib/Inr.ts`).
+
+| Method and path                                         | Returns                     | Cache                                  | Data                                                                   |
+| ------------------------------------------------------- | --------------------------- | -------------------------------------- | ---------------------------------------------------------------------- |
+| `GET /v1/india/summary`                                 | `IndiaSummary`              | 30 s                                   | the validator table, Stakewiz, validator profiles, the live price      |
+| `GET /v1/india/price?days=0`                            | `IndiaPrice`                | 15 s (read once a minute)              | CoinGecko, else Jupiter × USD/INR; `days` adds CoinGecko daily prices  |
+| `GET /v1/india/validators?…` (the `/v1/validators` query without `country`) | `IndiaValidatorList` | 30 s (built every 2 min) | as `/summary`                                         |
+| `GET /v1/india/wallets/:address/rewards?fy=2026-27`     | `IndiaWalletRewards`        | 60 s once complete (kept 10 min)       | mainnet `getInflationReward`, Stakewiz epoch times, daily SOL/INR      |
+| `GET /v1/india/wallets/:address/rewards.csv?fy=2026-27` | `text/csv` (UTF-8 with BOM) | 60 s                                   | as `/rewards`                                                          |
+
+**How the figures are computed**
+
+- **Live SOL/INR** (`InrPriceService`): CoinGecko `simple/price?vs_currencies=inr`, read at most once a minute. When it
+  fails, or its `last_updated_at` is over 15 minutes old, Jupiter SOL/USD × USD/INR from MarketData's caches. When
+  every source fails the last price is served with `stale: true` and a `staleReason` (sources are retried after 15 s);
+  503 `PRICE_UNAVAILABLE` only before any source has answered. A CoinGecko HTTP 429 pauses CoinGecko until its
+  `x-ratelimit-reset` (or `retry-after`); the free tier is about 30 calls a minute per IP.
+- **Daily SOL/INR** (for past epochs): CoinGecko `market_chart?vs_currency=inr&days=365&interval=daily` (00:00 UTC
+  points, re-read hourly). Days CoinGecko's free tier cannot serve (over 365 days ago), or all days while it is down:
+  Binance's daily SOL/USDT open × the ECB's USD/INR rate of that day or the business day before (Frankfurter). An
+  epoch is priced at the daily point nearest its end, within 36 hours; on 4 Oct 2025 the two sources differed by 0.04%.
+- **Validators hosted in India**: rows of the validator table with `countryCode` `IN` (Stakewiz IP geolocation), plus
+  `INDIA_VALIDATOR_VOTES` (operator-declared, `inIndiaBy: 'listed'`). India's share of validators and stake, its rank,
+  cities (Stakewiz `ip_city`, `Unknown` when missing) and the country comparison (top ten, India, Singapore / UAE /
+  Hong Kong / Japan) count geolocated validators only. When the table has no Stakewiz data, India's figures are
+  `null` and `status` is `unknown`, never zero. On 3 Oct 2026 Stakewiz placed none of 683 staked validators in India.
+- **Revenue and Epoch advance** per Indian validator: its profile's figures (`/v1/validators/:vote`: the vote account's
+  inflation reward, Jito Kobe tips commission, block fees, vote fees; `creditEstimate` with the planned Pool
+  parameters) when the profile answers within 8 s, else the table's rates (`basis: 'table-estimate'`, same formulas as
+  "SOL kept per epoch"). Revenue is priced at the day its epoch ended, the advance at the live price. Always labelled
+  an estimate.
+- **Start a validator in India** (`prospect`): 50,000 / 150,000 / 500,000 SOL at 5% commission and 5% MEV commission,
+  the median tips APY, blocks in proportion to stake, minus vote fees; advance = 25% (40% hedged) of 10 epochs of
+  inflation + tips commission. Break-even as `/v1/network`.
+- **Rewards by financial year** (`IndiaRewardsService`): the wallet's stake accounts as staker or withdrawer (the 100
+  largest delegated, as My Stake), then `getInflationReward` for every finished epoch whose end (Stakewiz
+  `all_epochs_history`: the next epoch's start) falls between 1 April 00:00 IST and the next 1 April, newest first,
+  three calls at a time per wallet and `INDIA_RPC_CONCURRENCY` across wallets, in its own InflationRewards cache. The
+  first request waits up to 8 s; then `status` is `loading` / `partial` with `retryAfterSeconds` and polls answer at
+  once. `incomplete` = finished with unreadable epochs (listed; retried after a minute). On the public RPC a year
+  (100–200 epochs) takes one to four minutes. Totals are the sum of the rows as shown (rounded to paise); months are
+  IST calendar months. Only protocol staking rewards are counted: Jito MEV tips claimed into stake accounts,
+  liquid-staking tokens and stake accounts closed before today are not, which the disclaimer says.
+- **CSV**: one row per epoch with a reward (IST time, FY, SOL, price, price date and source, ₹), a total row, then the
+  wallet, year, status, notes and the disclaimer; UTF-8 BOM, CRLF, `Content-Disposition: attachment`. 503
+  `REWARDS_LOADING` until the year is read.
+
+Limits per IP: `/rewards` 60 a minute, `/rewards.csv` 10 a minute, 20 new wallet-years an hour (429
+`TOO_MANY_REQUESTS` with `retryAfterSeconds`); 25 wallet-years loading at once (503 `BUSY`). Errors: 400 `BAD_REQUEST`
+(address or `fy` outside 2020-21 to the current year), 502 `CHAIN_ERROR` (stake accounts unreadable), 503
+`EPOCH_TIMES_UNAVAILABLE` (Stakewiz epoch times never loaded).
+
+**Configuration** (`IndiaConfigSchema` in `@epoch/config-sdk`; RPC, Stakewiz, Jupiter and USD/INR from
+`MarketDataConfigSchema`)
+
+| Variable                     | Default                                          | Notes                                                                                     |
+| ---------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `COINGECKO_API_URL`          | `https://api.coingecko.com/api/v3`               | `https://pro-api.coingecko.com/api/v3` with a paid key (full history).                    |
+| `COINGECKO_API_KEY`          | —                                                | Optional; sent only when set, in a header (`x-cg-demo-api-key`, or `x-cg-pro-api-key` on pro-api). |
+| `INDIA_SOL_USD_HISTORY_URL`  | `https://data-api.binance.vision/api/v3/klines`  | Daily SOL/USDT for days CoinGecko cannot serve.                                           |
+| `INDIA_FX_HISTORY_URL`       | `https://api.frankfurter.dev/v1`                 | Daily USD/INR (ECB) for those days.                                                       |
+| `INDIA_VALIDATOR_VOTES`      | —                                                | Comma list of vote accounts to list as Indian validators (operator-declared).             |
+| `INDIA_REWARDS_PER_MINUTE`   | `60`                                             | Per IP, `/rewards`.                                                                       |
+| `INDIA_CSV_PER_MINUTE`       | `10`                                             | Per IP, `/rewards.csv`.                                                                   |
+| `INDIA_NEW_WALLETS_PER_HOUR` | `20`                                             | Per IP, new wallet-years (each is 100–200 RPC calls).                                     |
+| `INDIA_RPC_CONCURRENCY`      | `3`                                              | `getInflationReward` calls in flight across all wallet reads.                             |

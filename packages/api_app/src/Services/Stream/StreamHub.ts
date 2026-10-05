@@ -15,13 +15,25 @@ import {
   type StreamChannel,
   type StreamFrame,
   type StreamServerMessage,
+  type StreamTopicChannel,
 } from '../../types/Activity.types';
 import { EMPTY_NAMES, type NameIndex } from '../Activity/ValidatorNames';
 
 const logger = Logger.create('StreamHub');
 
 /** Every channel, in the order the server lists them. */
-export const STREAM_CHANNELS: readonly StreamChannel[] = ['slot', 'activity', 'vault', 'feeIndex'];
+export const STREAM_CHANNELS: readonly StreamChannel[] = [
+  'slot',
+  'activity',
+  'vault',
+  'feeIndex',
+  'slots',
+  'index:live',
+  'predict:panta',
+];
+
+/** Whether `name` is one of the fixed channels above (some of them contain a colon, like keyed channels do). */
+const isFixedChannel = (name: string): name is StreamChannel => (STREAM_CHANNELS as readonly string[]).includes(name);
 
 /** Program events that change the Pool: the `vault` channel pushes a fresh snapshot after them. */
 export const VAULT_EVENTS: ReadonlySet<EventName> = new Set<EventName>([
@@ -36,6 +48,7 @@ export const VAULT_EVENTS: ReadonlySet<EventName> = new Set<EventName>([
   'AdvanceDefaulted',
   'BondPosted',
   'BondWithdrawn',
+  'TreasuryClaimed',
 ]);
 
 export const FEE_INDEX_EVENTS: ReadonlySet<EventName> = new Set<EventName>([
@@ -57,9 +70,29 @@ export interface ActivityMapper {
   fromPredictCall(call: PredictCallEvent): ActivityEvent;
 }
 
-export type ProviderChannel = 'vault' | 'feeIndex';
+export type ProviderChannel = 'vault' | 'feeIndex' | 'predict:panta';
+const PROVIDER_CHANNELS: readonly ProviderChannel[] = ['vault', 'feeIndex', 'predict:panta'];
 /** Reads the channel's current value (the whole snapshot is pushed, not a diff). */
 export type StreamProvider = () => Promise<unknown>;
+/** Channels fed from outside the hub (the indexer's live feed over Postgres NOTIFY), pushed with `publish()`. */
+export type FeedChannel = 'slots' | 'index:live';
+const isFeedChannel = (channel: string): channel is FeedChannel => channel === 'slots' || channel === 'index:live';
+
+/**
+ * A family of keyed channels, `<topic>:<key>` (e.g. `launch:<mint>`): the server validates the key on subscribe, sends
+ * the snapshot (when there is one) to the new subscriber, and forwards whatever `publish` sends to that channel.
+ */
+export interface StreamTopic {
+  /** Whether `key` names something this server streams (e.g. a launch's mint or symbol). */
+  validate(key: string): boolean;
+  /** The canonical key for a valid one (e.g. symbol → mint); default the key itself. */
+  canonical?(key: string): string;
+  /** What a new subscriber gets first. */
+  snapshot?(key: string): Promise<unknown>;
+}
+
+/** At most this many keyed channels per socket. */
+const MAX_TOPIC_CHANNELS_PER_CLIENT = 8;
 
 export interface StreamHubOptions {
   bus: EventBus;
@@ -72,7 +105,10 @@ export interface StreamHubOptions {
   /** Names the slot leader by identity. */
   names?: () => Promise<NameIndex>;
   activity: ActivityMapper;
-  /** `vault` (VaultService, built separately) and `feeIndex` (FeeIndexService.stream); a channel without one is off. */
+  /**
+   * `vault` (VaultService, built separately), `feeIndex` (FeeIndexService.stream) and `predict:panta` (PantaService,
+   * pushed by its poller through `refresh`); a channel without one is off.
+   */
   providers?: Partial<Record<ProviderChannel, StreamProvider>>;
   path?: string;
   /** Ping interval; a socket that misses a pong by the next one is terminated. Default 30 s. */
@@ -93,6 +129,8 @@ export interface StreamHubOptions {
 interface Client {
   socket: WebSocket;
   channels: Set<StreamChannel>;
+  /** Keyed channels (`launch:<mint>`). */
+  topics: Set<StreamTopicChannel>;
   alive: boolean;
   windowStart: number;
   messages: number;
@@ -207,7 +245,10 @@ export class StreamHub {
   private readonly pushers: Record<ProviderChannel, Debouncer>;
   private readonly cached = new Map<ProviderChannel, { data: unknown; at: number; generation: number }>();
   private readonly inflight = new Map<ProviderChannel, { promise: Promise<unknown>; generation: number }>();
-  private readonly generation: Record<ProviderChannel, number> = { vault: 0, feeIndex: 0 };
+  private readonly generation: Record<ProviderChannel, number> = { vault: 0, feeIndex: 0, 'predict:panta': 0 };
+  private readonly topics = new Map<string, StreamTopic>();
+  /** Enabled feed channels: an optional snapshot for new subscribers, and the last value pushed. */
+  private readonly feeds = new Map<FeedChannel, { snapshot?: StreamProvider; last?: { data: unknown; at: number } }>();
 
   constructor(private readonly options: StreamHubOptions) {
     this.path = options.path ?? '/v1/stream';
@@ -222,6 +263,7 @@ export class StreamHub {
     this.pushers = {
       vault: new Debouncer(() => void this.pushAll('vault'), vaultWait, vaultWait * 5),
       feeIndex: new Debouncer(() => void this.pushAll('feeIndex'), indexWait, indexWait * 5),
+      'predict:panta': new Debouncer(() => void this.pushAll('predict:panta'), 0, 0),
     };
   }
 
@@ -230,6 +272,7 @@ export class StreamHub {
     return STREAM_CHANNELS.filter((channel) => {
       if (channel === 'slot') return this.options.slots !== undefined;
       if (channel === 'activity') return true;
+      if (isFeedChannel(channel)) return this.feeds.has(channel);
       return this.providers[channel] !== undefined;
     });
   }
@@ -242,6 +285,54 @@ export class StreamHub {
   setProvider(channel: ProviderChannel, provider: StreamProvider | undefined): void {
     this.providers[channel] = provider;
     this.invalidate(channel);
+  }
+
+  /** Adds a family of keyed channels, `<name>:<key>` (e.g. `launch` for `launch:<mint>`). */
+  registerTopic(name: string, topic: StreamTopic): void {
+    this.topics.set(name, topic);
+  }
+
+  /**
+   * Enables a feed channel. `snapshot` answers a new subscriber when nothing was pushed in the last minute (e.g. the
+   * summary for `index:live`); `slots` has none: the page loads history over REST and appends frames.
+   */
+  setFeed(channel: FeedChannel, snapshot?: StreamProvider): void {
+    this.feeds.set(channel, { ...this.feeds.get(channel), snapshot });
+  }
+
+  /**
+   * Pushes `data` to a feed channel's subscribers (keeping it for the next subscriber), or to every socket subscribed
+   * to a keyed channel (`launch:<mint>`).
+   */
+  publish(channel: FeedChannel | StreamTopicChannel, data: unknown): void {
+    if (isFeedChannel(channel)) {
+      const feed = this.feeds.get(channel);
+      if (!feed) return;
+      feed.last = { data, at: this.now() };
+      if (this.subscribers(channel) > 0) this.broadcast(channel, data);
+      return;
+    }
+    const frame: StreamFrame = { channel, data, at: isoIst(new Date(this.now())) };
+    const text = JSON.stringify(frame);
+    for (const client of this.clients) if (client.topics.has(channel)) this.sendRaw(client, text);
+  }
+
+  /** Clients subscribed to a fixed channel (a poller polls only while someone listens). */
+  subscriberCount(channel: StreamChannel): number {
+    return this.subscribers(channel);
+  }
+
+  /** The provider's data changed (a poller re-read it): drop the cached value and push the new one to subscribers. */
+  refresh(channel: ProviderChannel): void {
+    this.invalidate(channel);
+    if (this.providers[channel]) this.pushers[channel].trigger();
+  }
+
+  /** Sockets subscribed to a keyed channel. */
+  topicSubscribers(channel: StreamTopicChannel): number {
+    let n = 0;
+    for (const client of this.clients) if (client.topics.has(channel)) n++;
+    return n;
   }
 
   /** Serves `path` upgrades on `server` (other upgrade paths are left to their own handlers). */
@@ -268,8 +359,7 @@ export class StreamHub {
     this.busListeners = [];
     clearInterval(this.heartbeat);
     this.stopSlotPolling();
-    this.pushers.vault.cancel();
-    this.pushers.feeIndex.cancel();
+    for (const channel of PROVIDER_CHANNELS) this.pushers[channel].cancel();
     for (const client of this.clients) client.socket.terminate();
     this.clients.clear();
     await new Promise<void>((resolve) => this.wss.close(() => resolve()));
@@ -299,7 +389,14 @@ export class StreamHub {
   }
 
   private onConnection(socket: WebSocket, req: IncomingMessage): void {
-    const client: Client = { socket, channels: new Set(), alive: true, windowStart: this.now(), messages: 0 };
+    const client: Client = {
+      socket,
+      channels: new Set(),
+      topics: new Set(),
+      alive: true,
+      windowStart: this.now(),
+      messages: 0,
+    };
     this.clients.add(client);
     socket.on('pong', () => {
       client.alive = true;
@@ -307,7 +404,10 @@ export class StreamHub {
     socket.on('message', (data) => this.onMessage(client, data));
     socket.on('close', () => this.drop(client));
     socket.on('error', (error) => logger.debug('websocket error', { error: String(error) }));
-    this.send(client, { type: 'hello', channels: this.channels });
+    this.send(client, {
+      type: 'hello',
+      channels: [...this.channels, ...[...this.topics.keys()].map((name) => `${name}:<key>`)],
+    });
     const requested = channelsParam(req.url);
     if (requested.length > 0) this.subscribe(client, requested);
   }
@@ -370,7 +470,41 @@ export class StreamHub {
     }
   }
 
-  private subscribe(client: Client, names: readonly string[]): void {
+  /** `<topic>:<key>` names this server streams, canonicalised (e.g. `launch:rREH` → `launch:<mint>`). */
+  private topicChannel(name: string): StreamTopicChannel | null {
+    const at = name.indexOf(':');
+    if (at <= 0) return null;
+    const topic = this.topics.get(name.slice(0, at));
+    const key = name.slice(at + 1);
+    if (!topic || !key || !topic.validate(key)) return null;
+    return `${name.slice(0, at)}:${topic.canonical?.(key) ?? key}` as StreamTopicChannel;
+  }
+
+  private subscribedNames(client: Client): (StreamChannel | StreamTopicChannel)[] {
+    return [...STREAM_CHANNELS.filter((c) => client.channels.has(c)), ...client.topics];
+  }
+
+  private subscribe(client: Client, requested: readonly string[]): void {
+    // Fixed channels may contain a colon too (`index:live`, `predict:panta`); anything else with one is keyed.
+    const topicNames = requested.filter((name) => !isFixedChannel(name) && name.includes(':'));
+    const names = requested.filter((name) => isFixedChannel(name) || !name.includes(':'));
+    const badTopics: string[] = [];
+    for (const name of topicNames) {
+      const channel = this.topicChannel(name);
+      if (!channel || (client.topics.size >= MAX_TOPIC_CHANNELS_PER_CLIENT && !client.topics.has(channel))) {
+        badTopics.push(name);
+        continue;
+      }
+      if (client.topics.has(channel)) continue;
+      client.topics.add(channel);
+      void this.sendTopicSnapshot(client, channel);
+    }
+    if (badTopics.length > 0) {
+      this.send(client, {
+        type: 'error',
+        message: `Unknown channel or too many keyed channels (at most ${MAX_TOPIC_CHANNELS_PER_CLIENT}): ${badTopics.join(', ')}`,
+      });
+    }
     const available = this.channels;
     const unknown = names.filter((name) => !(available as string[]).includes(name));
     if (unknown.length > 0) {
@@ -381,7 +515,7 @@ export class StreamHub {
     }
     const added = available.filter((channel) => names.includes(channel) && !client.channels.has(channel));
     for (const channel of added) client.channels.add(channel);
-    this.send(client, { type: 'subscribed', channels: STREAM_CHANNELS.filter((c) => client.channels.has(c)) });
+    this.send(client, { type: 'subscribed', channels: this.subscribedNames(client) });
 
     if (added.includes('slot')) {
       // While others listen the last read is at most one interval old: send it now instead of waiting.
@@ -391,15 +525,39 @@ export class StreamHub {
       }
       this.updateSlotPolling();
     }
-    for (const channel of ['vault', 'feeIndex'] as const) {
+    for (const channel of PROVIDER_CHANNELS) {
       if (added.includes(channel)) void this.sendCurrent(client, channel);
+    }
+    if (added.includes('index:live')) void this.sendFeedCurrent(client, 'index:live');
+  }
+
+  private async sendFeedCurrent(client: Client, channel: FeedChannel): Promise<void> {
+    const feed = this.feeds.get(channel);
+    if (!feed) return;
+    if (feed.last && this.now() - feed.last.at < 60_000) {
+      this.sendFrame(client, channel, feed.last.data, feed.last.at);
+      return;
+    }
+    if (!feed.snapshot) return;
+    try {
+      const data = await feed.snapshot();
+      if (client.channels.has(channel)) this.sendFrame(client, channel, data);
+    } catch (error) {
+      this.send(client, { type: 'error', channel, message: errorMessage(error) });
     }
   }
 
   private unsubscribeClient(client: Client, names: readonly string[]): void {
     const hadSlot = client.channels.has('slot');
-    for (const name of names) client.channels.delete(name as StreamChannel);
-    this.send(client, { type: 'subscribed', channels: STREAM_CHANNELS.filter((c) => client.channels.has(c)) });
+    for (const name of names) {
+      if (!isFixedChannel(name) && name.includes(':')) {
+        const channel = this.topicChannel(name);
+        client.topics.delete((channel ?? name) as StreamTopicChannel);
+      } else {
+        client.channels.delete(name as StreamChannel);
+      }
+    }
+    this.send(client, { type: 'subscribed', channels: this.subscribedNames(client) });
     if (hadSlot && !client.channels.has('slot')) this.updateSlotPolling();
   }
 
@@ -409,8 +567,20 @@ export class StreamHub {
     this.sendRaw(client, JSON.stringify(message));
   }
 
+  private async sendTopicSnapshot(client: Client, channel: StreamTopicChannel): Promise<void> {
+    const at = channel.indexOf(':');
+    const topic = this.topics.get(channel.slice(0, at));
+    if (!topic?.snapshot) return;
+    try {
+      const data = await topic.snapshot(channel.slice(at + 1));
+      if (client.topics.has(channel)) this.sendFrame(client, channel, data);
+    } catch (error) {
+      this.send(client, { type: 'error', channel, message: errorMessage(error) });
+    }
+  }
+
   /** `at`: when the data was read (epoch ms); default now. */
-  private sendFrame(client: Client, channel: StreamChannel, data: unknown, at = this.now()): void {
+  private sendFrame(client: Client, channel: StreamChannel | StreamTopicChannel, data: unknown, at = this.now()): void {
     const frame: StreamFrame = { channel, data, at: isoIst(new Date(at)) };
     this.sendRaw(client, JSON.stringify(frame));
   }

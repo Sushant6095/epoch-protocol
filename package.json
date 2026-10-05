@@ -22,6 +22,7 @@
     "dev:app": "pnpm --filter app dev",
     "dev:api": "pnpm --filter @epoch/api_app watch",
     "operator": "node packages/operator_cli/dist/index.js",
+    "solami:check": "node packages/indexer_app/dist/solami-check.js",
     "db:generate": "pnpm --filter @epoch/pg_models db:generate",
     "db:migrate": "pnpm --filter @epoch/pg_models db:migrate",
     "db:up": "docker compose -f packages/pg_models/testing-setup/docker-compose.yml up -d"

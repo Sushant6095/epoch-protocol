@@ -15,6 +15,13 @@
       "when": 1790969069043,
       "tag": "0001_programs_auth_predict",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791088597245,
+      "tag": "0002_side_tracks",
+      "breakpoints": true
     }
   ]
 }

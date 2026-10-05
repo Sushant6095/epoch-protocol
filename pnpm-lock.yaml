@@ -108,6 +108,9 @@ importers:
       '@epoch/meteora':
         specifier: workspace:*
         version: link:../meteora
+      '@epoch/panta':
+        specifier: workspace:*
+        version: link:../panta
       '@epoch/pg_models':
         specifier: workspace:*
         version: link:../pg_models
@@ -208,6 +211,9 @@ importers:
       '@epoch/logger':
         specifier: workspace:*
         version: link:../logger
+      '@epoch/meteora':
+        specifier: workspace:*
+        version: link:../meteora
       '@epoch/solana':
         specifier: workspace:*
         version: link:../solana
@@ -243,6 +249,9 @@ importers:
       '@epoch/config-sdk':
         specifier: workspace:*
         version: link:../config-sdk
+      '@epoch/exceptions':
+        specifier: workspace:*
+        version: link:../exceptions
       '@epoch/logger':
         specifier: workspace:*
         version: link:../logger
@@ -252,6 +261,9 @@ importers:
       '@epoch/solana':
         specifier: workspace:*
         version: link:../solana
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
       '@types/node':
         specifier: ^22.20.0
@@ -282,6 +294,9 @@ importers:
         specifier: ^5.2.5
         version: 5.2.5
     devDependencies:
+      '@epoch/epoch-sdk':
+        specifier: workspace:*
+        version: link:../epoch-sdk
       '@types/bn.js':
         specifier: ^5.2.0
         version: 5.2.0
@@ -311,6 +326,25 @@ importers:
         specifier: ^22.20.0
         version: 22.20.4
 
+  packages/panta:
+    dependencies:
+      '@epoch/common':
+        specifier: workspace:*
+        version: link:../common
+      '@epoch/epoch-sdk':
+        specifier: workspace:*
+        version: link:../epoch-sdk
+      '@epoch/logger':
+        specifier: workspace:*
+        version: link:../logger
+      '@solana/web3.js':
+        specifier: ^1.98.0
+        version: 1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.4
+
   packages/panta_bot_app:
     dependencies:
       '@epoch/common':
@@ -319,9 +353,30 @@ importers:
       '@epoch/config-sdk':
         specifier: workspace:*
         version: link:../config-sdk
+      '@epoch/epoch-sdk':
+        specifier: workspace:*
+        version: link:../epoch-sdk
+      '@epoch/exceptions':
+        specifier: workspace:*
+        version: link:../exceptions
       '@epoch/logger':
         specifier: workspace:*
         version: link:../logger
+      '@epoch/panta':
+        specifier: workspace:*
+        version: link:../panta
+      '@epoch/pg_models':
+        specifier: workspace:*
+        version: link:../pg_models
+      '@epoch/solana':
+        specifier: workspace:*
+        version: link:../solana
+      '@solana/web3.js':
+        specifier: ^1.98.0
+        version: 1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
       '@types/node':
         specifier: ^22.20.0

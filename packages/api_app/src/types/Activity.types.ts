@@ -56,7 +56,13 @@ export interface FeeIndexStreamData extends FeeIndexLatest {
 }
 
 // ── WS /v1/stream ───────────────────────────────────────────────────────────────────────────────────
-export type StreamChannel = 'slot' | 'activity' | 'vault' | 'feeIndex';
+/**
+ * `slots` and `index:live`: the live Fee Index from the indexer (Solami track, types/Live.types.ts).
+ * `predict:panta`: Epoch's Panta markets' prices (types/Panta.types.ts PantaStreamData), polled while subscribed.
+ */
+export type StreamChannel = 'slot' | 'activity' | 'vault' | 'feeIndex' | 'slots' | 'index:live' | 'predict:panta';
+/** A channel with a key, `<topic>:<key>`: `launch:<mint>` (the Launch page's trades and market, plan F13). */
+export type StreamTopicChannel = `launch:${string}`;
 
 /** `slot` channel data: MAINNET (the app header, the slot ruler). */
 export interface SlotUpdate {
@@ -72,14 +78,14 @@ export interface SlotUpdate {
 
 /** Control messages from the server. */
 export type StreamServerMessage =
-  | { type: 'hello'; channels: StreamChannel[] }
-  | { type: 'subscribed'; channels: StreamChannel[] }
+  | { type: 'hello'; channels: (StreamChannel | string)[] }
+  | { type: 'subscribed'; channels: (StreamChannel | StreamTopicChannel)[] }
   | { type: 'pong' }
-  | { type: 'error'; message: string; channel?: StreamChannel };
+  | { type: 'error'; message: string; channel?: StreamChannel | StreamTopicChannel };
 
 /** A data frame. `at` is when the server sent it, ISO 8601 in IST. */
 export interface StreamFrame<T = unknown> {
-  channel: StreamChannel;
+  channel: StreamChannel | StreamTopicChannel;
   data: T;
   at: string;
 }
