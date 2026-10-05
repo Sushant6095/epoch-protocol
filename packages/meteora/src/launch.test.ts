@@ -3,7 +3,14 @@ import { join } from 'path';
 
 import { PublicKey } from '@solana/web3.js';
 
-import { LaunchConfigError, parseLaunchConfig, planLaunch, registryEntryFor } from './launch';
+import {
+  LaunchConfigError,
+  launchRecordFor,
+  parseLaunchConfig,
+  planLaunch,
+  registryEntryFor,
+  withRegistration,
+} from './launch';
 import { appendRegistryEntry } from './registry';
 
 const example = JSON.parse(readFileSync(join(__dirname, '../scripts/launch-config.example.json'), 'utf8')) as unknown;
@@ -72,6 +79,15 @@ describe('parseLaunchConfig', () => {
     expect(() => parseLaunchConfig({ ...(example as object), raiseTargetSol: -1 })).toThrow(/raiseTargetSol/);
     expect(() => parseLaunchConfig(null)).toThrow(/expected a JSON object/);
   });
+
+  it("reads the creator's initial buy and the leftover receiver", () => {
+    const parsed = parseLaunchConfig({ ...(example as object), initialBuySol: 0.05, leftoverReceiver: VOTE });
+    expect(parsed.initialBuySol).toBe(0.05);
+    expect(parsed.leftoverReceiver).toBe(VOTE);
+    expect(parseLaunchConfig(example)).not.toHaveProperty('initialBuySol');
+    expect(() => parseLaunchConfig({ ...(example as object), initialBuySol: -1 })).toThrow(/initialBuySol/);
+    expect(() => parseLaunchConfig({ ...(example as object), leftoverReceiver: 'x' })).toThrow(/leftoverReceiver/);
+  });
 });
 
 describe('planLaunch', () => {
@@ -123,5 +139,75 @@ describe('planLaunch', () => {
     });
     expect(appendRegistryEntry([], entry)).toEqual([entry]);
     expect(() => appendRegistryEntry([entry], entry)).toThrow(/already has a launch/);
+  });
+
+  it('the launch record adds the parties and the signatures (public data only)', () => {
+    const record = launchRecordFor(plan, {
+      mint: 'mint-1',
+      dbcPool: 'pool-1',
+      dbcConfig: 'config-1',
+      creator: 'validator-wallet',
+      feeClaimer: 'treasury',
+      leftoverReceiver: 'treasury',
+      signatures: { createConfig: 'sig-1', createPool: 'sig-2' },
+      launchedAt: '2026-10-07T10:00:00+05:30',
+    });
+    expect(record).toMatchObject({
+      mint: 'mint-1',
+      creator: 'validator-wallet',
+      feeClaimer: 'treasury',
+      leftoverReceiver: 'treasury',
+      signatures: { createConfig: 'sig-1', createPool: 'sig-2' },
+      launchedAt: '2026-10-07T10:00:00+05:30',
+    });
+    expect(JSON.stringify(record)).not.toMatch(/secret|\[\d+(,\d+){20,}\]/);
+  });
+
+  it("records the Epoch program's accounts, and the program's term once registered", () => {
+    const receipt = {
+      mint: 'mint-1',
+      dbcPool: 'pool-1',
+      dbcConfig: 'config-1',
+      creator: 'validator-wallet',
+      feeClaimer: 'treasury-pda',
+      leftoverReceiver: 'treasury-pda',
+      signatures: { launch: 'sig-1' },
+      program: { programId: 'program', revenueToken: 'revenue-token-pda', escrow: 'escrow-pda' },
+    };
+    // Launched, not registered yet: the PDAs are known, the term's start is the plan's estimate.
+    const launched = launchRecordFor(plan, receipt);
+    expect(launched).toMatchObject({
+      programId: 'program',
+      revenueToken: 'revenue-token-pda',
+      escrow: 'escrow-pda',
+      registeredEpoch: null,
+      startEpoch: plan.startEpoch,
+    });
+    // Registered in the same run: the program's term (registration epoch + 1).
+    const registered = launchRecordFor(plan, { ...receipt, registered: { epoch: 2_000, startEpoch: 2_001 } });
+    expect(registered).toMatchObject({ registeredEpoch: 2_000, startEpoch: 2_001 });
+    // Registered later by the operator (the register script).
+    const later = withRegistration(launched, {
+      programId: 'program',
+      revenueToken: 'revenue-token-pda',
+      escrow: 'escrow-pda',
+      epoch: 2_010,
+      startEpoch: 2_011,
+      signature: 'sig-register',
+    });
+    expect(later).toMatchObject({
+      registeredEpoch: 2_010,
+      startEpoch: 2_011,
+      signatures: { launch: 'sig-1', registerRevenueToken: 'sig-register' },
+    });
+    // Found registered already (no signature from this run): the signatures stay as they were.
+    const found = withRegistration(launched, {
+      programId: 'program',
+      revenueToken: 'revenue-token-pda',
+      escrow: 'escrow-pda',
+      epoch: 2_010,
+      startEpoch: 2_011,
+    });
+    expect(found.signatures).toEqual({ launch: 'sig-1' });
   });
 });

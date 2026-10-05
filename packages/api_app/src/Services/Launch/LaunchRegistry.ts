@@ -22,8 +22,9 @@ const optionalKey = publicKey.nullable().optional();
 const epoch = z.number().int().nonnegative();
 
 /**
- * One launch in the registry (`LAUNCHES_PATH`), the stand-in for `register_revenue_token` until the program has it.
- * The launch script appends entries; `launches.example.json` shows the format.
+ * One launch in the registry (`LAUNCHES_PATH`): the token, its Meteora pools and its terms. The launch script appends
+ * entries (and the register script records the program's term); `launches.example.json` shows the format. Once
+ * registered, the program's `RevenueToken` account is the source of the terms (`RevenueTokenSource`).
  */
 export const LaunchRegistryEntrySchema = z.object({
   mint: publicKey,
@@ -50,6 +51,15 @@ export const LaunchRegistryEntrySchema = z.object({
   raiseTargetSol: z.number().positive().optional(),
   graduatedEpoch: epoch.nullable().optional(),
   launchedAt: z.string().optional(),
+  /** Written by the launch script: the pool creator (the validator), the partner, the leftover receiver, signatures. */
+  creator: optionalKey,
+  feeClaimer: optionalKey,
+  leftoverReceiver: optionalKey,
+  signatures: z.record(z.string(), z.string()).optional(),
+  /** Written once the token is registered with the Epoch program (the launch or register script). */
+  programId: optionalKey,
+  revenueToken: optionalKey,
+  registeredEpoch: epoch.nullable().optional(),
 });
 
 export const LaunchRegistrySchema = z.array(LaunchRegistryEntrySchema).superRefine((entries, ctx) => {

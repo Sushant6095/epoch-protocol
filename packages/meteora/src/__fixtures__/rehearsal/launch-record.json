@@ -1,0 +1,33 @@
+{
+  "mint": "2gg2Sun6S8EoJq2E9QjrjPf9bENzrveDGCvP9CHM7Tby",
+  "symbol": "rREH",
+  "name": "Epoch rehearsal revenue token",
+  "validator": {
+    "name": "Rehearsal (FzUN\u2026AmMk revenue)",
+    "vote": "FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk"
+  },
+  "shareBps": 500,
+  "termEpochs": 10,
+  "startEpoch": 1,
+  "opensAtEpoch": null,
+  "dbcPool": "FHoX5HBgmWG9x4z95zjmidM9jGVWUjbQ5poaMHZ9HfE1",
+  "dbcConfig": "3kZTyWpdohzCLo14rbqDGBWTh3CFcRvkQswxyJFUvWBJ",
+  "dammPool": null,
+  "escrow": null,
+  "supply": 1000000,
+  "decimals": 6,
+  "burned": 0,
+  "cluster": "devnet",
+  "avgRevenueSol": 6.820714317250001,
+  "raiseTargetSol": 0.750000386,
+  "graduatedEpoch": null,
+  "launchedAt": "2026-10-03T18:43:35+05:30",
+  "creator": "GjMZo48qTs7nuowtcPYj7K6vtsMiXJbRUePgmK6RF1c1",
+  "feeClaimer": "AQ3gcCLTPwTHsBhNBTFz94L2kxKevZuywYWobx9H9Mf8",
+  "leftoverReceiver": "AQ3gcCLTPwTHsBhNBTFz94L2kxKevZuywYWobx9H9Mf8",
+  "signatures": {
+    "createConfig": "RTEHXybzL3QXHr6P6rx1MEHSemVSmENBPLLtcFbrujenCTSuj9KNguZjWNGwjY57SZ24yoJdW623ZjpUuTT9J5P",
+    "createPool": "2hadiQ4cAwJcW2U89Ln4WoJgkaCgniWAGWLuN6beHLSyMcLwngnFRwFBWX7kpc4pD25a6bNuJuKbPJnUznpBfhWY",
+    "transferCreator": "3LnZVGTA1EvPTK18KbtYZkAVcVnXMxyU2bDStwz2en9z5hY5FTEHahabG65sN17EjbSJziKFg4YkiJntjX1mjfDd"
+  }
+}

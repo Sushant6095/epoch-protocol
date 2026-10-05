@@ -39,11 +39,17 @@ export interface LaunchChainReader {
   dammPool(pool: string): Promise<DammPoolState | null>;
   mint(mint: string): Promise<TokenMintInfo | null>;
   holders(mint: string, tokenProgram: string, exclude: HolderExclusions): Promise<TokenHolders>;
-  balanceSol(address: string): Promise<number>;
+  /**
+   * What the buyback escrow can spend: its SOL above the rent-exempt minimum it must keep (a 0-byte account keeps
+   * 0.00089088 SOL), as the program, the buyback feed and the revenue-token block count it.
+   */
+  escrowSol(address: string): Promise<number>;
 }
 
 /** Reads through `@epoch/meteora` on the launch RPC, with failover. */
 export class RpcLaunchChainReader implements LaunchChainReader {
+  private rent?: Promise<number>;
+
   constructor(private readonly connections: ConnectionManager) {}
 
   epochInfo(): Promise<LaunchEpochInfo> {
@@ -76,11 +82,18 @@ export class RpcLaunchChainReader implements LaunchChainReader {
     );
   }
 
-  async balanceSol(address: string): Promise<number> {
-    const lamports = await this.connections.withFailover((connection) =>
-      connection.getBalance(new PublicKey(address), 'confirmed'),
-    );
-    return lamports / LAMPORTS_PER_SOL;
+  async escrowSol(address: string): Promise<number> {
+    this.rent ??= this.connections
+      .withFailover((connection) => connection.getMinimumBalanceForRentExemption(0))
+      .catch((error: unknown) => {
+        this.rent = undefined;
+        throw error;
+      });
+    const [lamports, rent] = await Promise.all([
+      this.connections.withFailover((connection) => connection.getBalance(new PublicKey(address), 'confirmed')),
+      this.rent,
+    ]);
+    return Math.max(0, lamports - rent) / LAMPORTS_PER_SOL;
   }
 }
 
@@ -93,6 +106,7 @@ export interface LaunchChainSnapshot {
   damm?: DammPoolState | null;
   mint?: TokenMintInfo | null;
   holders?: TokenHolders;
+  /** The escrow's SOL above rent. */
   escrowSol?: number;
   /** Names of the reads that failed. */
   failed: string[];
@@ -119,7 +133,7 @@ export async function readLaunchChain(
   const [pool, mint, escrowSol] = await Promise.all([
     dbcPool ? attempt('curve pool', () => reader.launchPool(dbcPool, entry.dbcConfig ?? null)) : undefined,
     attempt('mint', () => reader.mint(entry.mint)),
-    escrow ? attempt('escrow', () => reader.balanceSol(escrow)) : undefined,
+    escrow ? attempt('escrow', () => reader.escrowSol(escrow)) : undefined,
   ]);
   const dammAddress = entry.dammPool ?? pool?.dammPool ?? null;
   const damm = dammAddress ? await attempt('DAMM v2 pool', () => reader.dammPool(dammAddress)) : undefined;

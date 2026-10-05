@@ -39,6 +39,13 @@ export interface LaunchConfigInput {
   startEpoch?: number;
   /** The validator's wallet: the pool's creator role (and its 70% at graduation) is transferred to it after launch. */
   creator?: string;
+  /** SOL the pool creator buys in the pool's creation transaction (optional, e.g. 0.05). */
+  initialBuySol?: number;
+  /**
+   * Who can withdraw the unused supply after graduation; default LAUNCH_LEFTOVER_RECEIVER, else the Epoch treasury PDA
+   * (the program withdraws the leftover from it and burns it).
+   */
+  leftoverReceiver?: string;
 }
 
 export class LaunchConfigError extends Error {
@@ -121,6 +128,17 @@ export function parseLaunchConfig(raw: unknown): LaunchConfigInput {
   }
   const creator = obj.creator;
   if (creator !== undefined && !isPubkey(creator)) problems.push('creator: a base58 wallet address');
+  const initialBuySol = obj.initialBuySol;
+  if (
+    initialBuySol !== undefined &&
+    (typeof initialBuySol !== 'number' || !Number.isFinite(initialBuySol) || initialBuySol < 0)
+  ) {
+    problems.push('initialBuySol: a SOL amount of 0 or more');
+  }
+  const leftoverReceiver = obj.leftoverReceiver;
+  if (leftoverReceiver !== undefined && !isPubkey(leftoverReceiver)) {
+    problems.push('leftoverReceiver: a base58 wallet address');
+  }
   if (avgRevenueSol === undefined && vote === null && !problems.some((p) => p.startsWith('avgRevenueSol'))) {
     problems.push('avgRevenueSol: required when validator.vote is null (revenue is read from the vote account)');
   }
@@ -142,6 +160,8 @@ export function parseLaunchConfig(raw: unknown): LaunchConfigInput {
     curvePoints,
     startEpoch,
     creator: creator as string | undefined,
+    ...(initialBuySol !== undefined ? { initialBuySol: initialBuySol as number } : {}),
+    ...(leftoverReceiver !== undefined ? { leftoverReceiver: leftoverReceiver as string } : {}),
   };
 }
 
@@ -221,5 +241,78 @@ export function registryEntryFor(
     raiseTargetSol: plan.curve.migrationThresholdSol,
     graduatedEpoch: null,
     ...(launchedAt ? { launchedAt } : {}),
+  };
+}
+
+/** What the launch script sent, for the launch record (public keys and signatures only). */
+export interface LaunchReceipt {
+  mint: string;
+  dbcPool: string;
+  dbcConfig: string;
+  /** The pool creator after the launch (the validator when the role was handed over). */
+  creator: string;
+  feeClaimer: string;
+  leftoverReceiver: string;
+  /** Signatures by step: createConfig, createPool, launch (both in one), transferCreator, registerRevenueToken. */
+  signatures: Record<string, string>;
+  launchedAt?: string;
+  /** The Epoch program and the token's PDAs under it (`["revenue_token", vote]`, `["buyback", vote]`). */
+  program?: { programId: string; revenueToken: string; escrow: string };
+  /** Set when `register_revenue_token` ran: the epoch it ran in and the first epoch of the term the program recorded. */
+  registered?: { epoch: number; startEpoch: number };
+}
+
+/** The registry entry for a launch, with the receipt's addresses and signatures (`registryEntryFor` plus the receipt). */
+export function launchRecordFor(plan: LaunchPlan, receipt: LaunchReceipt): LaunchRegistryEntry {
+  const entry: LaunchRegistryEntry = {
+    ...registryEntryFor(
+      plan,
+      { mint: receipt.mint, dbcPool: receipt.dbcPool, dbcConfig: receipt.dbcConfig },
+      receipt.launchedAt,
+    ),
+    creator: receipt.creator,
+    feeClaimer: receipt.feeClaimer,
+    leftoverReceiver: receipt.leftoverReceiver,
+    signatures: { ...receipt.signatures },
+  };
+  if (receipt.program) {
+    entry.programId = receipt.program.programId;
+    entry.revenueToken = receipt.program.revenueToken;
+    entry.escrow = receipt.program.escrow;
+    entry.registeredEpoch = null;
+  }
+  if (receipt.registered) {
+    // The program's term, which starts with the epoch after registration.
+    entry.registeredEpoch = receipt.registered.epoch;
+    entry.startEpoch = receipt.registered.startEpoch;
+  }
+  return entry;
+}
+
+/** A registry entry after `register_revenue_token` ran later (the operator signed separately): the program's term. */
+export function withRegistration(
+  entry: LaunchRegistryEntry,
+  registration: {
+    programId: string;
+    revenueToken: string;
+    escrow: string;
+    /** The epoch it ran in; the term starts with `startEpoch`, the next one. */
+    epoch: number;
+    startEpoch: number;
+    /** The registration's signature, when this run sent it. */
+    signature?: string;
+  },
+): LaunchRegistryEntry {
+  return {
+    ...entry,
+    programId: registration.programId,
+    revenueToken: registration.revenueToken,
+    escrow: registration.escrow,
+    registeredEpoch: registration.epoch,
+    startEpoch: registration.startEpoch,
+    signatures: {
+      ...(entry.signatures ?? {}),
+      ...(registration.signature ? { registerRevenueToken: registration.signature } : {}),
+    },
   };
 }

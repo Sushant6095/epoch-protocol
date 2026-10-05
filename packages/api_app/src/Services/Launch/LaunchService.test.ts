@@ -83,7 +83,7 @@ function fakeReader(prices: number[] = [0.000846]) {
     dammPool: jest.fn().mockResolvedValue(null),
     mint: jest.fn(async (address: string) => (address === RKEST.mint ? mint(98_570) : null)),
     holders: jest.fn().mockResolvedValue({ holders: 43, holdersExcluding: 41 }),
-    balanceSol: jest.fn().mockResolvedValue(0),
+    escrowSol: jest.fn().mockResolvedValue(0),
   } satisfies LaunchChainReader;
 }
 
@@ -135,8 +135,8 @@ describe('LaunchService', () => {
       impliedYieldPctPerEpoch: 1.25,
       backingRatio: 1.23,
     });
-    expect(list.note).toContain("Buybacks start when the program's execute_buyback ships.");
-    expect(list.note).toContain('register_revenue_token is not in the program yet');
+    expect(list.note).toContain('Buybacks: GET /v1/launches/:mint/buybacks');
+    expect(list.note).toContain("a registered token's terms are the program's");
     expect(list.source).toMatch(/Meteora DBC and DAMM v2 pools on devnet/);
   });
 

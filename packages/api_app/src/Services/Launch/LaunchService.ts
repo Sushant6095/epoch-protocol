@@ -1,5 +1,5 @@
 import { NotFoundException } from '@epoch/exceptions';
-import { type TokenHolders } from '@epoch/meteora';
+import { type LaunchRegistryEntry, type TokenHolders } from '@epoch/meteora';
 
 import { SnapshotCache } from '../../Lib/SnapshotCache';
 import { isoIst } from '../../Lib/Stats';
@@ -13,8 +13,9 @@ import { type LaunchRevenueSource } from './LaunchRevenue';
 /** Parallel launch reads per refresh (the public RPC rate-limits). */
 const READ_CONCURRENCY = 3;
 
-const BUYBACK_NOTE = "Buybacks start when the program's execute_buyback ships.";
-const REGISTRY_NOTE = 'Launches come from the launch registry: register_revenue_token is not in the program yet.';
+const BUYBACK_NOTE = "Buybacks: GET /v1/launches/:mint/buybacks (the program's escrow, schedule and burns).";
+const REGISTRY_NOTE =
+  "Launches come from the launch registry; a registered token's terms are the program's (revenueToken on GET /v1/launches/:mint/page).";
 const REVENUE_NOTE =
   "Share revenue is a mainnet estimate (inflation and MEV commission per epoch, from the validator table) until the program's swept revenue replaces it.";
 
@@ -115,6 +116,24 @@ export class LaunchService {
         priceSol: sample.priceSol,
       })),
     };
+  }
+
+  /**
+   * One launch from the cached board, by mint or symbol, with when the board was read: the Launch page's services
+   * build on it. 404 for an unknown token.
+   */
+  async find(key: string): Promise<{ item: LaunchItem; readAt: Date; epoch: LaunchEpochInfo | null }> {
+    const board = await this.board.get();
+    const item =
+      board.items.find((candidate) => candidate.entry.mint === key) ??
+      board.items.find((candidate) => candidate.entry.symbol.toLowerCase() === key.toLowerCase());
+    if (!item) throw new NotFoundException('No launch with this mint', { mint: key });
+    return { item, readAt: board.readAt, epoch: board.epoch };
+  }
+
+  /** The registry's launches on this network (no chain reads). */
+  entries(): LaunchRegistryEntry[] {
+    return this.options.registry.load().filter((entry) => entry.cluster === this.options.network);
   }
 
   /** For the sampler: every priced launch at the time of a fresh read (re-read when the cached one is old). */

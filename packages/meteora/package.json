@@ -17,7 +17,9 @@
     "lint": "eslint src scripts --max-warnings=0",
     "lint:fix": "eslint --fix src scripts",
     "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests",
-    "launch": "tsx scripts/launch-revenue-token.ts"
+    "launch": "tsx scripts/launch-revenue-token.ts",
+    "register": "tsx scripts/register-revenue-token.ts",
+    "rehearse": "tsx scripts/rehearse-launch.ts"
   },
   "dependencies": {
     "@meteora-ag/cp-amm-sdk": "1.5.1",
@@ -26,6 +28,7 @@
     "bn.js": "^5.2.5"
   },
   "devDependencies": {
+    "@epoch/epoch-sdk": "workspace:*",
     "@types/bn.js": "^5.2.0",
     "@types/node": "^22.20.0"
   }

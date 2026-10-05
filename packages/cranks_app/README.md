@@ -100,3 +100,50 @@ is what disagrees (the program does not check the flag, it trusts the scorer).
 pnpm --filter @epoch/cranks_app build
 DRY_RUN=true node packages/cranks_app/dist/index.js --env .env.devnet     # watch what it would do
 ```
+
+## Launch fee claims (plan F13, ADR 0006)
+
+`LaunchFeeClaimJob` claims what Epoch and the launches' creators are owed from each revenue token's Meteora pools, for
+every launch in the registry (`LAUNCHES_PATH`) on `LAUNCH_CLUSTER`. It runs on its own loop, every
+`LAUNCH_CLAIM_INTERVAL_MINUTES` (30) and once at start, next to the program cranks (`index.ts`), or alone with
+`pnpm --filter @epoch/cranks_app start:claims` (`dist/launch-claims.js`, `--once` for one pass).
+
+| Kind                                   | From                         | Treasury PDA as fee claimer: sent as     | Default |
+| -------------------------------------- | ---------------------------- | ---------------------------------------- | ------- |
+| `partnerTradingFee`                    | DBC curve trading fees       | `claim_partner_trading_fee`: SOL → pool income, tokens burned | on |
+| `partnerSurplus`, `partnerMigrationFee` | DBC, after the raise        | `claim_partner_surplus` / `claim_partner_migration_fee`: SOL → pool income | on |
+| `lpFee`                                | the treasury's DAMM v2 LP position | `claim_treasury_lp_fee`: SOL → pool income, tokens burned | on |
+| `leftover`                             | the unsold supply after graduation | `burn_leftover`: all burned        | on      |
+| `creatorMigrationFee` (the 70%), `creatorSurplus`, `creatorTradingFee`, the creator's `lpFee` | DBC, DAMM v2 | signed by the pool creator (validator) → itself | on, if its key is configured |
+
+Epoch's launches name the treasury PDA `["treasury", pool]` as fee claimer and leftover receiver. A PDA cannot sign,
+so with `EPOCH_PROGRAM_ID` and the crank key (`CRANK_KEYPAIR_PATH`; `index.ts` passes its own) the job sends those
+claims as Epoch program instructions: the crank pays the fee only, the SOL becomes pool income for lenders (senior
+coupon first at `accrue`) and the tokens are burned (`src/Launch/TreasuryClaims.ts`, 150,000 CU each; 16k–75k
+measured). DBC lets anyone withdraw the leftover to the receiver's token account; when that already happened to the
+treasury, the job reads that account and burns what it holds. This needs `LAUNCH_CLUSTER` to be the program's `EPOCH_CLUSTER`; otherwise the treasury's claims are
+simulated. A fee claimer that is a plain wallet (a rehearsal) still signs its own claims with `TREASURY_KEYPAIR_PATH`.
+
+Every run reads the pools first (`@epoch/meteora` `readLaunchClaims`) and claims only what is available, so repeats are
+no-ops: one-shot withdrawals (migration fee, surplus, leftover) are flagged on the pool after they happen, and trading
+and LP fees under `LAUNCH_CLAIM_MIN_SOL` (0.001) wait to accumulate. A claim whose signer's key is not configured (no
+`TREASURY_KEYPAIR_PATH`, say, when the treasury is a multisig) is simulated and logged instead of sent, and so is every
+claim with `LAUNCH_CLAIMS_DRY_RUN=true`. Sends go through `@epoch/solana`'s `TransactionSender`; an execution failure is
+not retried. Tests: `src/Jobs/LaunchFeeClaimJob.test.ts`, `src/Launch/TreasuryClaims.test.ts`; the devnet-stand-in run
+is in `docs/runbooks/meteora-devnet-rehearsal.md` (4 claims, then nothing to claim). On localnet against the real
+Meteora programs, one run with no treasury key sent 3 program claims (two DAMM v2 LP fees, one DBC trading fee) and
+simulated the creators' 3; the next run found nothing to claim.
+
+| Variable                              | Default                       | Meaning                                                             |
+| ------------------------------------- | ----------------------------- | ------------------------------------------------------------------- |
+| `LAUNCH_CLAIMS_ENABLED`               | false                         | turn the job on                                                     |
+| `LAUNCHES_PATH`                       | required when enabled         | the launch registry                                                 |
+| `LAUNCH_CLUSTER`                      | devnet                        | only these registry entries                                         |
+| `LAUNCH_RPC_URL`, `LAUNCH_RPC_FALLBACK_URL` | `EPOCH_RPC_URL`         | the pools' cluster                                                  |
+| `TREASURY_KEYPAIR_PATH`               | unset                         | keypair FILE of a fee claimer that is a plain wallet (not needed for the treasury PDA) |
+| `LAUNCH_CREATOR_KEYPAIR_PATHS`        | none                          | comma-separated keypair FILES of pool creators that let Epoch claim |
+| `LAUNCH_CLAIM_KINDS`                  | all                           | comma list of the kinds above                                       |
+| `LAUNCH_CLAIM_MIN_SOL`                | 0.001                         | smallest trading / LP fee worth a claim                             |
+| `LAUNCH_CLAIM_INTERVAL_MINUTES`       | 30                            | loop interval                                                       |
+| `LAUNCH_CLAIMS_DRY_RUN`               | false                         | simulate and log every claim; send nothing                          |
+| `LAUNCH_CLAIM_CU_PRICE_MICROLAMPORTS` | 10000                         | priority fee                                                        |

@@ -53,6 +53,13 @@ const curve = await readLaunchPool({ connection, dbcPool }); // price, raise pro
 | Tokens        | `readTokenMint` (supply, decimals, mint authority, token program), `countTokenHolders` (one filtered `getProgramAccounts`), `decodeMintAccount`, `tallyHolders`                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Launch script | `parseLaunchConfig`, `planLaunch`, `registryEntryFor`, `appendRegistryEntry`, `LaunchRegistryEntry`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Units         | `toBaseUnits`, `fromBaseUnits`, `parseDecimal`, `toBN`, `toBigInt`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Events        | `normalizeTransaction` (a raw JSON-RPC or web3.js `getTransaction` answer, any version) · `decodeMeteoraEvents` (Anchor CPI events of DBC and DAMM v2, with the instruction that emitted them; IDL-driven `IdlCoder`) · `launchTradesFromTransaction` → `LaunchTradeEvent` (side, trader, SOL and token amounts, fee, execution and post-trade price; DBC's twin `EvtSwap`/`EvtSwap2` counted once) · `launchFeeEventsFromTransaction` (claims, leftover, LP fees, curve completion, DAMM v2 pool creation) · `base58Encode`/`base58Decode` |
+| Candles       | `buildCandles(points, interval, { from, to, fill, previousClose })`, `fillCandles` (SQL-bucketed candles), `CANDLE_INTERVALS` 1m–1d, `MAX_CANDLES` |
+| Claims        | `readLaunchClaims({ connection, dbcPool, dbcConfig?, dammPool? })` → `LaunchClaimsState` (partner and creator trading fees, the migration fee split, surplus, leftover, DAMM v2 positions with locked share and fees, and every `ClaimableItem` with its signer and receiver) · `buildClaimTx` · `launchClaimsFromState`, `migrationFeeSplit`, `surplusSplit`, `dammPositionClaim` (pure, the DBC program's own arithmetic) |
+| Graduation    | `migrationReadiness(connection, dbcPool)`, `buildMigrateToDammV2Tx` (the permissionless `migrateToDammV2`)                                     |
+| Holders       | `readTopHolders` (`getTokenLargestAccounts` + owners, labelled), `mapTopHolders`                                                                 |
+| Revenue       | `readRevenueHistory({ connection, vote, epochs })` (inflation commission, sampled block revenue, MEV commission per epoch), `summarizeRevenue`, `estimateBlockRevenue`, `retryRateLimited` |
+| Launch CLI    | `estimateLaunchCost`, `rentExemptLamports`, the pre-flight checks (`checkCluster`, `checkProgram`, `checkRegistry`, `checkExistingConfig`, `checkMetadataJson`, `checkPayerBalance`, `checkInitialBuy`, `summarizePreflight`, `GENESIS_HASH`), the Epoch program's checks for `register_revenue_token` (`treasuryMismatch`, `checkEpochPool`, `checkRevenueTokenTerms`, `checkValidatorPosition`, `checkLeftoverReceiver`, `checkStartEpoch`, `checkRegistrableConfig`, `checkRegistrableMint`), `launchPlanLines`, `revenueTableLines`, `launchRecordFor`, `withRegistration`, `readTokenMetadata`/`decodeTokenMetadata` |
 
 ## Quotes and trades
 
@@ -75,10 +82,10 @@ with the SDK's own `createSqrtPrices` to within 1e-18 (the SDK rounds to 20 sign
 
 **The raise and the supply.** A constant-product curve over the band raises about 61% of the share's value whatever the
 supply (for rKEST, 63.4 SOL of a 104 SOL share). A smaller `raiseTargetSol` (2–5 SOL for the demo) leaves the unused
-supply as DBC _leftover_, which the config's leftover receiver (Epoch's treasury) can withdraw after graduation: 92,113
-of rKEST's 100,000 tokens at a 5 SOL target. The market cap stays fully diluted (price × supply not burned), as the spec
-defines it. What the treasury does with the leftover (burn it, hold it) is a product decision; the alternative is a
-smaller share or term, so that 61% of the share's value is the raise.
+supply as DBC _leftover_, which the config's leftover receiver can withdraw after graduation: 92,113 of rKEST's 100,000
+tokens at a 5 SOL target. The receiver is the Epoch program's treasury PDA, and the program burns the leftover. The
+market cap stays fully diluted (price × supply not burned), as the spec defines it. The alternative is a smaller share or
+term, so that 61% of the share's value is the raise.
 
 ## Devnet
 
@@ -100,3 +107,7 @@ its `tsconfig.json` type-checks with `module: commonjs` and `moduleResolution: n
 against the SDK, the preset through the SDK's own `validateConfigParameters`, quotes simulated on a fresh curve with the
 SDK's `getQuoteFromInputAmount`, pool and mint decoding, the launch config and the browser-safety scan. No test touches
 the network.
+
+The event decoders, the claims arithmetic and the token metadata decoder are tested on the rehearsal's recorded
+transactions and accounts (`src/__fixtures__/rehearsal/`, Meteora's mainnet programs on a local validator:
+`docs/runbooks/meteora-devnet-rehearsal.md`).

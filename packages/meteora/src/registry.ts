@@ -1,6 +1,7 @@
 /**
  * The launch registry: one JSON entry per revenue token, read by api_app (`LAUNCHES_PATH`) and appended by the launch
- * script. It stands in for `register_revenue_token` until that instruction is in the Epoch program.
+ * script. It lists the launches and their Meteora pools; once `register_revenue_token` ran, the program's `RevenueToken`
+ * account (`revenueToken`) is the source of the terms and the buyback state.
  */
 export type LaunchCluster = 'devnet' | 'mainnet';
 
@@ -21,7 +22,7 @@ export interface LaunchRegistryEntry {
   dbcConfig?: string | null;
   /** The DAMM v2 pool after graduation (derived from the curve when omitted). */
   dammPool?: string | null;
-  /** The buyback escrow (program work: `execute_buyback`). */
+  /** The buyback escrow, the program's PDA `["buyback", vote]`: every sweep's share lands here. */
   escrow?: string | null;
   /** Fixed supply at launch, UI units. */
   supply: number;
@@ -37,6 +38,23 @@ export interface LaunchRegistryEntry {
   graduatedEpoch?: number | null;
   /** When the launch script created the pool (ISO 8601, IST). */
   launchedAt?: string;
+  /** The pool creator (receives the 70% migration fee): the validator's wallet. */
+  creator?: string | null;
+  /** The DBC partner and fee claimer: the Epoch program's treasury PDA `["treasury", pool]`. */
+  feeClaimer?: string | null;
+  /** Who can withdraw the unused supply after graduation (the treasury PDA: the program burns it). */
+  leftoverReceiver?: string | null;
+  /**
+   * Transaction signatures by step: createConfig, createPool, launch (both in one), transferCreator, and
+   * registerRevenueToken once the validator's operator registered the token.
+   */
+  signatures?: Record<string, string>;
+  /** The Epoch program the token is (to be) registered with. */
+  programId?: string | null;
+  /** The program's `RevenueToken` account, `["revenue_token", vote]`. */
+  revenueToken?: string | null;
+  /** The epoch `register_revenue_token` ran in (the term starts with the next one); null until registered. */
+  registeredEpoch?: number | null;
 }
 
 /** Adds an entry, refusing a second entry for the same mint (pure: the caller writes the file). */
