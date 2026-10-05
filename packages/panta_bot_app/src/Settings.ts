@@ -59,9 +59,9 @@ export function lifecycleConfig(config: PantaBotConfig, reasons: string[]): Life
   return {
     dryRun: reasons.length > 0,
     dryRunReasons: reasons,
-    marketsPerEpoch: config.PANTA_MARKETS_PER_EPOCH,
+    strikesPerEpoch: config.PANTA_STRIKES_PER_EPOCH,
     epochsAhead: config.PANTA_EPOCHS_AHEAD,
-    thresholdLookback: config.PANTA_THRESHOLD_LOOKBACK_EPOCHS,
+    strikeLookback: config.PANTA_STRIKE_LOOKBACK_EPOCHS,
     schedule: {
       ...DEFAULT_SCHEDULE,
       closeBeforeEpochSec: config.PANTA_CLOSE_BEFORE_EPOCH_MINUTES * 60,

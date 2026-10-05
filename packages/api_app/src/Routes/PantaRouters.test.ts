@@ -23,6 +23,7 @@ import { SESSION_LOCALS_KEY } from '../Lib/Session';
 import { buildPantaServices, type PantaServices, setPantaServices } from '../Services/Panta';
 import { BroadcastRejected } from '../Services/Panta/PantaChain';
 import { FeeIndexEpochService, setFeeIndexEpochService } from '../Services/Program/FeeIndexEpochService';
+import { feeIndexRouter } from './FeeIndexRouter';
 import { feeIndexEpochRouter, pantaRouter } from './PantaRouters';
 
 const KEY = 'pk_live_test_only_not_real';
@@ -39,8 +40,15 @@ interface Harness {
   services: PantaServices;
 }
 
-/** Services on fakes: our market on epoch 1051 at 1,300 µL/CU, two catalog markets, ten epochs of index history. */
-function harness(env: Record<string, string> = {}, configured = true): Harness {
+/** Two more strikes on epoch 1051 (the forecast's ladder). */
+const LOW = pkey(81);
+const HIGH = pkey(82);
+
+/**
+ * Services on fakes: our market on epoch 1051 at 1,300 µL/CU, two catalog markets, ten epochs of index history.
+ * `ladder`: also strikes 1,100 and 1,500 on epoch 1051.
+ */
+function harness(env: Record<string, string> = {}, configured = true, ladder = false): Harness {
   const panta = new FakeApiPanta();
   panta.configured = configured;
   panta.markets.set(
@@ -55,10 +63,19 @@ function harness(env: Record<string, string> = {}, configured = true): Harness {
   );
   panta.markets.set(OTHER, pantaMarket());
   panta.catalog = [
-    pantaMarket({ marketId: OUR, title: 'Solana Fee Index above 1,300 µL/CU in epoch 1051' }),
+    pantaMarket({
+      marketId: OUR,
+      title: 'Solana Fee Index above 1,300 µL/CU in epoch 1051',
+      createdByPartner: true,
+      totalVolumeUsdc: '1250.40',
+    }),
     pantaMarket(),
     pantaMarket({ marketId: GOLD, title: 'Will BTC flip gold?' }),
   ];
+  if (ladder) {
+    panta.markets.set(LOW, pantaMarket({ marketId: LOW, yesPrice: '0.85', noPrice: '0.15', volumeUsdc: '300.00' }));
+    panta.markets.set(HIGH, pantaMarket({ marketId: HIGH, yesPrice: '0.30', noPrice: '0.70', volumeUsdc: '80.00' }));
+  }
   const chain = new FakePantaChain();
   const trades = new MemoryPantaTradeStore();
   // Four of the last ten epochs closed above 1,300.
@@ -73,7 +90,15 @@ function harness(env: Record<string, string> = {}, configured = true): Harness {
     panta,
     chain,
     trades,
-    markets: new MemoryPantaMarketReader([feeIndexRow(1_051, 1_300, OUR)]),
+    markets: new MemoryPantaMarketReader([
+      feeIndexRow(1_051, 1_300, OUR),
+      ...(ladder
+        ? [
+            { ...feeIndexRow(1_051, 1_100, LOW), id: 2 },
+            { ...feeIndexRow(1_051, 1_500, HIGH), id: 3 },
+          ]
+        : []),
+    ]),
     reads,
     finals: null,
     now: () => clock.now,
@@ -96,6 +121,7 @@ describe('Panta routes (/v1/predict/panta)', () => {
         if (session) res.locals[SESSION_LOCALS_KEY] = { id: 'test', address: session, expiresAt: '' };
         next();
       })
+      .route('/v1/index', feeIndexRouter)
       .route('/v1/index/epochs', feeIndexEpochRouter)
       .route('/v1/predict/panta', pantaRouter);
     await server.start();
@@ -210,7 +236,16 @@ describe('Panta routes (/v1/predict/panta)', () => {
     const h = use(harness());
     const fresh = await call('GET', `/v1/predict/panta/markets/${OTHER}`);
     expect(fresh.body.data).toMatchObject({ stale: false, market: { marketId: OTHER, ours: false } });
-    expect(fresh.body.data.trades[0]).toMatchObject({ side: 'yes', yesShares: '10.00', isPrimary: true });
+    // Panta's live tape sends base units: 10,000,000 → 10 shares, fee 50,000 → 0.05, amount 10,200,000 → 10.20.
+    expect(fresh.body.data.trades[0]).toMatchObject({
+      side: 'yes',
+      yesShares: '10',
+      noShares: '0',
+      feeUsdc: '0.05',
+      amountUsdc: '10.20',
+      kind: 'buy',
+      isPrimary: true,
+    });
 
     h.clock.now += 20_000;
     h.panta.failNext.getMarket = new PantaNetworkError('down', 'GET /markets/x/', false);
@@ -269,6 +304,24 @@ describe('Panta routes (/v1/predict/panta)', () => {
     expect(page.status).toBe(200);
     expect(page.body.data.access).toMatchObject({ geoBlocked: true, country: 'US', tradingEnabled: true });
     expect(page.body.data.access.reason).toContain('region');
+  });
+
+  it('refuses trades from an unknown country only with PANTA_GEO_FAIL_CLOSED', async () => {
+    const quote = { wallet: OTHER, marketId: OTHER, side: 'yes', amountUsdc: '20' };
+    use(harness());
+    expect((await call('POST', '/v1/predict/panta/quote', quote)).status).toBe(200);
+    use(harness({ PANTA_GEO_FAIL_CLOSED: 'true' }));
+    const unknown = await call('POST', '/v1/predict/panta/quote', quote);
+    expect([unknown.status, unknown.body.error.code, unknown.body.error.details]).toEqual([
+      403,
+      'PANTA_GEO_BLOCKED',
+      { country: null },
+    ]);
+    expect(unknown.body.error.message).toContain('could not be determined');
+    expect((await call('POST', '/v1/predict/panta/quote', quote, { 'cf-ipcountry': 'IN' })).status).toBe(200);
+    const page = await call('GET', '/v1/predict/panta/markets');
+    expect(page.body.data.access).toMatchObject({ geoBlocked: true, country: null });
+    expect(page.body.data.access.reason).toBe('Trading needs your region, which could not be determined');
   });
 
   it('quotes publicly, inside the trade limits', async () => {
@@ -650,6 +703,19 @@ describe('Panta routes (/v1/predict/panta)', () => {
 
   it('reports traction from our records and Panta’s metrics', async () => {
     const h = use(harness());
+    h.panta.attributed = [
+      {
+        signature: base58Encode(randomBytes(64)),
+        wallet: pkey(71),
+        marketId: OUR,
+        side: 'yes',
+        kind: 'buy',
+        amountUsdc: '40.00',
+        amountUsdcBase: '40000000',
+        status: 'processed',
+        createdAt: null,
+      },
+    ];
     const wallet = Keypair.generate();
     const build = await built(wallet);
     const signature = base58Encode(randomBytes(64));
@@ -673,6 +739,123 @@ describe('Panta routes (/v1/predict/panta)', () => {
       },
       panta: { attributedTrades: 3, attributedVolumeUsdc: '60.00', byKind: { buy: 2, claim: 1 } },
     });
+    // Epoch on Panta: Panta's dashboard, metrics, creates, attributed trades and own catalog, joined with our records.
+    expect(stats.body.data.traction).toMatchObject({
+      stale: false,
+      account: { status: 'active', canCreateMarkets: true },
+      marketsCreated: 2,
+      createsByStatus: { registered: 2, pending: 1 },
+      attributedVolumeUsdc: '60.00',
+      marketsVolumeUsdc: '1250.40',
+      traders: 2,
+      tradersComplete: false,
+      attributedTrades: 3,
+      tradesByKind: { buy: 2, claim: 1 },
+      creatorFeesClaimedUsdc: '0.00',
+      creationFeesPaidUsdc: '50.00',
+      estimatedProtocolFeesUsdc: '0.40',
+      sources: { dashboard: true, metrics: true, creates: true, trades: true, catalog: true },
+    });
+    expect(stats.body.data.traction.asOf).toMatch(/\+05:30$/);
+    for (const name of ['dashboard', 'metrics', 'creates', 'attributedTrades']) expect(h.panta.count(name)).toBe(1);
+
+    // Cached for two minutes; afterwards a Panta outage serves the cached copy, flagged stale.
+    await call('GET', '/v1/predict/panta/stats');
+    expect(h.panta.count('dashboard')).toBe(1);
+    h.clock.now += 121_000;
+    for (const name of ['dashboard', 'metrics', 'creates', 'attributedTrades', 'listMarkets']) {
+      h.panta.failNext[name] = new PantaNetworkError('down', name, false);
+    }
+    const stale = await call('GET', '/v1/predict/panta/stats');
+    expect(stale.body.data.traction).toMatchObject({ stale: true, marketsCreated: 2, traders: 2 });
+  });
+
+  it('forecasts an epoch’s index from its strike ladder, with the monotonic fit and an 80% band', async () => {
+    const h = use(harness({}, true, true));
+    const res = await call('GET', '/v1/predict/panta/forecast');
+    expect(res.status).toBe(200);
+    const data = res.body.data;
+    expect(data).toMatchObject({
+      poweredBy: 'Panta',
+      label: 'informational',
+      stale: false,
+      epoch: 1_051,
+      epochs: [1_051],
+      unit: 'µL/CU',
+      fit: { method: 'lognormal-fit', strikesUsed: 3 },
+      lastValue: { epoch: 1_049, value: 1_250 },
+      reason: null,
+    });
+    expect(data.strikes.map((s: { strikeMicroLamports: number }) => s.strikeMicroLamports)).toEqual([
+      1_100, 1_300, 1_500,
+    ]);
+    expect(data.strikes.map((s: { impliedProbability: number }) => s.impliedProbability)).toEqual([0.85, 0.62, 0.3]);
+    expect(data.strikes.map((s: { empiricalProbability: number }) => s.empiricalProbability)).toEqual([0.8, 0.4, 0]);
+    // P(index > 1,300) = 0.62 and P(index > 1,500) = 0.30: the median lies between the two strikes.
+    expect(data.median).toBeGreaterThan(1_300);
+    expect(data.median).toBeLessThan(1_500);
+    expect(data.expected).toBeGreaterThan(data.median);
+    expect(data.band.low).toBeLessThan(1_100);
+    expect(data.band.high).toBeGreaterThan(1_500);
+    expect(data.band.coverage).toBe(0.8);
+    expect(data.disclaimer).toContain('not advice');
+
+    const none = await call('GET', '/v1/predict/panta/forecast?epoch=999');
+    expect(none.body.data).toMatchObject({
+      epoch: 999,
+      strikes: [],
+      median: null,
+      reason: 'no markets on this epoch yet',
+    });
+    expect((await call('GET', '/v1/predict/panta/forecast?epoch=abc')).status).toBe(400);
+
+    // The WS predict:panta frame carries the same forecast, from the same prices.
+    const frame = await h.services.service.streamSnapshot();
+    expect(frame.forecasts).toEqual([
+      {
+        epoch: 1_051,
+        median: data.median,
+        expected: data.expected,
+        band: data.band,
+        method: 'lognormal-fit',
+        strikes: 3,
+      },
+    ]);
+
+    // The Terminal's Fee Index card: the same forecast, compact.
+    const card = await call('GET', '/v1/index/forecast');
+    expect(card.status).toBe(200);
+    expect(card.body.data).toMatchObject({
+      available: true,
+      epoch: 1_051,
+      median: data.median,
+      expected: data.expected,
+      band: data.band,
+      method: 'lognormal-fit',
+      strikes: 3,
+      poweredBy: 'Panta',
+      details: '/v1/predict/panta/forecast?epoch=1051',
+    });
+    use(harness({}, false));
+    expect((await call('GET', '/v1/index/forecast')).body.data).toMatchObject({
+      available: false,
+      reason: 'Panta is not configured on this server',
+      median: null,
+    });
+  });
+
+  it('serves the markets’ 1024×1024 catalog image', async () => {
+    use(harness());
+    const res = await fetch(`${base}/v1/predict/panta/market-image.png`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    expect(res.headers.get('cache-control')).toBe('public, max-age=86400');
+    const png = Buffer.from(await res.arrayBuffer());
+    expect([...png.subarray(1, 4)].map((c) => String.fromCharCode(c)).join('')).toBe('PNG');
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1_024, 1_024]);
+    const etag = res.headers.get('etag') as string;
+    const again = await fetch(`${base}/v1/predict/panta/market-image.png`, { headers: { 'if-none-match': etag } });
+    expect(again.status).toBe(304);
   });
 
   it('serves one epoch’s Fee Index as the resolution source', async () => {

@@ -129,12 +129,23 @@ function blankRecord(fields: Partial<MarketRecord> & Pick<MarketRecord, 'id' | '
 }
 
 export class MemoryIndexHistory implements IndexHistory {
-  constructor(public values: { epoch: number; value: number }[] = []) {}
+  /** `finals`: the epochs whose values the program has finalized (all of them unless set). */
+  constructor(
+    public values: { epoch: number; value: number }[] = [],
+    public finals: Set<number> | null = null,
+  ) {}
 
   async recent(beforeEpoch: number, limit: number): Promise<{ epoch: number; value: number }[]> {
     return this.values
       .filter((point) => point.epoch < beforeEpoch)
       .sort((a, b) => b.epoch - a.epoch)
+      .slice(0, limit);
+  }
+
+  async recentFinal(beforeEpoch: number, limit: number): Promise<{ epoch: number; value: number }[]> {
+    const finals = this.finals;
+    return (await this.recent(beforeEpoch, Number.MAX_SAFE_INTEGER))
+      .filter((point) => finals === null || finals.has(point.epoch))
       .slice(0, limit);
   }
 }
@@ -296,6 +307,7 @@ export class FakePanta implements PantaApi {
   }
 
   account = notUsed('account');
+  dashboard = notUsed('dashboard');
   metrics = notUsed('metrics');
   creates = notUsed('creates');
   attributedTrades = notUsed('attributedTrades');

@@ -145,12 +145,14 @@ Catalog rows carry no live prices (`yesPrice: null`): open the detail for prices
   "poweredBy": "Panta", "asOf": "…", "ageSeconds": 2, "stale": false, "access": { "…": "as above" },
   "market": { "…": "a card as above; one of ours carries epoch, threshold, rule, sources, intelligence" },
   "trades": [
-    { "walletShort": "9aB1…x7Qe", "side": "yes", "yesShares": "10.00", "noShares": "0", "feeUsdc": "0.05", "isPrimary": true, "at": "2026-10-03T18:50:02+05:30", "signature": "5VEJ…" }
+    { "walletShort": "9aB1…x7Qe", "side": "yes", "yesShares": "10", "noShares": "0", "feeUsdc": "0.05", "amountUsdc": "10.20", "kind": "buy", "isPrimary": true, "at": "2026-10-03T18:50:02+05:30", "signature": "5VEJ…" }
   ]
 }
 ```
 
-`note` is set when the tape could not be read (show the market, hide the tape).
+`note` is set when the tape could not be read (show the market, hide the tape). Every tape field but `yesShares` /
+`noShares` may be `null` (Panta's live tape leaves fields out): render "—", and link the explorer only with a
+`signature`.
 
 ### `GET /v1/predict/panta/categories`
 
@@ -177,8 +179,60 @@ side, not claimable yet) · `lost` · `claimed` · `cancelled`. A wallet with YE
 
 ### `GET /v1/predict/panta/stats`
 
-For a small traction strip: `epoch.trades`, `epoch.uniqueWallets`, `epoch.volumeUsdc`, `epoch.attributedTrades`,
-`epoch.marketsCreated`, `epoch.marketsLive`, and Panta's own count in `panta.attributedTrades` / `attributedVolumeUsdc`.
+For the traction strip ("Epoch on Panta"), read `traction`:
+
+```json
+{
+  "traction": {
+    "asOf": "2026-10-05T19:40:00+05:30", "stale": false,
+    "account": { "status": "active", "canCreateMarkets": true },
+    "marketsCreated": 12, "createsByStatus": { "registered": 12, "pending": 1 },
+    "attributedVolumeUsdc": "4210.50", "marketsVolumeUsdc": "18950.40",
+    "traders": 87, "tradersComplete": true,
+    "attributedTrades": 233, "tradesByKind": { "buy": 201, "claim": 32 },
+    "creatorFeesClaimedUsdc": "41.20", "creationFeesPaidUsdc": "600.00", "estimatedProtocolFeesUsdc": "80.40",
+    "sources": { "dashboard": true, "metrics": true, "creates": true, "trades": true, "catalog": true }
+  },
+  "epoch": { "…": "Epoch's own records: trades, buys, claims, uniqueWallets, volumeUsdc, attributedTrades, …" },
+  "panta": { "…": "Panta's account metrics: attributedTrades, attributedVolumeUsdc, byKind, creates" },
+  "poweredBy": "Panta", "asOf": "…", "stale": false
+}
+```
+
+Tiles: Markets created · Volume (attributed) · Volume on our markets · Traders (`tradersComplete: false` → "87+") ·
+Trades · Creator fees. Label `estimatedProtocolFeesUsdc` "≈ fees to Panta (est.)". Stale → the Delayed chip.
+
+### `GET /v1/predict/panta/forecast?epoch=<mainnet epoch>`
+
+Public. The crowd's forecast of one epoch's Fee Index, read from the YES prices of Epoch's markets on it (one market
+per strike; the bot opens `PANTA_STRIKES_PER_EPOCH` of them). Without `epoch`: the soonest epoch still trading.
+
+```json
+{
+  "epoch": 1051, "epochs": [1052, 1051], "unit": "µL/CU", "label": "informational",
+  "strikes": [
+    { "strikeMicroLamports": 1100, "marketId": "…", "title": "…", "phase": "primary", "yesPrice": 0.85, "noPrice": 0.15, "impliedProbability": 0.85, "fittedProbability": 0.85, "curveProbability": 0.8583, "empiricalProbability": 0.8, "volumeUsdc": "300.00" },
+    { "strikeMicroLamports": 1300, "…": "…" },
+    { "strikeMicroLamports": 1500, "…": "…" }
+  ],
+  "fit": { "method": "lognormal-fit", "mu": 7.218438, "sigma": 0.200808, "strikesUsed": 3 },
+  "median": 1364, "expected": 1392, "band": { "low": 1055, "high": 1765, "coverage": 0.8 },
+  "lastValue": { "epoch": 1049, "value": 1250 },
+  "reason": null,
+  "disclaimer": "Informational only, not advice. …",
+  "poweredBy": "Panta", "asOf": "…", "stale": false
+}
+```
+
+Draw it as a survival curve: x = µL/CU, y = P(index > x). Dots: `impliedProbability` per strike (open circles where
+`fittedProbability` differs: the fit pooled them), line: `curveProbability`, a band shading `band.low`–`band.high`, a
+marker at `median`, and `empiricalProbability` as a faint second series ("past epochs"). Headline: "The crowd expects
+≈ 1,364 µL/CU (80%: 1,055 – 1,765)". `reason` non-null → show it instead of numbers ("no live prices yet"). Picker:
+`epochs`. Render `disclaimer` under it and **Powered by Panta**.
+
+### `GET /v1/predict/panta/market-image.png`
+
+The 1024×1024 PNG every one of Epoch's markets uses in Panta's catalog. Use it as the card art of our markets.
 
 ### `POST /v1/predict/panta/quote`
 
@@ -252,8 +306,16 @@ it is our traction record.
 ### `GET /v1/index/epochs/:epoch` (resolution source)
 
 Public. One mainnet epoch's Fee Index and how settled it is: `status` = `pending` · `computed` · `proposed` · `final`
-· `vetoed`; `value` in µL/CU. Link it from our market's detail ("Resolution source"). Example in
-[FEE_INDEX_METHODOLOGY.md](../FEE_INDEX_METHODOLOGY.md#reading-it).
+· `vetoed`; `value` in µL/CU; `onChain.postSignature` / `onChain.finalizeSignature` (explorer links). Link it from our
+market's detail ("Resolution source"). Example in [FEE_INDEX_METHODOLOGY.md](../FEE_INDEX_METHODOLOGY.md#reading-it).
+
+### `GET /v1/index/forecast` (Terminal: Fee Index card)
+
+Public, for the Terminal's Fee Index card (not the Predict page): the same forecast, compact.
+`{ "available": true, "epoch": 1051, "median": 1364, "expected": 1392, "band": { … }, "method": "lognormal-fit",
+"strikes": 3, "details": "/v1/predict/panta/forecast?epoch=1051", "poweredBy": "Panta", "asOf": "…", "stale": false,
+"disclaimer": "…" }`. Show "Crowd forecast for epoch 1051: ≈ 1,364 µL/CU" with the band, **Powered by Panta**, and a
+link to the Predict page. `available: false` → hide the row (`reason` says why); never an error.
 
 ## Live updates: WS `predict:panta`
 
@@ -271,12 +333,15 @@ throttles us):
     "stale": false,
     "markets": [
       { "marketId": "8xQd…Fee1", "epoch": 1049, "thresholdMicroLamports": 1300, "phase": "primary", "yesPrice": 0.63, "noPrice": 0.37, "impliedProbability": 0.63, "modelProbability": 0.4, "volumeUsdc": "1310.00" }
+    ],
+    "forecasts": [
+      { "epoch": 1049, "median": 1364, "expected": 1392, "band": { "low": 1055, "high": 1765, "coverage": 0.8 }, "method": "lognormal-fit", "strikes": 3 }
     ]
   }
 }
 ```
 
-Merge by `marketId` into the cards. If `hello` does not list `predict:panta` (no key on the server), poll
+Merge by `marketId` into the cards, and by `epoch` into the forecast headline. If `hello` does not list `predict:panta` (no key on the server), poll
 `GET /markets` every 30 s instead. Combine with the existing `feeIndex` channel for the live index next to the price.
 
 ## Buying: step by step
@@ -321,7 +386,7 @@ refresh positions (the row becomes `claimed`).
 | Stale | `stale` or `pricesStale` | **Delayed · as of HH:MM IST** chip on that module; no live pulse |
 | Signed out | Buy / Claim without a session (`401`) | sign-in prompt; browsing and quotes still work |
 | Wrong wallet | `403 WALLET_MISMATCH` | "Sign in with the wallet you are trading from" |
-| Geo-blocked | `access.geoBlocked` or `403 PANTA_GEO_BLOCKED` | banner "Real-money trading isn't available in your region"; cards visible, trade buttons disabled; link to the Points tab |
+| Geo-blocked | `access.geoBlocked` or `403 PANTA_GEO_BLOCKED` | banner "Real-money trading isn't available in your region"; cards visible, trade buttons disabled; link to the Points tab. With `access.country: null` (the server refuses unknown regions, `PANTA_GEO_FAIL_CLOSED`): `access.reason`, "Trading needs your region, which could not be determined" |
 | Panta restriction | `403 PANTA_FORBIDDEN` | "Panta does not allow this for this wallet or region" (no workaround) |
 | Trading off | `access.tradingEnabled: false` or `503 PANTA_TRADING_DISABLED` | banner with `access.reason`; browse only |
 | Not configured | `503 PANTA_NOT_CONFIGURED` on the page | Real tab shows "Real-money markets are coming soon" and the Points tab opens by default |
@@ -341,6 +406,8 @@ refresh positions (the row becomes `claimed`).
   (`modelProbability`, "N of the last K epochs closed above X"), `gapPct`, and `index.last` / `index.running` from
   the same payload; the existing `feeIndex` WS channel and `GET /v1/index` give the chart. Render `intelligence.note`
   under it. Never call it a prediction or advice.
+- **Crowd forecast** for the epoch (from `GET /v1/predict/panta/forecast?epoch=`): the survival curve with this
+  market's strike highlighted, "informational".
 - Resolution: the rule (collapsible), the sources of truth as links, and `resolutionUrl` ("Resolution source").
 - **Powered by Panta**.
 

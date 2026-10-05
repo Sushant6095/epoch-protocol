@@ -42,6 +42,10 @@ export type PantaMarketParams = z.infer<typeof PantaMarketParamsDto>;
 export const PantaPositionsQueryDto = z.object({ wallet: publicKey('wallet') });
 export type PantaPositionsQuery = z.infer<typeof PantaPositionsQueryDto>;
 
+/** GET /v1/predict/panta/forecast?epoch= (a Solana mainnet epoch; default: the soonest one still trading). */
+export const PantaForecastQueryDto = z.object({ epoch: z.coerce.number().int().min(0).max(100_000_000).optional() });
+export type PantaForecastQuery = z.infer<typeof PantaForecastQueryDto>;
+
 export const PantaQuoteDto = z.object({
   wallet: publicKey('wallet'),
   marketId: publicKey('marketId'),

@@ -21,21 +21,23 @@ market it would create (question, rule, sources, times in IST) and calls nothing
 
 1. **Recover.** `quoted` rows go back to `planned` (nothing was signed). A `signed` row is resolved from its stored
    signature: landed → `confirmed` and registered at once; failed, or expired (block height past its
-   `lastValidBlockHeight`) → `planned` with one more attempt; still in flight → the same signed transaction is sent
+   `lastValidBlockHeight`, Panta's, or the height at build + 150 when Panta leaves it out) → `planned` with one more
+   attempt; still in flight → the same signed transaction is sent
    again. A `confirmed` row is registered.
 2. **Plan.** For epochs current + 1 … current + `PANTA_EPOCHS_AHEAD` whose trading window is still at least
-   `PANTA_MIN_TRADING_HOURS`, insert `PANTA_MARKETS_PER_EPOCH` markets into `panta_markets` (unique per epoch and
-   threshold). Once an epoch has its markets, a newer index value never adds another.
-3. **Create**, oldest epoch first, inside `PANTA_MAX_CREATE_USDC_PER_DAY` (rolling 24 h of signed fees):
+   `PANTA_MIN_TRADING_HOURS`, insert `PANTA_STRIKES_PER_EPOCH` markets (one per strike, below) into `panta_markets`
+   (unique per epoch and threshold). Once an epoch has its markets, a newer index value never adds another.
+3. **Create**, oldest epoch first and, inside an epoch, the middle strike first, all inside
+   `PANTA_MAX_CREATE_USDC_PER_DAY` (rolling 24 h of signed fees; a ladder the budget cannot pay for waits):
    `POST /markets/create/quote/` → `POST /markets/create/build/` → **spend guard** → sign with the bot key → **store
    the signature and signed transaction** → broadcast (`@epoch/solana` `PrebuiltTransactionSender`, re-sending until
    confirmed or the blockhash expires) → `POST /markets/register/`.
 4. **Creator fees.** Every `PANTA_CREATOR_FEE_CHECK_HOURS`, each registered market that has graduated (phase
    `secondary` or `resolved`) gets `POST /claim/creator-fees/build/`; the instructions are signed and sent with the
    bot key (`TransactionSender`). Not reported to `/trades/` (Panta does not accept those).
-5. **Ops line.** One `tick` log line: epoch and progress, targets and thresholds, skipped epochs and why, planned,
-   created, registered, recovered, markets waiting, fees spent in 24 h against the budget, creator fees claimed,
-   errors.
+5. **Ops line.** One `tick` log line: epoch and progress, targets and thresholds, where the strikes came from
+   (`strikeSource`: `final` or `computed`, `strikeSample`), skipped epochs and why, planned, created, registered,
+   recovered, markets waiting, fees spent in 24 h against the budget, creator fees claimed, errors.
 
 ### Never twice, never more than quoted
 
@@ -67,19 +69,35 @@ From the mainnet slot clock (`EpochClock`) and the measured slot time (`getRecen
 
 An epoch whose window would be shorter than `PANTA_MIN_TRADING_HOURS` (6) is skipped (the next one is created).
 
-### Thresholds (`src/Markets/Thresholds.ts`)
+### Strikes (`src/Markets/Thresholds.ts`)
 
-One market per epoch (default): the last finished epoch's value, rounded (steps of 1 / 10 / 50 / 500 by size), so each
-market asks "higher than last epoch?", close to an even bet. More markets per epoch: evenly spaced quantiles of the
-last `PANTA_THRESHOLD_LOOKBACK_EPOCHS` (16) values. History comes from `epoch_index`.
+Strikes are quantiles of the last `PANTA_STRIKE_LOOKBACK_EPOCHS` (10) **final** Fee Index values, rounded (steps of 1 /
+10 / 50 / 500 by size), 20 percentage points apart around the median:
+
+| `PANTA_STRIKES_PER_EPOCH` | Quantiles |
+| --- | --- |
+| 1 (default) | p50: "above the recent median?", close to an even bet |
+| 2 | p40, p60 |
+| 3 | p30, p50, p70 |
+| 4 | p20, p40, p60, p80 |
+| 5 | p10, p30, p50, p70, p90 |
+
+Two quantiles that round to the same number (a calm stretch) are spread one rounding step apart, so an epoch always
+gets its full ladder. Together a ladder's prices are the crowd's forecast of the epoch's index (api_app
+`GET /v1/predict/panta/forecast`). **Final** means posted and finalized on chain: an `epoch_index` row whose
+`posted_signature` has an IndexProposed event whose program epoch has an IndexFinalized event with the same value (the
+events api_app records in `program_events`), whatever the mainnet → program epoch offset. While fewer than 3 values
+are final (a new deployment, or api_app not recording events), the computed values are used and the tick line says
+`strikeSource: "computed"`.
 
 ## Costs
 
 Every market costs the creation fee Panta quotes (`paymentUsdc`; part of it, `liquidityInjectionUsdc`, seeds the
 market's liquidity, the rest is Panta's). Panta's docs show 50 USDC (10 + 40) as an example; the real fee comes from
-on-chain config and is logged at each quote. One market per ~2-day epoch is about 25 USDC a day at that price; the
-default cap `PANTA_MAX_CREATE_USDC_PER_DAY=100` allows two creates in any 24 hours. Plus SOL for transaction fees and
-rent (well under 0.05 SOL per create). Creator fees flow back once a market graduates.
+on-chain config and is logged at each quote. One market per ~2-day epoch is about 25 USDC a day at that price; a
+3-strike ladder about 75. The default cap `PANTA_MAX_CREATE_USDC_PER_DAY=100` allows two creates in any 24 hours: raise
+it with the ladder (a ladder that does not fit is created middle strike first, the rest as the budget frees). Plus SOL
+for transaction fees and rent (well under 0.05 SOL per create). Creator fees flow back once a market graduates.
 
 ## Configuration (`PantaBotConfigSchema`)
 
@@ -88,20 +106,20 @@ rent (well under 0.05 SOL per create). Creator fees flow back once a market grad
 | `PANTA_API_KEY` | — (dry run) | `pk_live_…` from Panta's dashboard. Server-side only; never logged. |
 | `PANTA_API_URL` | `https://live-api.panta.market/api/v1` | |
 | `PANTA_BOT_KEYPAIR_PATH` | — (dry run) | keypair FILE of the market creator (pays fees in USDC and SOL). Outside the repo; never logged. |
-| `PANTA_MARKET_IMAGE_URL` | — (dry run) | public https image for the catalog, 1024×1024 |
+| `PANTA_MARKET_IMAGE_URL` | `{PUBLIC_API_URL}/v1/predict/panta/market-image.png` (dry run without either) | public https image for the catalog, 1024×1024; api_app serves one |
 | `PUBLIC_API_URL` | — (dry run) | Epoch's public https API: markets resolve from `{PUBLIC_API_URL}/v1/index/epochs/{N}` |
 | `EPOCH_PROGRAM_ID`, `EPOCH_CLUSTER` | — (dry run), devnet | the program whose FeeIndex account finalizes values (listed as a source) |
 | `DATABASE_URL` | — (dry run) | `panta_markets` (state) and `epoch_index` (thresholds) |
 | `PANTA_RPC_URL`, `PANTA_RPC_FALLBACK_URL` | `DATA_RPC_URL`, else the public mainnet RPC | MAINNET: clock, simulation, broadcast |
 | `PANTA_DRY_RUN` | false | force a dry run |
 | `PANTA_MAX_CREATE_USDC_PER_DAY` | 100 | creation fees in any rolling 24 h |
-| `PANTA_MARKETS_PER_EPOCH` | 1 | ladder size (1–5) |
+| `PANTA_STRIKES_PER_EPOCH` | 1 | strikes (markets) per epoch, 1–5; `PANTA_MARKETS_PER_EPOCH` is the old name, still read |
 | `PANTA_EPOCHS_AHEAD` | 2 | how far ahead markets are opened |
 | `PANTA_MIN_TRADING_HOURS` | 6 | skip an epoch below this |
 | `PANTA_CLOSE_BEFORE_EPOCH_MINUTES` | 60 | trading closes this long before N's start |
 | `PANTA_RESOLUTION_BUFFER_HOURS` | 6 | after N's end |
 | `PANTA_RESOLUTION_GRACE_HOURS` | 48 | no final value by then → NO |
-| `PANTA_THRESHOLD_LOOKBACK_EPOCHS` | 16 | ladder quantiles |
+| `PANTA_STRIKE_LOOKBACK_EPOCHS` | 10 | final values the strikes are quantiles of; `PANTA_THRESHOLD_LOOKBACK_EPOCHS` is the old name |
 | `PANTA_TICK_SECONDS` | 300 | loop interval |
 | `PANTA_CREATOR_FEE_CHECK_HOURS` | 6 | per market |
 | `PANTA_MAX_SOL_PER_CREATE` | 0.05 | spend guard, SOL |
@@ -120,6 +138,7 @@ rent (well under 0.05 SOL per create). Creator fees flow back once a market grad
    `select epoch, threshold, status, market_id, paid_usdc_base, error from panta_markets order by epoch desc;`,
    `GET /v1/predict/panta/markets` (our market with prices), and `GET {PUBLIC_API_URL}/v1/index/epochs/{N}`.
 
-Tests: `pnpm --filter @epoch/panta_bot_app test` (timing, thresholds, words, the lifecycle on fakes: idempotency,
-budget, dry run, crash recovery, duplicates, the spend guard, creator fees; the store on Postgres with
-`TEST_DATABASE_URL`).
+Tests: `pnpm --filter @epoch/panta_bot_app test` (timing, strikes, words, the lifecycle on fakes: idempotency,
+budget, the strike ladder and its creation order, dry run, crash recovery, duplicates, the spend guard, creator fees;
+the store on Postgres with `TEST_DATABASE_URL`, final values included). End to end on a local validator, the final
+value the strikes read: `scripts/e2e/index-to-final.mts` (see docs/FEE_INDEX_METHODOLOGY.md).

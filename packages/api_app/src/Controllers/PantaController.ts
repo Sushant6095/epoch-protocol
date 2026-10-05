@@ -5,6 +5,7 @@ import {
   type FeeIndexEpochParams,
   type PantaBuildBody,
   type PantaClaimBody,
+  type PantaForecastQuery,
   type PantaMarketParams,
   type PantaMarketsQuery,
   type PantaPositionsQuery,
@@ -14,12 +15,15 @@ import {
 } from '../dto/Panta.dto';
 import { getPantaServices } from '../Services/Panta';
 import { type RequestContext } from '../Services/Panta/PantaService';
+import { marketImage } from '../Services/Panta/MarketImage';
 import { countryOf } from '../Services/Panta/PantaSupport';
 import { getFeeIndexEpochService } from '../Services/Program/FeeIndexEpochService';
 import {
   type FeeIndexEpochView,
+  type FeeIndexForecastCard,
   type PantaBuildView,
   type PantaCategoriesView,
+  type PantaForecastView,
   type PantaMarketDetail,
   type PantaMarketsPage,
   type PantaPositionsView,
@@ -72,6 +76,25 @@ export class PantaController {
     return getPantaServices().service.stats();
   }
 
+  /** GET /v1/predict/panta/forecast?epoch= */
+  static async forecast(_req: Request, res: Response): Promise<PantaForecastView> {
+    res.setHeader('cache-control', 'public, max-age=10');
+    const { epoch } = res.locals.query as PantaForecastQuery;
+    return getPantaServices().service.forecast(epoch);
+  }
+
+  /** GET /v1/predict/panta/market-image.png: the catalog image of Epoch's markets (PANTA_MARKET_IMAGE_URL). */
+  static async marketImage(req: Request, res: Response): Promise<void> {
+    const { png, etag } = marketImage();
+    res.setHeader('cache-control', 'public, max-age=86400');
+    res.setHeader('etag', etag);
+    if (req.get('if-none-match') === etag) {
+      res.status(304).end();
+      return;
+    }
+    res.type('png').send(png);
+  }
+
   /** POST /v1/predict/panta/quote */
   static async quote(req: Request, res: Response): Promise<PantaQuoteView> {
     res.setHeader('cache-control', 'no-store');
@@ -101,6 +124,14 @@ export class PantaController {
   static async claim(req: Request, res: Response): Promise<PantaBuildView> {
     res.setHeader('cache-control', 'no-store');
     return getPantaServices().service.claimBuild(res.locals.body as PantaClaimBody, context(req, res));
+  }
+}
+
+/** GET /v1/index/forecast: the crowd's forecast of the next epoch's Fee Index, for the Terminal's Fee Index card. */
+export class FeeIndexForecastController {
+  static async get(_req: Request, res: Response): Promise<FeeIndexForecastCard> {
+    res.setHeader('cache-control', 'public, max-age=10');
+    return getPantaServices().service.forecastCard();
   }
 }
 

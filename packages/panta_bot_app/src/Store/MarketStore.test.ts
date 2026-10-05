@@ -1,5 +1,12 @@
-import { epochIndex, pantaMarkets, PostgresConnectionManager, runMigrations } from '@epoch/pg_models';
-import { and, gte, lt } from 'drizzle-orm';
+import {
+  type EpochDb,
+  epochIndex,
+  pantaMarkets,
+  PostgresConnectionManager,
+  programEvents,
+  runMigrations,
+} from '@epoch/pg_models';
+import { and, gte, inArray, lt, TransactionRollbackError } from 'drizzle-orm';
 
 import { MemoryIndexHistory, MemoryMarketStore, NOW } from '../__fixtures__/fakes';
 import { type IndexHistory, type MarketStore, type NewMarket, PgIndexHistory, PgMarketStore } from './MarketStore';
@@ -84,11 +91,42 @@ const HISTORY = [
   { epoch: BASE + 49, value: 1_284 },
   { epoch: BASE + 50, value: 1_400 },
 ];
+/** Posted under program epochs 970,048 … 970,050; 970,049 is not finalized yet. */
+const FINALIZED = new Set([BASE + 48, BASE + 50]);
 
 contract('MemoryMarketStore', async () => ({
   store: new MemoryMarketStore(),
-  history: new MemoryIndexHistory(HISTORY),
+  history: new MemoryIndexHistory(HISTORY, FINALIZED),
 }));
+
+/** BASE + 49 is posted but still in its dispute window: only BASE + 48 and BASE + 50 are final. */
+async function expectFinals(history: IndexHistory): Promise<void> {
+  expect(await history.recentFinal(BASE + 51, 5)).toEqual([
+    { epoch: BASE + 50, value: 1_400 },
+    { epoch: BASE + 48, value: 1_250 },
+  ]);
+  expect(await history.recentFinal(BASE + 50, 5)).toEqual([{ epoch: BASE + 48, value: 1_250 }]);
+}
+
+it('MemoryIndexHistory reads only the values the program has finalized', () =>
+  expectFinals(new MemoryIndexHistory(HISTORY, FINALIZED)));
+
+/** program_events rows as api_app records them: a post's IndexProposed and, once final, an IndexFinalized. */
+function indexEvents() {
+  const event = (signature: string, kind: string, programEpoch: number, value: number) => ({
+    signature,
+    ix: 0,
+    slot: programEpoch,
+    kind,
+    payload: { epoch: String(programEpoch), value: String(value), slot: String(programEpoch) },
+  });
+  return HISTORY.flatMap(({ epoch, value }) => {
+    const programEpoch = 970_000 + (epoch - BASE);
+    const posted = event(`bot-store-test-post-${epoch}`, 'IndexProposed', programEpoch, value);
+    const finalized = event(`bot-store-test-final-${epoch}`, 'IndexFinalized', programEpoch, value);
+    return FINALIZED.has(epoch) ? [posted, finalized] : [posted];
+  });
+}
 
 const TEST_DB = process.env.TEST_DATABASE_URL;
 (TEST_DB ? describe : describe.skip)('PgMarketStore (TEST_DATABASE_URL)', () => {
@@ -107,4 +145,22 @@ const TEST_DB = process.env.TEST_DATABASE_URL;
     await db.insert(epochIndex).values(HISTORY);
     return { store: new PgMarketStore(db), history: new PgIndexHistory(db) };
   });
+
+  // program_events is read whole by other test files: these rows live only inside a transaction that is rolled back.
+  it('PgIndexHistory reads only the values the program has finalized', () =>
+    PostgresConnectionManager.getDb()
+      .transaction(async (tx) => {
+        const db = tx as unknown as EpochDb;
+        const epochs = HISTORY.map((point) => point.epoch);
+        await db.delete(epochIndex).where(inArray(epochIndex.epoch, epochs));
+        await db
+          .insert(epochIndex)
+          .values(HISTORY.map((point) => ({ ...point, postedSignature: `bot-store-test-post-${point.epoch}` })));
+        await db.insert(programEvents).values(indexEvents());
+        await expectFinals(new PgIndexHistory(db));
+        tx.rollback();
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof TransactionRollbackError)) throw error;
+      }));
 });

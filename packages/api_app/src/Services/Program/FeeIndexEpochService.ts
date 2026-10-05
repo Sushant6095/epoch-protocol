@@ -22,6 +22,8 @@ export interface FeeIndexEpochDeps {
   programPoint(programEpoch: number): Promise<{ value: number; status: FeeIndexStatus } | null>;
   /** The program epoch an index post landed under (from its IndexProposed event), or null when not ingested. */
   postedEpoch(signature: string): Promise<number | null>;
+  /** The `finalize_index` transaction of a PROGRAM epoch (its IndexFinalized event), or null. */
+  finalizedBy?(programEpoch: number): Promise<string | null>;
   program: { programId: string | null; cluster: string };
   methodologyUrl: string;
   now?: () => number;
@@ -51,6 +53,8 @@ export class FeeIndexEpochService {
     }
     const point = programEpoch === null ? null : await deps.programPoint(programEpoch);
     const status: FeeIndexEpochStatus = point?.status ?? (row ? 'computed' : 'pending');
+    const finalizeSignature =
+      status === 'final' && programEpoch !== null && deps.finalizedBy ? await deps.finalizedBy(programEpoch) : null;
     return {
       schemaVersion: 1,
       kind: 'real',
@@ -70,6 +74,7 @@ export class FeeIndexEpochService {
             feeIndexAccount: feeIndexAddress(deps.program.programId),
             programEpoch,
             postSignature: row?.postedSignature ?? null,
+            finalizeSignature,
           }
         : null,
       methodology: deps.methodologyUrl,
@@ -90,8 +95,10 @@ export function getFeeIndexEpochService(): FeeIndexEpochService {
   const { program, events } = getServices();
   const programOnly = new FeeIndexService({ program, events, computed: null });
   const db: (() => EpochDb) | null = dbAvailable() ? () => PostgresConnectionManager.getDb() : null;
-  // The IndexProposed events, re-read at most every 30 s (an epoch's post is found once and does not change).
+  // The IndexProposed / IndexFinalized events, re-read at most every 30 s (a post or a finalize, once found, never
+  // changes).
   const posts = new TimedCache<Map<string, number>>(30_000, 10 * 60_000, 1);
+  const finals = new TimedCache<Map<number, string>>(30_000, 10 * 60_000, 1);
   const methodologyUrl = (() => {
     try {
       return loadConfig(PantaApiConfigSchema).PANTA_METHODOLOGY_URL;
@@ -116,6 +123,13 @@ export function getFeeIndexEpochService(): FeeIndexEpochService {
         return new Map(proposed.map((event) => [event.signature, Number(event.data.epoch)]));
       });
       return map.value.get(signature) ?? null;
+    },
+    finalizedBy: async (programEpoch) => {
+      const map = await finals.get('finals', async () => {
+        const finalized = await events.query({ names: ['IndexFinalized'], limit: 10_000 });
+        return new Map(finalized.map((event) => [Number(event.data.epoch), event.signature]));
+      });
+      return map.value.get(programEpoch) ?? null;
     },
     program: { programId: program.programId?.toBase58() ?? null, cluster: program.cluster },
     methodologyUrl,

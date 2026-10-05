@@ -6,12 +6,17 @@ import { EpochException, ServiceUnavailableException, UnauthorizedException } fr
 import { Logger } from '@epoch/logger';
 import {
   baseToUsdc,
+  baseUnits,
+  catalogAmount,
   compileUnsignedTransaction,
   decodeTransaction,
   isRetryablePantaError,
   messageHash,
   type PantaApi,
   PantaApiError,
+  type PantaAttributedTrades,
+  type PantaCreates,
+  type PantaDashboard,
   PantaError,
   type PantaMarket,
   type PantaMarketList,
@@ -27,10 +32,14 @@ import { type SessionInfo } from '../../Lib/Session';
 import { verifyEd25519 } from '../../Lib/Siws';
 import { isoIst, shortKey } from '../../Lib/Stats';
 import {
+  type FeeIndexForecastCard,
   type PantaAccess,
   type PantaBuildView,
   type PantaCategoriesView,
   type PantaFeeIndexMarket,
+  type PantaForecastStrike,
+  type PantaForecastSummary,
+  type PantaForecastView,
   type PantaMarketCard,
   type PantaMarketDetail,
   type PantaMarketsPage,
@@ -46,6 +55,7 @@ import {
   type PantaTapeRow,
   type PantaTradeState,
   type PantaTradeStatusView,
+  type PantaTraction,
 } from '../../types/Panta.types';
 import {
   type PantaBuildBody,
@@ -54,13 +64,16 @@ import {
   type PantaQuoteBody,
   type PantaSubmitBody,
 } from '../../dto/Panta.dto';
+import { crowdForecast, type StrikeQuote } from './CrowdForecast';
 import { type BroadcastRejected, type PantaChain } from './PantaChain';
 import { mapPanta } from './PantaErrors';
 import {
   type PantaMarketReader,
   type PantaMarketRow,
+  type PantaMarketTotals,
   type PantaTradeRecord,
   type PantaTradeStore,
+  type PantaTradeTotals,
 } from './PantaStores';
 import { type IndexSnapshot, type IndexSnapshotSource, intelligenceFor, isGeoBlocked } from './PantaSupport';
 import { type Timed, TimedCache } from './TimedCache';
@@ -69,8 +82,8 @@ const logger = Logger.create('PantaService');
 
 export const PANTA_SOURCE = 'Panta public API (live-api.panta.market) through Epoch';
 const POWERED = { poweredBy: 'Panta', poweredByUrl: 'https://panta.market' } as const;
-/** Our markets shown with live prices (each is one cached detail read). */
-const OUR_MARKETS_SHOWN = 8;
+/** Our markets shown with live prices (each is one cached detail read): two epochs of a full 5-strike ladder. */
+const OUR_MARKETS_SHOWN = 10;
 /** Catalog pages searched for `q`. */
 const SEARCH_PAGES = 4;
 /** Markets enriched with titles and prices on the positions view. */
@@ -81,6 +94,20 @@ const ATTRIBUTION_WINDOW_MS = 48 * 3_600_000;
 const MAX_REPORT_ATTEMPTS = 30;
 /** Blocks past the transaction's last valid height before an unseen signature counts as expired. */
 const EXPIRY_MARGIN_BLOCKS = 150;
+/** Blocks a recent blockhash stays valid for (Solana's MAX_PROCESSING_AGE). */
+const BLOCKHASH_LIFETIME_BLOCKS = 150;
+/** Our markets read to find the epochs that have strikes (the forecast's epoch picker). */
+const FORECAST_ROWS = 60;
+/** Panta's typical primary fee (MarketConfig `primaryFeeBps`, 2%), as its metrics docs suggest for estimates. */
+const PRIMARY_FEE_BPS = 200n;
+/** Rows asked of Panta's account lists (its cap). */
+const ACCOUNT_ROWS = 200;
+/** Catalog pages of our own markets read for their all-time volume. */
+const OWN_CATALOG_PAGES = 4;
+
+export const FORECAST_DISCLAIMER =
+  'Informational only, not advice. The crowd forecast is read from the YES prices of Epoch’s Panta markets on the ' +
+  'epoch (one per strike) and a lognormal fitted through them; it is only as good as those markets’ liquidity.';
 
 export interface RequestContext {
   /** From the trusted proxy's geo header. */
@@ -122,9 +149,9 @@ export class PantaService {
   private readonly tapes: TimedCache<PantaMarketTrades>;
   private readonly categoryCache: TimedCache<string[]>;
   private readonly positionCache: TimedCache<PantaPositions>;
-  private readonly metricsCache: TimedCache<PantaMetrics>;
   private readonly searchCache: TimedCache<PantaMarket[]>;
   private readonly orderStatus: TimedCache<string>;
+  private readonly tractionCache: TimedCache<PantaAccountReads>;
 
   constructor(private readonly deps: PantaServiceDeps) {
     this.now = deps.now ?? Date.now;
@@ -135,9 +162,9 @@ export class PantaService {
     this.tapes = new TimedCache(ttl, stale, 200, this.now);
     this.categoryCache = new TimedCache(3_600_000, 24 * 3_600_000, 1, this.now);
     this.positionCache = new TimedCache(10_000, 60_000, 2_000, this.now);
-    this.metricsCache = new TimedCache(60_000, 30 * 60_000, 1, this.now);
     this.searchCache = new TimedCache(60_000, stale, 50, this.now);
     this.orderStatus = new TimedCache(5_000, 5_000, 1_000, this.now);
+    this.tractionCache = new TimedCache(120_000, 30 * 60_000, 1, this.now);
   }
 
   /** Trading routes answer: the switch is on and the server has an API key. */
@@ -147,10 +174,11 @@ export class PantaService {
 
   access(country: string | null): PantaAccess {
     const { config, panta } = this.deps;
-    const geoBlocked = isGeoBlocked(country, config.PANTA_BLOCKED_COUNTRIES);
+    const geoBlocked = isGeoBlocked(country, config.PANTA_BLOCKED_COUNTRIES, config.PANTA_GEO_FAIL_CLOSED);
     let reason: string | null = null;
     if (!panta.configured) reason = 'Real-money Predict is not set up on this server yet';
     else if (!config.PANTA_TRADING_ENABLED) reason = 'Real-money trading is switched off right now';
+    else if (geoBlocked && !country) reason = 'Trading needs your region, which could not be determined';
     else if (geoBlocked) reason = `Trading is not available in your region (${country})`;
     return {
       tradingEnabled: this.tradingEnabled,
@@ -273,13 +301,15 @@ export class PantaService {
   /** GET /v1/predict/panta/stats */
   async stats(): Promise<PantaStatsView> {
     const { trades, markets } = this.requireStores();
-    const [ours, created] = await Promise.all([trades.totals(), markets.totals(new Date(this.now()))]);
-    const metrics = this.deps.panta.configured
-      ? await this.metricsCache.get('metrics', () => this.deps.panta.metrics({ limit: 1 })).catch(() => null)
-      : null;
-    const m = metrics?.value;
+    const [ours, created, wallets, reads] = await Promise.all([
+      trades.totals(),
+      markets.totals(new Date(this.now())),
+      trades.wallets(10_000),
+      this.accountReads(),
+    ]);
+    const m = reads?.value.metrics ?? null;
     return {
-      ...this.metaOf(metrics ? [metrics] : [], metrics ? undefined : 'Panta’s account metrics could not be read.'),
+      ...this.metaOf(reads ? [reads] : [], m ? undefined : 'Panta’s account metrics could not be read.'),
       epoch: {
         trades: ours.trades,
         buys: ours.buys,
@@ -303,6 +333,164 @@ export class PantaService {
             creates: { total: m.summary.creates.total, byStatus: m.summary.creates.byStatus },
           }
         : null,
+      traction: traction(reads, { ours, created, wallets }),
+    };
+  }
+
+  /**
+   * Panta's account endpoints for the traction record, read together and cached 2 minutes (stale copies up to 30
+   * minutes when Panta cannot be read). Any of them may fail on its own; null when none answered.
+   */
+  private async accountReads(): Promise<Timed<PantaAccountReads> | null> {
+    if (!this.deps.panta.configured) return null;
+    const { panta } = this.deps;
+    return this.tractionCache
+      .get('traction', async () => {
+        const settled = await Promise.allSettled([
+          panta.dashboard(),
+          panta.metrics({ limit: ACCOUNT_ROWS }),
+          panta.creates({ limit: ACCOUNT_ROWS }),
+          panta.attributedTrades({ limit: ACCOUNT_ROWS }),
+          this.ownCatalog(),
+        ]);
+        const value = <T>(result: PromiseSettledResult<T>): T | null =>
+          result.status === 'fulfilled' ? result.value : null;
+        const reads: PantaAccountReads = {
+          dashboard: value(settled[0]),
+          metrics: value(settled[1]),
+          creates: value(settled[2]),
+          trades: value(settled[3]),
+          catalog: value(settled[4]),
+        };
+        if (Object.values(reads).every((read) => read === null)) {
+          throw (settled[0] as PromiseRejectedResult).reason;
+        }
+        return reads;
+      })
+      .catch((error: unknown) => {
+        logger.warn('Panta account endpoints unreadable', { error: errorText(error) });
+        return null;
+      });
+  }
+
+  /** GET /markets/?createdBy=me, a few pages: Epoch's markets as Panta's catalog sees them (their volume). */
+  private async ownCatalog(): Promise<PantaMarket[]> {
+    const out: PantaMarket[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < OWN_CATALOG_PAGES; page++) {
+      const list = await this.deps.panta.listMarkets({ createdBy: 'me', cursor, limit: 50 });
+      out.push(...list.items);
+      if (!list.nextCursor) break;
+      cursor = list.nextCursor;
+    }
+    return out;
+  }
+
+  // ── Crowd forecast ───────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * GET /v1/predict/panta/forecast?epoch=: the crowd's forecast of one epoch's Fee Index from the YES prices of
+   * Epoch's markets on it (one per strike). Default epoch: the soonest one whose markets still trade, else the newest.
+   */
+  async forecast(epoch?: number): Promise<PantaForecastView> {
+    this.requireConfigured();
+    const { markets } = this.requireStores();
+    const recent = await markets.recent(FORECAST_ROWS);
+    const epochs = [...new Set(recent.map((row) => row.epoch))].sort((a, b) => b - a);
+    const target = epoch ?? defaultForecastEpoch(recent, this.now());
+    const rows = target === null ? [] : await markets.forEpoch(target);
+    const snapshot = await this.snapshot();
+    const details = await Promise.all(
+      rows.map((row) => {
+        const marketId = row.marketId as string;
+        return this.details.get(marketId, () => this.deps.panta.getMarket(marketId)).catch(() => null);
+      }),
+    );
+    const reads = details.filter((detail): detail is Timed<PantaMarket> => detail !== null);
+    const quotes = rows.map((row, i) => strikeQuote(row, details[i]?.value ?? null));
+    const history = snapshot.history.map((point) => point.value);
+    const newest = snapshot.history[0];
+    const result = crowdForecast(quotes, history, target !== null && newest ? target - newest.epoch : 1);
+    const lookback = history.slice(0, this.deps.config.PANTA_MODEL_LOOKBACK_EPOCHS);
+    const strikes: PantaForecastStrike[] = rows.map((row, i) => {
+      const point = result.points.find((p) => p.strike === row.threshold);
+      const market = details[i]?.value ?? null;
+      return {
+        strikeMicroLamports: row.threshold,
+        marketId: row.marketId as string,
+        title: market?.title ?? row.title,
+        phase: market?.phase ?? 'unknown',
+        yesPrice: quotes[i].yesPrice,
+        noPrice: quotes[i].noPrice,
+        impliedProbability: point?.implied ?? null,
+        fittedProbability: point?.fitted ?? null,
+        curveProbability: point?.curve ?? null,
+        empiricalProbability: lookback.length
+          ? Math.round((lookback.filter((value) => value > row.threshold).length / lookback.length) * 10_000) / 10_000
+          : null,
+        volumeUsdc: market?.volumeUsdc ?? null,
+      };
+    });
+    return {
+      ...this.metaOf(reads, reads.length < rows.length ? 'Some of the markets’ prices could not be read.' : undefined),
+      label: 'informational',
+      disclaimer: FORECAST_DISCLAIMER,
+      epoch: target,
+      epochs,
+      unit: 'µL/CU',
+      strikes,
+      fit: result.fit,
+      median: result.median,
+      expected: result.mean,
+      band: result.band,
+      lastValue: newest ? { epoch: newest.epoch, value: newest.value } : null,
+      reason: target === null ? 'Epoch has no markets on Panta yet' : result.reason,
+    };
+  }
+
+  /** GET /v1/index/forecast: the Terminal's Fee Index card; `available: false` instead of an error. */
+  async forecastCard(): Promise<FeeIndexForecastCard> {
+    const unavailable = (reason: string): FeeIndexForecastCard => ({
+      available: false,
+      reason,
+      epoch: null,
+      unit: 'µL/CU',
+      median: null,
+      expected: null,
+      band: null,
+      method: null,
+      strikes: 0,
+      ...POWERED,
+      asOf: isoIst(new Date(this.now())),
+      ageSeconds: 0,
+      stale: false,
+      details: null,
+      disclaimer: FORECAST_DISCLAIMER,
+    });
+    if (!this.deps.panta.configured) return unavailable('Panta is not configured on this server');
+    if (!this.deps.markets) return unavailable('No database: Epoch’s markets are unknown');
+    let view: PantaForecastView;
+    try {
+      view = await this.forecast();
+    } catch (error) {
+      return unavailable(`The forecast could not be built: ${errorText(error)}`);
+    }
+    return {
+      available: view.median !== null,
+      reason: view.reason,
+      epoch: view.epoch,
+      unit: 'µL/CU',
+      median: view.median,
+      expected: view.expected,
+      band: view.band,
+      method: view.fit?.method ?? null,
+      strikes: view.strikes.length,
+      ...POWERED,
+      asOf: view.asOf,
+      ageSeconds: view.ageSeconds,
+      stale: view.stale,
+      details: view.epoch === null ? null : `/v1/predict/panta/forecast?epoch=${view.epoch}`,
+      disclaimer: FORECAST_DISCLAIMER,
     };
   }
 
@@ -326,7 +514,38 @@ export class PantaService {
         modelProbability: card.intelligence.modelProbability,
         volumeUsdc: card.volumeUsdc,
       })),
+      forecasts: await this.streamForecasts(ours.cards),
     };
+  }
+
+  /** The crowd forecast of each epoch in a frame, from the prices already read (no extra Panta calls). */
+  private async streamForecasts(cards: PantaFeeIndexMarket[]): Promise<PantaForecastSummary[]> {
+    if (cards.length === 0) return [];
+    const snapshot = await this.snapshot();
+    const history = snapshot.history.map((point) => point.value);
+    const newest = snapshot.history[0];
+    const epochs = [...new Set(cards.map((card) => card.epoch))].sort((a, b) => a - b);
+    return epochs.map((epoch) => {
+      const strikes = cards.filter((card) => card.epoch === epoch);
+      const result = crowdForecast(
+        strikes.map((card) => ({
+          strike: card.thresholdMicroLamports,
+          yesPrice: card.yesPrice,
+          noPrice: card.noPrice,
+          volumeUsdc: Number(card.volumeUsdc ?? 0) || 0,
+        })),
+        history,
+        newest ? epoch - newest.epoch : 1,
+      );
+      return {
+        epoch,
+        median: result.median,
+        expected: result.mean,
+        band: result.band,
+        method: result.fit?.method ?? null,
+        strikes: strikes.length,
+      };
+    });
   }
 
   /** Re-reads our markets' prices (the stream poller); throws when Panta cannot be read. */
@@ -378,6 +597,7 @@ export class PantaService {
     if (build.wallet !== body.wallet) throw badResponse('the build is for another wallet');
     this.checkAmount(build.amountUsdc);
     const unsigned = compile(body.wallet, build.recentBlockhash, build.instructions);
+    const lastValidBlockHeight = await this.lastValidOf(build.lastValidBlockHeight);
     const title = await this.titleOf(build.marketId);
     const side = build.side.toUpperCase();
     const slippage = body.maxSlippageBps ?? 100;
@@ -411,7 +631,7 @@ export class PantaService {
       quoteId: build.quoteId ?? body.quoteId,
       orderId: build.orderId,
       messageHash: unsigned.messageHash,
-      lastValidBlockHeight: build.lastValidBlockHeight,
+      lastValidBlockHeight,
       summary,
       consentAt: new Date(this.now()),
       sessionAddress: session.address,
@@ -423,7 +643,7 @@ export class PantaService {
       action: 'buy',
       transaction: unsigned.transaction,
       recentBlockhash: build.recentBlockhash,
-      lastValidBlockHeight: build.lastValidBlockHeight,
+      lastValidBlockHeight,
       orderId: build.orderId,
       expiresAt: build.expiresAt ? isoIst(new Date(Date.parse(build.expiresAt) || this.now())) : null,
       summary,
@@ -440,6 +660,7 @@ export class PantaService {
     const claim = await mapPanta(() => this.deps.panta.buildWinClaim({ wallet: body.wallet, marketId: body.marketId }));
     if (claim.wallet !== body.wallet) throw badResponse('the claim is for another wallet');
     const unsigned = compile(body.wallet, claim.recentBlockhash, claim.instructions);
+    const lastValidBlockHeight = await this.lastValidOf(claim.lastValidBlockHeight);
     const title = await this.titleOf(claim.marketId);
     const outcome = claim.outcome === 'yes' || claim.outcome === 'no' ? claim.outcome : null;
     const summary =
@@ -460,7 +681,7 @@ export class PantaService {
       quoteId: null,
       orderId: null,
       messageHash: unsigned.messageHash,
-      lastValidBlockHeight: claim.lastValidBlockHeight,
+      lastValidBlockHeight,
       summary,
       consentAt: new Date(this.now()),
       sessionAddress: session.address,
@@ -472,7 +693,7 @@ export class PantaService {
       action: 'claim',
       transaction: unsigned.transaction,
       recentBlockhash: claim.recentBlockhash,
-      lastValidBlockHeight: claim.lastValidBlockHeight,
+      lastValidBlockHeight,
       orderId: null,
       expiresAt: null,
       summary,
@@ -489,6 +710,20 @@ export class PantaService {
         network: 'solana-mainnet',
       },
     };
+  }
+
+  /**
+   * live: Panta may leave `lastValidBlockHeight` out of a build (the playground types it optional). A blockhash lives
+   * 150 blocks and Panta fetched it before this call, so our height + 150 is an upper bound: a trade is never marked
+   * expired while it could still land.
+   */
+  private async lastValidOf(fromPanta: number | null): Promise<number> {
+    if (fromPanta !== null) return fromPanta;
+    try {
+      return (await this.deps.chain.blockHeight()) + BLOCKHASH_LIFETIME_BLOCKS;
+    } catch {
+      throw new EpochException('Could not reach Solana: try again', 'RPC_UNAVAILABLE', 502);
+    }
   }
 
   /**
@@ -743,8 +978,8 @@ export class PantaService {
       phase: market.phase,
       status: market.status,
       imageUrl: market.images[0] ?? null,
-      yesPrice: price(market.yesPrice),
-      noPrice: price(market.noPrice),
+      yesPrice: spotPrice(market, 'yes'),
+      noPrice: spotPrice(market, 'no'),
       volumeUsdc: market.volumeUsdc,
       startsAt: market.startTime === null ? null : isoIst(new Date(market.startTime * 1_000)),
       endsAt: ends === null ? null : isoIst(new Date(ends)),
@@ -929,6 +1164,107 @@ const newTradeId = (): string => `ptr_${randomBytes(12).toString('base64url')}`;
 
 const explorerTx = (signature: string): string => `https://explorer.solana.com/tx/${signature}`;
 
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+/** What Panta's account endpoints said (each may be missing). */
+interface PantaAccountReads {
+  dashboard: PantaDashboard | null;
+  metrics: PantaMetrics | null;
+  creates: PantaCreates | null;
+  trades: PantaAttributedTrades | null;
+  catalog: PantaMarket[] | null;
+}
+
+/** An integer base-unit string → bigint, or null (never throws). */
+function baseOrNull(text: string | null | undefined): bigint | null {
+  return text !== null && text !== undefined && /^\d+$/.test(text) ? baseUnits(text) : null;
+}
+
+/** A decimal USDC string → base units, or null (never throws). */
+function decimalBaseOrNull(text: string | null | undefined): bigint | null {
+  return text !== null && text !== undefined && /^\d{1,15}(\.\d{1,6})?$/.test(text) ? usdcToBase(text) : null;
+}
+
+/** A market's all-time volume in base units: the total when Panta sends it, else the active volume. */
+function volumeBaseOf(market: PantaMarket): bigint {
+  return (
+    baseOrNull(market.totalVolumeUsdcBase) ??
+    decimalBaseOrNull(market.totalVolumeUsdc) ??
+    baseOrNull(market.volumeUsdcBase) ??
+    decimalBaseOrNull(market.volumeUsdc) ??
+    0n
+  );
+}
+
+/** Pure: the traction block from Panta's account reads (when any answered) and Epoch's own records. */
+function traction(
+  read: Timed<PantaAccountReads> | null,
+  own: { ours: PantaTradeTotals; created: PantaMarketTotals; wallets: string[] },
+): PantaTraction {
+  const r = read?.value ?? null;
+  const creates = r?.creates?.summary ?? r?.metrics?.summary.creates ?? r?.dashboard?.metrics.creates ?? null;
+  const trades = r?.metrics?.summary.trades ?? r?.trades?.summary ?? r?.dashboard?.metrics.trades ?? null;
+  const rows = [...(r?.trades?.items ?? []), ...(r?.metrics?.trades ?? [])];
+  const seen = new Set(rows.map((row) => row.signature)).size;
+  const traders = new Set([...own.wallets, ...rows.map((row) => row.wallet)]);
+  const attributedBase = baseOrNull(trades?.volumeUsdcBase) ?? BigInt(own.ours.volumeUsdcBase);
+  const dashboard = r?.dashboard ?? null;
+  return {
+    asOf: read ? isoIst(new Date(read.at)) : null,
+    stale: read?.stale ?? false,
+    account: dashboard
+      ? {
+          status: dashboard.account.status,
+          canCreateMarkets: dashboard.permissions.canCreateMarkets ?? dashboard.account.canCreateMarkets,
+        }
+      : null,
+    marketsCreated: creates ? (creates.byStatus.registered ?? 0) : own.created.created,
+    createsByStatus: creates?.byStatus ?? {},
+    attributedVolumeUsdc: baseToUsdc(attributedBase),
+    marketsVolumeUsdc: r?.catalog
+      ? baseToUsdc(r.catalog.reduce((sum, market) => sum + volumeBaseOf(market), 0n))
+      : null,
+    traders: traders.size,
+    tradersComplete: trades ? seen >= trades.total : true,
+    attributedTrades: trades?.total ?? own.ours.attributed,
+    tradesByKind: trades?.byKind ?? {},
+    creatorFeesClaimedUsdc: baseToUsdc(BigInt(own.created.creatorFeesClaimedBase)),
+    creationFeesPaidUsdc: baseToUsdc(BigInt(own.created.creationFeesPaidBase)),
+    estimatedProtocolFeesUsdc: baseToUsdc((BigInt(own.ours.volumeUsdcBase) * PRIMARY_FEE_BPS) / 10_000n),
+    sources: {
+      dashboard: Boolean(r?.dashboard),
+      metrics: Boolean(r?.metrics),
+      creates: Boolean(r?.creates),
+      trades: Boolean(r?.trades),
+      catalog: Boolean(r?.catalog),
+    },
+  };
+}
+
+/** The soonest epoch whose markets still trade; else the newest epoch with markets; null without markets. */
+function defaultForecastEpoch(rows: PantaMarketRow[], now: number): number | null {
+  if (rows.length === 0) return null;
+  const open = rows.filter((row) => row.endTime !== null && row.endTime.getTime() > now).map((row) => row.epoch);
+  return open.length ? Math.min(...open) : Math.max(...rows.map((row) => row.epoch));
+}
+
+/** One strike's quote for the forecast. */
+function strikeQuote(row: PantaMarketRow, market: PantaMarket | null): StrikeQuote {
+  return {
+    strike: row.threshold,
+    yesPrice: market ? spotPrice(market, 'yes') : null,
+    noPrice: market ? spotPrice(market, 'no') : null,
+    volumeUsdc: market ? Number(baseToUsdc(volumeBaseOf(market))) : 0,
+  };
+}
+
+/** The spot price of one side, as Panta's playground reads it: the live price, else the phase's price. */
+function spotPrice(market: PantaMarket, side: PantaSide): number | null {
+  return side === 'yes'
+    ? price(market.yesPrice ?? market.secondaryYesPrice ?? market.primaryYesPrice)
+    : price(market.noPrice ?? market.secondaryNoPrice ?? market.primaryNoPrice);
+}
+
 /** A decimal price string → 0–1, or null. */
 function price(text: string | null): number | null {
   if (text === null) return null;
@@ -936,15 +1272,29 @@ function price(text: string | null): number | null {
   return Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
 }
 
+/**
+ * One row of Panta's public tape. live: share and fee amounts arrive in 1e6 base units (the docs show decimals;
+ * `catalogAmount` reads both) and every field may be missing.
+ */
 function tapeRow(row: PantaMarketTrades['items'][number]): PantaTapeRow {
-  const yes = Number(row.yesAmount) > 0;
-  const no = Number(row.noAmount) > 0;
+  const yesShares = catalogAmount(row.yesAmount) ?? '0';
+  const noShares = catalogAmount(row.noAmount) ?? '0';
+  const yes = Number(yesShares) > 0;
+  const no = Number(noShares) > 0;
+  let side: PantaTapeRow['side'] = yes && no ? 'both' : yes ? 'yes' : no ? 'no' : null;
+  if (row.side === 'yes' || row.side === 'no') side = row.side;
+  let amountUsdc = row.amountUsdc;
+  if (amountUsdc === null && row.amountUsdcBase !== null && /^\d+$/.test(row.amountUsdcBase)) {
+    amountUsdc = baseToUsdc(baseUnits(row.amountUsdcBase));
+  }
   return {
-    walletShort: shortKey(row.wallet),
-    side: yes && no ? 'both' : yes ? 'yes' : 'no',
-    yesShares: row.yesAmount,
-    noShares: row.noAmount,
-    feeUsdc: row.feePaid,
+    walletShort: row.wallet ? shortKey(row.wallet) : null,
+    side,
+    yesShares,
+    noShares,
+    feeUsdc: catalogAmount(row.feePaid),
+    amountUsdc,
+    kind: row.kind,
     isPrimary: row.isPrimary,
     at: row.blockTime === null ? null : isoIst(new Date(row.blockTime * 1_000)),
     signature: row.signature,

@@ -67,7 +67,8 @@ describe('Settings', () => {
     );
     expect(settings).toMatchObject({
       dryRun: false,
-      marketsPerEpoch: 1,
+      strikesPerEpoch: 1,
+      strikeLookback: 10,
       epochsAhead: 2,
       maxCreateUsdcBasePerDay: 75_500_000,
       maxLamportsPerCreate: 50_000_000,

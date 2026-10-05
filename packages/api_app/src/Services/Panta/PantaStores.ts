@@ -52,6 +52,8 @@ export interface PantaTradeStore {
   /** Submitted or confirmed trades whose attribution is still pending, created since `since`, oldest first. */
   pending(since: Date, limit: number): Promise<PantaTradeRecord[]>;
   totals(): Promise<PantaTradeTotals>;
+  /** Distinct wallets of submitted or confirmed trades, at most `limit` (the traders count). */
+  wallets(limit: number): Promise<string[]>;
 }
 
 export interface PantaMarketTotals {
@@ -65,6 +67,8 @@ export interface PantaMarketTotals {
 export interface PantaMarketReader {
   /** Registered markets, newest epoch first. */
   recent(limit: number): Promise<PantaMarketRow[]>;
+  /** One epoch's registered markets (its strikes), lowest threshold first. */
+  forEpoch(epoch: number): Promise<PantaMarketRow[]>;
   byMarketId(marketId: string): Promise<PantaMarketRow | null>;
   totals(now: Date): Promise<PantaMarketTotals>;
 }
@@ -158,6 +162,15 @@ export class PgPantaTradeStore implements PantaTradeStore {
       .limit(limit);
   }
 
+  async wallets(limit: number): Promise<string[]> {
+    const rows = await this.db()
+      .selectDistinct({ wallet: pantaTrades.wallet })
+      .from(pantaTrades)
+      .where(inArray(pantaTrades.status, ['submitted', 'confirmed']))
+      .limit(limit);
+    return rows.map((row) => row.wallet);
+  }
+
   async totals(): Promise<PantaTradeTotals> {
     const result = await this.db().execute<Record<string, unknown>>(sql`
       SELECT
@@ -197,6 +210,16 @@ export class PgPantaMarketReader implements PantaMarketReader {
       .where(and(eq(pantaMarkets.status, 'registered'), isNotNull(pantaMarkets.marketId)))
       .orderBy(desc(pantaMarkets.epoch), asc(pantaMarkets.threshold))
       .limit(limit);
+  }
+
+  async forEpoch(epoch: number): Promise<PantaMarketRow[]> {
+    return this.db()
+      .select()
+      .from(pantaMarkets)
+      .where(
+        and(eq(pantaMarkets.epoch, epoch), eq(pantaMarkets.status, 'registered'), isNotNull(pantaMarkets.marketId)),
+      )
+      .orderBy(asc(pantaMarkets.threshold));
   }
 
   async byMarketId(marketId: string): Promise<PantaMarketRow | null> {

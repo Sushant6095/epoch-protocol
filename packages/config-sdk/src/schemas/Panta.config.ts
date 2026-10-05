@@ -41,6 +41,8 @@ export const SOLANA_MAINNET_RPC_URL = 'https://api.mainnet-beta.solana.com';
 export const USDC_MAINNET_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 export const FEE_INDEX_METHODOLOGY_URL =
   'https://github.com/Sushant6095/epoch-protocol/blob/main/docs/FEE_INDEX_METHODOLOGY.md';
+/** api_app serves the markets' catalog image here (1024×1024 PNG); the bot's default PANTA_MARKET_IMAGE_URL. */
+export const PANTA_MARKET_IMAGE_PATH = '/v1/predict/panta/market-image.png';
 
 /** The Panta API, shared by api_app (trading) and panta_bot_app (market creation). */
 export const PantaApiConfigSchema = z.object({
@@ -98,6 +100,12 @@ export const PantaTradingConfigSchema = PantaApiConfigSchema.extend({
    * proxy (Cloudflare: `cf-ipcountry`, Vercel: `x-vercel-ip-country`); anywhere else a client could set them itself.
    */
   PANTA_GEO_HEADERS: csv('cf-ipcountry,x-vercel-ip-country', (part) => part.toLowerCase()),
+  /**
+   * What a trade does when no trusted header names the visitor's country (no proxy in front, or the proxy did not
+   * know). `false` (default): allowed, as before. `true`: refused like a blocked country (403 PANTA_GEO_BLOCKED), so a
+   * deployment without a geo-aware proxy cannot trade by mistake.
+   */
+  PANTA_GEO_FAIL_CLOSED: flag('false'),
   /** Largest primary buy one request may ask for, USDC. */
   PANTA_MAX_TRADE_USDC: usdcAmount('500'),
   /** Smallest, USDC (Panta has its own minimum: AMOUNT_TOO_SMALL). */
@@ -123,7 +131,10 @@ export const PantaBotConfigSchema = PantaApiConfigSchema.extend({
   ...EpochProgramConfigSchema.pick({ EPOCH_CLUSTER: true, EPOCH_PROGRAM_ID: true }).shape,
   /** Keypair FILE of the market creator: pays each creation fee in USDC (and SOL for fees). Never logged. */
   PANTA_BOT_KEYPAIR_PATH: z.preprocess(blank, z.string().min(1).optional()),
-  /** Public catalog image for every market (http/https, 1024×1024 recommended). Required to create. */
+  /**
+   * Public catalog image for every market (http/https, 1024×1024 recommended). Default: the API's own
+   * `{PUBLIC_API_URL}/v1/predict/panta/market-image.png`. Required to create.
+   */
   PANTA_MARKET_IMAGE_URL: optionalUrl,
   /** Epoch's public API base (https), e.g. https://api.epoch.example: markets resolve from `/v1/index/epochs/{N}`. */
   PUBLIC_API_URL: optionalUrl,
@@ -131,8 +142,13 @@ export const PantaBotConfigSchema = PantaApiConfigSchema.extend({
   PANTA_DRY_RUN: flag('false'),
   /** Creation fees the bot may spend in any rolling 24 hours, USDC. Each market's fee is quoted by Panta. */
   PANTA_MAX_CREATE_USDC_PER_DAY: usdcAmount('100'),
-  /** Markets per epoch (the threshold ladder). Each one costs a creation fee. */
-  PANTA_MARKETS_PER_EPOCH: z.coerce.number().int().min(1).max(5).default(1),
+  /**
+   * Strikes per epoch: one market per strike, each paying its own creation fee inside PANTA_MAX_CREATE_USDC_PER_DAY.
+   * 1 (default) asks about the median of recent final values; 3 gives p30 / p50 / p70; up to 5 (p10 … p90).
+   */
+  PANTA_STRIKES_PER_EPOCH: z.preprocess(blank, z.coerce.number().int().min(1).max(5).optional()),
+  /** Deprecated name of PANTA_STRIKES_PER_EPOCH (read when that one is unset). */
+  PANTA_MARKETS_PER_EPOCH: z.preprocess(blank, z.coerce.number().int().min(1).max(5).optional()),
   /** Markets are opened for epochs current + 1 … current + this. */
   PANTA_EPOCHS_AHEAD: z.coerce.number().int().min(1).max(4).default(2),
   /** An epoch is skipped when its market could trade for less than this. */
@@ -143,8 +159,10 @@ export const PantaBotConfigSchema = PantaApiConfigSchema.extend({
   PANTA_RESOLUTION_BUFFER_HOURS: z.coerce.number().min(1).max(72).default(6),
   /** No final value this long after the resolution time → the market resolves NO (written into its rule). */
   PANTA_RESOLUTION_GRACE_HOURS: z.coerce.number().int().min(1).max(336).default(48),
-  /** Ladder thresholds come from this many recent epochs (one market: the last finished epoch's value). */
-  PANTA_THRESHOLD_LOOKBACK_EPOCHS: z.coerce.number().int().min(2).max(64).default(16),
+  /** Strikes are quantiles of this many recent final Fee Index values (default 10). */
+  PANTA_STRIKE_LOOKBACK_EPOCHS: z.preprocess(blank, z.coerce.number().int().min(2).max(64).optional()),
+  /** Deprecated name of PANTA_STRIKE_LOOKBACK_EPOCHS (read when that one is unset). */
+  PANTA_THRESHOLD_LOOKBACK_EPOCHS: z.preprocess(blank, z.coerce.number().int().min(2).max(64).optional()),
   PANTA_TICK_SECONDS: z.coerce.number().int().min(30).max(3_600).default(300),
   /** How often a registered market is checked for claimable creator fees. */
   PANTA_CREATOR_FEE_CHECK_HOURS: z.coerce.number().min(1).max(168).default(6),
@@ -161,7 +179,23 @@ export const PantaBotConfigSchema = PantaApiConfigSchema.extend({
   PANTA_CU_PRICE_MICROLAMPORTS: computeUnitPrice,
   /** The bot's share of Panta's per-account rate limits (the API takes PANTA_RATE_LIMIT_SHARE, 0.8 by default). */
   PANTA_BOT_RATE_LIMIT_SHARE: z.coerce.number().gt(0).max(1).default(0.2),
-}).transform(withPantaRpc);
+}).transform((config) => {
+  const {
+    PANTA_STRIKES_PER_EPOCH,
+    PANTA_MARKETS_PER_EPOCH,
+    PANTA_STRIKE_LOOKBACK_EPOCHS,
+    PANTA_THRESHOLD_LOOKBACK_EPOCHS,
+    ...rest
+  } = withPantaRpc(config);
+  const publicApi = rest.PUBLIC_API_URL?.replace(/\/+$/, '');
+  return {
+    ...rest,
+    PANTA_STRIKES_PER_EPOCH: PANTA_STRIKES_PER_EPOCH ?? PANTA_MARKETS_PER_EPOCH ?? 1,
+    PANTA_STRIKE_LOOKBACK_EPOCHS: PANTA_STRIKE_LOOKBACK_EPOCHS ?? PANTA_THRESHOLD_LOOKBACK_EPOCHS ?? 10,
+    PANTA_MARKET_IMAGE_URL:
+      rest.PANTA_MARKET_IMAGE_URL ?? (publicApi ? `${publicApi}${PANTA_MARKET_IMAGE_PATH}` : undefined),
+  };
+});
 
 export type PantaApiConfig = z.infer<typeof PantaApiConfigSchema>;
 export type PantaTradingConfig = z.infer<typeof PantaTradingConfigSchema>;

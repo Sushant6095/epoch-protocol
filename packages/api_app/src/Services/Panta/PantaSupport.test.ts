@@ -32,6 +32,10 @@ describe('geo', () => {
     expect(isGeoBlocked('T1', ['US'])).toBe(true);
     expect(isGeoBlocked('T1', [])).toBe(false);
     expect(isGeoBlocked(null, ['US'])).toBe(false);
+    // PANTA_GEO_FAIL_CLOSED: no trusted country → blocked, with or without a blocklist.
+    expect(isGeoBlocked(null, ['US'], true)).toBe(true);
+    expect(isGeoBlocked(null, [], true)).toBe(true);
+    expect(isGeoBlocked('IN', [], true)).toBe(false);
   });
 });
 

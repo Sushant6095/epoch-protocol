@@ -10,6 +10,7 @@ import {
   PantaCreateQuoteSchema,
   PantaCreatesSchema,
   PantaCreatorFeeClaimSchema,
+  PantaDashboardSchema,
   PantaMarketListSchema,
   PantaMarketSchema,
   PantaMarketTradesSchema,
@@ -28,6 +29,7 @@ describe('Panta schemas', () => {
   it('accept every documented example', () => {
     const pairs: [{ parse: (value: unknown) => unknown }, unknown][] = [
       [PantaAccountSchema, fx.account],
+      [PantaDashboardSchema, fx.dashboard],
       [PantaMetricsSchema, fx.metrics],
       [PantaCreatesSchema, fx.creates],
       [PantaAttributedTradesSchema, fx.attributedTrades],
@@ -69,6 +71,30 @@ describe('Panta schemas', () => {
       createdByPartner: false,
     });
     expect(() => PantaBuyQuoteSchema.parse({ ...fx.buyQuote, side: 'maybe' })).toThrow();
+  });
+
+  it('read the live shapes of the playground (optional heights, base-unit tape, market totals)', () => {
+    expect(PantaBuyBuildSchema.parse(fx.liveBuyBuild)).toMatchObject({ lastValidBlockHeight: null, derived: {} });
+    expect(
+      PantaCreateBuildSchema.parse({ ...fx.createBuild, lastValidBlockHeight: undefined }).lastValidBlockHeight,
+    ).toBe(null);
+    expect(PantaWinClaimSchema.parse({ ...fx.winClaim, lastValidBlockHeight: undefined }).lastValidBlockHeight).toBe(
+      null,
+    );
+    expect(PantaMarketSchema.parse(fx.liveMarket)).toMatchObject({
+      totalVolumeUsdc: '1250.40',
+      totalVolumeUsdcBase: '1250400000',
+      creationFee: '50',
+      creatorAddress: fx.CREATOR,
+      oracle: 'https://api.example.com/v1/index/epochs/1051',
+    });
+    const [row, bare] = PantaMarketTradesSchema.parse(fx.liveMarketTrades).items;
+    expect(row).toMatchObject({ yesAmount: '38420000', noAmount: '0', feePaid: '400000', side: 'yes', kind: 'buy' });
+    expect(bare).toMatchObject({ id: null, wallet: null, signature: null, isPrimary: null, yesAmount: null });
+    const dash = PantaDashboardSchema.parse(fx.dashboard);
+    expect(dash.metrics.trades).toEqual({ total: 5, volumeUsdcBase: '125000000', byKind: { buy: 4, claim: 1 } });
+    expect(dash.permissions.canCreateMarkets).toBe(true);
+    expect(PantaDashboardSchema.parse({ ...fx.dashboard, permissions: undefined }).permissions).toEqual({});
   });
 
   it('check a market quote request the way Panta documents it', () => {

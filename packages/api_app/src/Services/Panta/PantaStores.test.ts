@@ -101,6 +101,7 @@ const TEST_DB = process.env.TEST_DATABASE_URL;
     expect(done?.reportedAt).toBeInstanceOf(Date);
     expect((await store.pending(since, 10)).map((t) => t.id)).not.toContain(id);
 
+    expect(await store.wallets(10_000)).toContain(row.wallet);
     const totals = await store.totals();
     expect(totals.trades).toBeGreaterThanOrEqual(1);
     expect(totals.attributed).toBeGreaterThanOrEqual(1);
@@ -144,6 +145,8 @@ const TEST_DB = process.env.TEST_DATABASE_URL;
       [BASE + 1, 1_250],
     ]);
     expect(await reader.byMarketId(live.marketId as string)).toMatchObject({ epoch: BASE + 2, threshold: 1_300 });
+    expect((await reader.forEpoch(BASE + 1)).map((row) => row.threshold)).toEqual([1_250]);
+    expect(await reader.forEpoch(BASE + 3)).toEqual([]);
     const totals = await reader.totals(new Date());
     expect(totals.created).toBeGreaterThanOrEqual(2);
     expect(totals.live).toBeGreaterThanOrEqual(1);

@@ -59,7 +59,8 @@ signature, so it always answers in mainnet epochs.
     "programId": "<Epoch program id>",
     "feeIndexAccount": "<FeeIndex PDA>",
     "programEpoch": 1051,
-    "postSignature": "<post_index transaction>"
+    "postSignature": "<post_index transaction>",
+    "finalizeSignature": "<finalize_index transaction>"
   },
   "methodology": "https://github.com/Sushant6095/epoch-protocol/blob/main/docs/FEE_INDEX_METHODOLOGY.md"
 }
@@ -68,10 +69,20 @@ signature, so it always answers in mainnet epochs.
 `status` is one of `pending`, `computed`, `proposed`, `final`, `vetoed`. Only `final` settles anything: Epoch's fee
 swaps (`settle_swap`) and Epoch's Panta markets. `GET /v1/index?from=&to=` lists many epochs at once.
 
+### Verified end to end
+
+`scripts/e2e/index-to-final.mts` runs the whole path on a local validator with the program built from this repository
+(throwaway program id), a Postgres schema of its own and the built apps: an `epoch_index` row for a finished mainnet
+epoch → `publisher_app` posts it (`post_index`, mapped to a program epoch by `FEE_INDEX_EPOCH_OFFSET`) → the dispute
+window (`FinalizeIndexJob` waits) → `FinalizeIndexJob` finalizes it → `api_app` answers `GET /v1/index/epochs/{N}` with
+`final`, the value, the program epoch and both signatures, and the next epoch `pending`; `panta_bot_app`'s strike source
+reads the value as final. Run on 2026-10-05 20:28 IST: 13 of 13 checks passed (mainnet epoch 1051 under program epoch 1,
+value 1,400 µL/CU, dispute window 100 slots).
+
 ## How Epoch's Panta markets use it
 
-Each market asks whether the final value for one mainnet epoch is **strictly greater** than a threshold (equal
-resolves NO). Trading closes before that epoch starts, so nobody can trade while watching its fees. If the value is
-vetoed, the market resolves from the corrected final value; if no final value is published by the deadline written in
-the market's rule (its resolution time plus a grace period), it resolves NO. The rule, the sources and the times are
-in each market's `resolutionRule` and `sourcesOfTruth` on Panta.
+Each market asks whether the final value for one mainnet epoch is **strictly greater** than a threshold (equal resolves
+NO); the thresholds (strikes) are quantiles of the last 10 final values. Trading closes before that epoch starts, so
+nobody can trade while watching its fees. If the value is vetoed, the market resolves from the corrected final value; if
+no final value is published by the deadline written in the market's rule (its resolution time plus a grace period), it
+resolves NO. The rule, the sources and the times are in each market's `resolutionRule` and `sourcesOfTruth` on Panta.

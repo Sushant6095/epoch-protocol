@@ -13,7 +13,7 @@ import {
 import { type BotChain, SpendGuardError } from './Chain/BotChain';
 import { type ClockSnapshot, marketWindow, type MarketWindow, type ScheduleOptions } from './Markets/EpochSchedule';
 import { type FeeIndexAccountRef, marketText, type MarketText, marketTitle } from './Markets/MarketText';
-import { ladderThresholds } from './Markets/Thresholds';
+import { byCentrality, strikeLadder } from './Markets/Thresholds';
 import { isoIst } from './Markets/Time';
 import { type IndexHistory, type MarketRecord, type MarketStatus, type MarketStore } from './Store/MarketStore';
 
@@ -24,15 +24,19 @@ const DAY_MS = 24 * 3_600_000;
 const CREATOR_FEE_CHECKS_PER_TICK = 5;
 /** Pages of `GET /markets/?createdBy=me` searched when a quote says DUPLICATE_MARKET. */
 const DUPLICATE_SEARCH_PAGES = 4;
+/** Fewer final values than this and the strikes come from computed values instead (said in the tick line). */
+const MIN_FINAL_SAMPLE = 3;
 
 export interface LifecycleConfig {
   /** Plan and log only: no Panta writes, no signatures, no database writes. */
   dryRun: boolean;
   /** Why it is a dry run (missing key, keypair, image…), for the log. */
   dryRunReasons: string[];
-  marketsPerEpoch: number;
+  /** Markets (strikes) per epoch, 1–5. */
+  strikesPerEpoch: number;
   epochsAhead: number;
-  thresholdLookback: number;
+  /** Strikes are quantiles of this many recent final values. */
+  strikeLookback: number;
   schedule: ScheduleOptions;
   /** Rolling 24 h cap on creation fees, USDC base units. */
   maxCreateUsdcBasePerDay: number;
@@ -74,6 +78,10 @@ export interface TickSummary {
   progressPct: number;
   dryRun: boolean;
   targets: { epoch: number; thresholds: number[] }[];
+  /** Where the strikes came from: final values, computed ones (too few finals yet), or none. */
+  strikeSource: 'final' | 'computed' | 'none';
+  /** Values in the strike sample. */
+  strikeSample: number;
   skipped: { epoch: number; reason: string }[];
   planned: number;
   created: string[];
@@ -97,7 +105,7 @@ class StopTick extends Error {}
  *    signature (landed → confirmed; failed or expired → planned again, attempts + 1; still in flight → re-broadcast);
  *    a `confirmed` row is registered.
  * 2. Plan: for epochs current + 1 … current + PANTA_EPOCHS_AHEAD whose trading window is still long enough, insert
- *    PANTA_MARKETS_PER_EPOCH thresholds from the index history (unique per epoch and threshold).
+ *    PANTA_STRIKES_PER_EPOCH strikes from recent final index values (unique per epoch and threshold).
  * 3. Create, oldest epoch first, within PANTA_MAX_CREATE_USDC_PER_DAY: quote → build → spend guard (simulate: no more
  *    USDC than quoted) → sign → persist the signature → broadcast → confirm → register.
  * 4. Creator fees: graduated markets' accumulated fees are claimed to the creator wallet.
@@ -122,6 +130,8 @@ export class MarketLifecycle {
       progressPct: Math.round((clock.slotIndex / clock.slotsInEpoch) * 1_000) / 10,
       dryRun: config.dryRun,
       targets: [],
+      strikeSource: 'none',
+      strikeSample: 0,
       skipped: [],
       planned: 0,
       created: [],
@@ -133,7 +143,9 @@ export class MarketLifecycle {
       creatorFeesClaimedUsdc: '0.00',
       errors: [],
     };
-    const history = this.deps.history ? await this.deps.history.recent(clock.epoch, config.thresholdLookback) : [];
+    const { sample: history, source } = await this.strikeSample(clock.epoch);
+    summary.strikeSource = source;
+    summary.strikeSample = history.length;
     const targets = this.targets(clock, history, summary);
     summary.targets = targets.map(({ epoch, thresholds }) => ({ epoch, thresholds }));
 
@@ -215,6 +227,21 @@ export class MarketLifecycle {
 
   // ── 2. Plan ──────────────────────────────────────────────────────────────────────────────────────
 
+  /** The last `strikeLookback` FINAL values; computed values while fewer than MIN_FINAL_SAMPLE are final. */
+  private async strikeSample(
+    epoch: number,
+  ): Promise<{ sample: { epoch: number; value: number }[]; source: TickSummary['strikeSource'] }> {
+    const { history, config } = this.deps;
+    if (!history) return { sample: [], source: 'none' };
+    const finals = await history.recentFinal(epoch, config.strikeLookback).catch((error: unknown) => {
+      logger.warn('final index values unreadable; using computed values', { error: errorText(error) });
+      return [];
+    });
+    if (finals.length >= MIN_FINAL_SAMPLE) return { sample: finals, source: 'final' };
+    const computed = await history.recent(epoch, config.strikeLookback);
+    return { sample: computed, source: computed.length > 0 ? 'computed' : 'none' };
+  }
+
   private targets(clock: ClockSnapshot, history: { epoch: number; value: number }[], summary: TickSummary): Target[] {
     const { config } = this.deps;
     const targets: Target[] = [];
@@ -224,12 +251,12 @@ export class MarketLifecycle {
         summary.skipped.push({ epoch, reason: window.reason ?? 'no window' });
         continue;
       }
-      const thresholds = ladderThresholds(
+      const thresholds = strikeLadder(
         history.map((point) => point.value),
-        config.marketsPerEpoch,
+        config.strikesPerEpoch,
       );
       if (thresholds.length === 0) {
-        summary.skipped.push({ epoch, reason: 'no Fee Index history yet (epoch_index is empty)' });
+        summary.skipped.push({ epoch, reason: 'no Fee Index history yet (no final or computed values)' });
         continue;
       }
       targets.push({ epoch, window, thresholds });
@@ -247,7 +274,7 @@ export class MarketLifecycle {
     for (const target of targets) {
       const rows = existing.filter((row) => row.epoch === target.epoch);
       // Thresholds are fixed once an epoch has its markets: a newer final value never adds a second market.
-      let open = this.deps.config.marketsPerEpoch - rows.filter((row) => row.status !== 'failed').length;
+      let open = this.deps.config.strikesPerEpoch - rows.filter((row) => row.status !== 'failed').length;
       for (const threshold of target.thresholds) {
         if (open <= 0) break;
         if (rows.some((row) => row.threshold === threshold)) continue;
@@ -284,7 +311,7 @@ export class MarketLifecycle {
     if (!wallet) return;
     let committed = await store.committedSince(new Date(this.now() - DAY_MS));
 
-    for (const row of await store.withStatus(['planned'])) {
+    for (const row of creationOrder(await store.withStatus(['planned']))) {
       if (row.attempts >= config.maxAttempts) {
         await store.transition(row.id, 'planned', { status: 'failed', error: row.error ?? 'too many attempts' });
         summary.errors.push(`epoch ${row.epoch}: given up after ${row.attempts} attempts`);
@@ -380,6 +407,11 @@ export class MarketLifecycle {
         continue;
       }
 
+      // live: Panta may leave lastValidBlockHeight out (the playground types it optional). A blockhash lives 150 blocks
+      // and Panta fetched it before we ask, so the current height + 150 is an upper bound: the create is never given
+      // up as expired while it could still land (and a second create of the same question fails on chain anyway).
+      const lastValid = build.lastValidBlockHeight ?? (await chain.blockHeight()) + BLOCKHASH_LIFETIME_BLOCKS;
+
       let signed;
       try {
         signed = await chain.guardAndSign(build.transaction, {
@@ -403,7 +435,7 @@ export class MarketLifecycle {
         status: 'signed',
         createSignature: signed.signature,
         signedTx: signed.signedBase64,
-        lastValidBlockHeight: build.lastValidBlockHeight,
+        lastValidBlockHeight: lastValid,
         signedAt: new Date(this.now()),
       });
       if (!stored) continue; // never broadcast what we could not record
@@ -416,7 +448,7 @@ export class MarketLifecycle {
         signature: signed.signature,
       });
       const signedRow: MarketRecord = { ...row, status: 'signed', quotedUsdcBase: fee };
-      const outcome = await this.broadcast(store, signedRow, signed, build.lastValidBlockHeight);
+      const outcome = await this.broadcast(store, signedRow, signed, lastValid);
       if (outcome === 'retry') committed -= fee;
       if (outcome !== 'confirmed') continue;
       const marketId = await this.register(
@@ -707,6 +739,15 @@ export class MarketLifecycle {
     });
   }
 }
+
+/** Oldest epoch first; inside an epoch the middle strike first (the daily budget may not pay for the whole ladder). */
+function creationOrder(rows: MarketRecord[]): MarketRecord[] {
+  const epochs = [...new Set(rows.map((row) => row.epoch))].sort((a, b) => a - b);
+  return epochs.flatMap((epoch) => byCentrality(rows.filter((row) => row.epoch === epoch)));
+}
+
+/** Blocks a recent blockhash stays valid for (Solana's MAX_PROCESSING_AGE). */
+const BLOCKHASH_LIFETIME_BLOCKS = 150;
 
 /** Fields of an abandoned create attempt (a new quote starts clean). */
 const CLEAR_CREATE = {

@@ -22,9 +22,9 @@ const FEE_INDEX = { address: key(30), cluster: 'devnet' as const };
 const config = (overrides: Partial<LifecycleConfig> = {}): LifecycleConfig => ({
   dryRun: false,
   dryRunReasons: [],
-  marketsPerEpoch: 1,
+  strikesPerEpoch: 1,
   epochsAhead: 2,
-  thresholdLookback: 16,
+  strikeLookback: 10,
   schedule: DEFAULT_SCHEDULE,
   maxCreateUsdcBasePerDay: 100_000_000,
   maxLamportsPerCreate: 50_000_000,
@@ -44,10 +44,11 @@ function setup(overrides: Partial<LifecycleConfig> = {}) {
   const store = new MemoryMarketStore(() => clock.now);
   const chain = new FakeBotChain();
   const panta = new FakePanta();
+  // Final values (median 1,290 → strike 1,300).
   const history = new MemoryIndexHistory([
     { epoch: 1_049, value: 1_284 },
-    { epoch: 1_048, value: 1_250 },
-    { epoch: 1_047, value: 1_190 },
+    { epoch: 1_048, value: 1_310 },
+    { epoch: 1_047, value: 1_290 },
   ]);
   const lifecycle = new MarketLifecycle({
     config: config(overrides),
@@ -349,18 +350,44 @@ describe('MarketLifecycle (F10)', () => {
     expect(quiet.errors).toEqual([]);
   });
 
-  it('opens a ladder of thresholds when asked for more markets per epoch', async () => {
+  it('opens a p30 / p50 / p70 strike ladder from the last 10 final values', async () => {
     const { store, history, lifecycle } = setup({
-      marketsPerEpoch: 3,
+      strikesPerEpoch: 3,
       epochsAhead: 1,
       maxCreateUsdcBasePerDay: 500_000_000,
     });
+    // 16 epochs of history; the newest 10 (1,000 … 1,180) are the sample.
     history.values = Array.from({ length: 16 }, (_, i) => ({ epoch: 1_049 - i, value: 1_000 + i * 20 }));
-    await lifecycle.tick();
+    const summary = await lifecycle.tick();
+    expect(summary).toMatchObject({ strikeSource: 'final', strikeSample: 10 });
     expect(store.byEpoch(1_051).map((row) => [row.threshold, row.status])).toEqual([
+      [1_050, 'registered'],
       [1_100, 'registered'],
       [1_150, 'registered'],
-      [1_250, 'registered'],
+    ]);
+  });
+
+  it('takes computed values while fewer than three are final, and says so', async () => {
+    const { store, history, lifecycle } = setup({ epochsAhead: 1 });
+    history.finals = new Set([1_049]);
+    const summary = await lifecycle.tick();
+    expect(summary).toMatchObject({ strikeSource: 'computed', strikeSample: 3 });
+    expect(store.byEpoch(1_051).map((row) => row.threshold)).toEqual([1_300]);
+  });
+
+  it('creates the middle strike first when the daily budget pays for only one', async () => {
+    const { store, panta, history, lifecycle } = setup({
+      strikesPerEpoch: 3,
+      epochsAhead: 1,
+      maxCreateUsdcBasePerDay: 50_000_000,
+    });
+    history.values = Array.from({ length: 10 }, (_, i) => ({ epoch: 1_049 - i, value: 1_000 + i * 20 }));
+    await lifecycle.tick();
+    expect(quotes(panta).map((q) => q.question)).toEqual([marketQuestion(1_051, 1_100)]);
+    expect(store.byEpoch(1_051).map((row) => [row.threshold, row.status])).toEqual([
+      [1_050, 'planned'],
+      [1_100, 'registered'],
+      [1_150, 'planned'],
     ]);
   });
 });

@@ -43,6 +43,19 @@ export function baseToUsdc(base: bigint, minDecimals = 2): string {
   return negative ? `-${body}` : body;
 }
 
+/**
+ * A catalog trade amount (`yesAmount`, `noAmount`, `feePaid` of GET /markets/{id}/trades/) as a decimal string. The
+ * live API sends 1e6 base units ("10500000" → "10.5"; Panta's playground divides them by 1e6) while the docs example
+ * shows decimals ("10.00", kept as is): an integer is read as base units, anything with a point as a decimal. Null when
+ * absent or unreadable.
+ */
+export function catalogAmount(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const text = value.trim();
+  if (/^\d+$/.test(text)) return baseToUsdc(BigInt(text), 0);
+  return /^\d+\.\d+$/.test(text) ? text : null;
+}
+
 /** A decimal string from the API as a number, for display maths only (prices, shares). NaN when unreadable. */
 export function decimalToNumber(text: string | null | undefined): number {
   if (text === null || text === undefined || text.trim() === '') return Number.NaN;

@@ -10,6 +10,7 @@ export {
   type BuyQuoteRequest,
   type ListMarketsParams,
   PANTA_DEFAULT_BASE_URL,
+  PANTA_STAGING_BASE_URL,
   type PantaApi,
   PantaClient,
   type PantaClientOptions,
@@ -58,4 +59,12 @@ export {
   type TransactionSummary,
   type UnsignedTransaction,
 } from './transactions';
-export { baseToUsdc, baseUnits, decimalToNumber, isUsdcAmount, USDC_DECIMALS, usdcToBase } from './units';
+export {
+  baseToUsdc,
+  baseUnits,
+  catalogAmount,
+  decimalToNumber,
+  isUsdcAmount,
+  USDC_DECIMALS,
+  usdcToBase,
+} from './units';

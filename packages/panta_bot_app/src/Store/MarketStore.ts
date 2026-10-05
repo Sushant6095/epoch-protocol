@@ -1,4 +1,4 @@
-import { epochIndex, type EpochDb, pantaMarkets } from '@epoch/pg_models';
+import { epochIndex, type EpochDb, pantaMarkets, programEvents } from '@epoch/pg_models';
 import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 
 /** A `panta_markets` row. */
@@ -50,8 +50,13 @@ export interface MarketStore {
 
 /** Finished epochs' Fee Index values (mainnet epochs, µL/CU), from the indexer's `epoch_index`. */
 export interface IndexHistory {
-  /** Epochs before `beforeEpoch`, newest first, at most `limit`. */
+  /** Epochs before `beforeEpoch`, newest first, at most `limit` (computed values, final or not). */
   recent(beforeEpoch: number, limit: number): Promise<{ epoch: number; value: number }[]>;
+  /**
+   * Only FINAL values: posted on chain and finalized by the program (its IndexProposed and IndexFinalized events, as
+   * api_app records them in `program_events`), newest first, at most `limit`.
+   */
+  recentFinal(beforeEpoch: number, limit: number): Promise<{ epoch: number; value: number }[]>;
 }
 
 export class PgMarketStore implements MarketStore {
@@ -112,5 +117,27 @@ export class PgIndexHistory implements IndexHistory {
       .where(lt(epochIndex.epoch, beforeEpoch))
       .orderBy(desc(epochIndex.epoch))
       .limit(limit);
+  }
+
+  /**
+   * A row is final when its `posted_signature` is an IndexProposed transaction whose program epoch has an
+   * IndexFinalized event with the same value: whatever the mainnet → program epoch offset (publisher_app README).
+   */
+  async recentFinal(beforeEpoch: number, limit: number): Promise<{ epoch: number; value: number }[]> {
+    const result = await this.db.execute<{ epoch: number | string; value: number | string }>(sql`
+      SELECT ei.epoch, ei.value
+      FROM ${epochIndex} ei
+      JOIN ${programEvents} proposed
+        ON proposed.signature = ei.posted_signature AND proposed.kind = 'IndexProposed'
+      WHERE ei.epoch < ${beforeEpoch}
+        AND EXISTS (
+          SELECT 1 FROM ${programEvents} fin
+          WHERE fin.kind = 'IndexFinalized'
+            AND fin.payload ->> 'epoch' = proposed.payload ->> 'epoch'
+            AND fin.payload ->> 'value' = ei.value::text
+        )
+      ORDER BY ei.epoch DESC
+      LIMIT ${limit}`);
+    return result.rows.map((row) => ({ epoch: Number(row.epoch), value: Number(row.value) }));
   }
 }

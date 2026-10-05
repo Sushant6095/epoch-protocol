@@ -25,9 +25,13 @@ export function countryOf(
   return null;
 }
 
-/** On the blocklist; with any blocklist set, Tor exits (`T1`, no country to check) count as blocked too. */
-export function isGeoBlocked(country: string | null, blocked: readonly string[]): boolean {
-  if (!country || blocked.length === 0) return false;
+/**
+ * On the blocklist; with any blocklist set, Tor exits (`T1`, no country to check) count as blocked too. An unknown
+ * country (no trusted header) is blocked only with PANTA_GEO_FAIL_CLOSED.
+ */
+export function isGeoBlocked(country: string | null, blocked: readonly string[], failClosed = false): boolean {
+  if (!country) return failClosed;
+  if (blocked.length === 0) return false;
   return country === TOR || blocked.includes(country);
 }
 

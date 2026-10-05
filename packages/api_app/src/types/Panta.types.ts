@@ -121,15 +121,21 @@ export interface PantaMarketsPage extends PantaMeta {
 
 /** One row of a market's public tape. */
 export interface PantaTapeRow {
-  walletShort: string;
-  side: PantaSide | 'both';
+  walletShort: string | null;
+  /** From Panta's `side` when it sends one, else from which share amount is non-zero. */
+  side: PantaSide | 'both' | null;
+  /** Decimal shares (Panta's base units divided by 1e6). */
   yesShares: string;
   noShares: string;
-  feeUsdc: string;
-  isPrimary: boolean;
+  feeUsdc: string | null;
+  /** USDC paid, when Panta sends it. */
+  amountUsdc: string | null;
+  /** `buy`, `claim`, … when Panta sends it. */
+  kind: string | null;
+  isPrimary: boolean | null;
   /** ISO 8601 (IST). */
   at: string | null;
-  signature: string;
+  signature: string | null;
 }
 
 /** GET /v1/predict/panta/markets/:marketId */
@@ -271,6 +277,118 @@ export interface PantaStatsView extends PantaMeta {
     byKind: Record<string, number>;
     creates: { total: number; byStatus: Record<string, number> };
   } | null;
+  /** Epoch on Panta, the traction record: Panta's account endpoints joined with Epoch's own records. */
+  traction: PantaTraction;
+}
+
+/**
+ * Built from Panta's GET /account/dashboard/, /account/metrics/, /account/creates/, /account/trades/ and
+ * /markets/?createdBy=me (cached 2 minutes) plus panta_trades and panta_markets. Each figure says what it counts.
+ */
+export interface PantaTraction {
+  /** When Panta's figures were read (IST), and whether they are a cached copy because Panta could not be read. */
+  asOf: string | null;
+  stale: boolean;
+  /** Panta's view of Epoch's API account; null when the dashboard could not be read. */
+  account: { status: string; canCreateMarkets: boolean } | null;
+  /** Markets Epoch's account created on Panta (registered creates); Epoch's own count when Panta is unreadable. */
+  marketsCreated: number;
+  /** Panta's create sessions by status (`pending`, `built`, `registered`, …). */
+  createsByStatus: Record<string, number>;
+  /** Attributed volume, USDC: what Panta credits to Epoch (buys and claims reported through POST /trades/). */
+  attributedVolumeUsdc: string;
+  /** All-time volume on Epoch's own markets from Panta's catalog (any trader, any app), USDC; null when unread. */
+  marketsVolumeUsdc: string | null;
+  /** Distinct wallets among the attributed trades Panta returned and the trades in panta_trades. */
+  traders: number;
+  /** False when Panta holds more attributed rows than it returns (the traders count is then a lower bound). */
+  tradersComplete: boolean;
+  /** Attributed trades as Panta counts them (Epoch's processed reports when Panta is unreadable). */
+  attributedTrades: number;
+  tradesByKind: Record<string, number>;
+  /** Creator fees the bot claimed from graduated markets (panta_markets; Panta does not attribute them). */
+  creatorFeesClaimedUsdc: string;
+  creationFeesPaidUsdc: string;
+  /** Panta's primary fee on buys through Epoch, estimated as Panta's docs suggest (volume × 200 bps). */
+  estimatedProtocolFeesUsdc: string;
+  /** Which Panta endpoints answered this time. */
+  sources: { dashboard: boolean; metrics: boolean; creates: boolean; trades: boolean; catalog: boolean };
+}
+
+// ── Crowd forecast · GET /v1/predict/panta/forecast?epoch= · GET /v1/index/forecast ─────────────────
+
+export type PantaForecastMethod = 'lognormal-fit' | 'lognormal-history-sigma';
+
+/** One strike (one of Epoch's markets on the epoch). Probabilities are P(index > strike), 0–1. */
+export interface PantaForecastStrike {
+  strikeMicroLamports: number;
+  marketId: string;
+  title: string;
+  phase: string;
+  yesPrice: number | null;
+  noPrice: number | null;
+  /** YES / (YES + NO). */
+  impliedProbability: number | null;
+  /** The monotonic fit across strikes (a higher strike never gets a higher probability). */
+  fittedProbability: number | null;
+  /** The lognormal forecast at this strike. */
+  curveProbability: number | null;
+  /** Share of recent finished epochs above this strike (the informational model). */
+  empiricalProbability: number | null;
+  volumeUsdc: string | null;
+}
+
+/** The crowd's forecast of one mainnet epoch's Fee Index, from the YES prices of Epoch's markets on it. */
+export interface PantaForecastView extends PantaMeta {
+  label: 'informational';
+  disclaimer: string;
+  /** The forecast epoch (Solana mainnet); null when Epoch has no markets yet. */
+  epoch: number | null;
+  /** Epochs that have markets, newest first (for an epoch picker). */
+  epochs: number[];
+  unit: 'µL/CU';
+  strikes: PantaForecastStrike[];
+  fit: { method: PantaForecastMethod; mu: number; sigma: number; strikesUsed: number } | null;
+  /** µL/CU. */
+  median: number | null;
+  expected: number | null;
+  /** 80% band (p10 – p90). */
+  band: { low: number; high: number; coverage: 0.8 } | null;
+  /** The newest finished epoch's value, for scale. */
+  lastValue: { epoch: number; value: number } | null;
+  /** Why there is no forecast, when there is none. */
+  reason: string | null;
+}
+
+/** GET /v1/index/forecast: the Terminal's Fee Index card. `available: false` instead of an error when there is none. */
+export interface FeeIndexForecastCard {
+  available: boolean;
+  reason: string | null;
+  epoch: number | null;
+  unit: 'µL/CU';
+  median: number | null;
+  expected: number | null;
+  band: { low: number; high: number; coverage: 0.8 } | null;
+  method: PantaForecastMethod | null;
+  strikes: number;
+  poweredBy: 'Panta';
+  poweredByUrl: 'https://panta.market';
+  asOf: string;
+  ageSeconds: number;
+  stale: boolean;
+  /** The full forecast. */
+  details: string | null;
+  disclaimer: string;
+}
+
+/** One epoch's forecast in a `predict:panta` frame. */
+export interface PantaForecastSummary {
+  epoch: number;
+  median: number | null;
+  expected: number | null;
+  band: { low: number; high: number; coverage: 0.8 } | null;
+  method: PantaForecastMethod | null;
+  strikes: number;
 }
 
 /** WS `predict:panta` channel data: Epoch's Fee Index markets' prices, pushed every 15 s or so while subscribed. */
@@ -289,6 +407,8 @@ export interface PantaStreamData {
     modelProbability: number | null;
     volumeUsdc: string | null;
   }[];
+  /** The crowd forecast of each epoch above, from the same prices. */
+  forecasts: PantaForecastSummary[];
 }
 
 // ── GET /v1/index/epochs/:epoch ─────────────────────────────────────────────────────────────────────
@@ -318,7 +438,10 @@ export interface FeeIndexEpochView extends Meta {
     feeIndexAccount: string;
     /** The program epoch the value was posted under (the mainnet epoch when the program runs on mainnet). */
     programEpoch: number | null;
+    /** The `post_index` transaction (publisher_app). */
     postSignature: string | null;
+    /** The `finalize_index` transaction (cranks_app), once final. */
+    finalizeSignature: string | null;
   } | null;
   methodology: string;
 }

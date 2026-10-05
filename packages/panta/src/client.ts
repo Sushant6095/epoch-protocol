@@ -32,6 +32,8 @@ import {
   PantaCreatesSchema,
   type PantaCreatorFeeClaim,
   PantaCreatorFeeClaimSchema,
+  type PantaDashboard,
+  PantaDashboardSchema,
   PantaErrorEnvelopeSchema,
   type PantaMarket,
   type PantaMarketList,
@@ -68,6 +70,8 @@ const logger = Logger.create('PantaClient');
 
 /** https://docs.panta.market/index.md → Base URL. Every path ends with a slash (required). */
 export const PANTA_DEFAULT_BASE_URL = 'https://live-api.panta.market/api/v1';
+/** Panta's staging API, from the playground's `.env.example` (not in the docs): for a `pk_test_` dry run of a flow. */
+export const PANTA_STAGING_BASE_URL = 'https://staging-api.panta.market/api/v1';
 
 /** Base58 ids: addresses (32–44 chars) and transaction signatures (64–88). */
 const BASE58_ID = /^[1-9A-HJ-NP-Za-km-z]{32,88}$/;
@@ -133,6 +137,7 @@ export interface BuyBuildRequest {
 export interface PantaApi {
   readonly configured: boolean;
   account(): Promise<PantaAccount>;
+  dashboard(): Promise<PantaDashboard>;
   metrics(params?: { limit?: number }): Promise<PantaMetrics>;
   creates(params?: { limit?: number; status?: string }): Promise<PantaCreates>;
   attributedTrades(params?: { limit?: number; kind?: 'buy' | 'claim' }): Promise<PantaAttributedTrades>;
@@ -214,6 +219,16 @@ export class PantaClient implements PantaApi {
   /** GET /account/ (alias /whoami/): the key's account, including `canCreateMarkets`. */
   async account(): Promise<PantaAccount> {
     return this.request({ method: 'GET', path: ['account'], family: 'read', schema: PantaAccountSchema });
+  }
+
+  /** GET /account/dashboard/: the account, key counts, create and attributed-trade totals, permissions. */
+  async dashboard(): Promise<PantaDashboard> {
+    return this.request({
+      method: 'GET',
+      path: ['account', 'dashboard'],
+      family: 'read',
+      schema: PantaDashboardSchema,
+    });
   }
 
   /** GET /account/metrics/: create and attributed-trade totals plus recent rows (`limit` ≤ 200). */

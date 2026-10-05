@@ -12,6 +12,7 @@ function service(
     computed?: Record<number, { value: number; postedSignature: string | null }>;
     points?: Record<number, { value: number; status: FeeIndexStatus }>;
     posts?: Record<string, number>;
+    finals?: Record<number, string>;
     cluster?: string;
     program?: boolean;
   } = {},
@@ -20,6 +21,7 @@ function service(
     computed: async (epoch) => setup.computed?.[epoch] ?? null,
     programPoint: async (epoch) => setup.points?.[epoch] ?? null,
     postedEpoch: async (signature) => setup.posts?.[signature] ?? null,
+    finalizedBy: async (programEpoch) => setup.finals?.[programEpoch] ?? null,
     program: { programId: setup.program === false ? null : PROGRAM.toBase58(), cluster: setup.cluster ?? 'devnet' },
     methodologyUrl: 'https://github.com/Sushant6095/epoch-protocol/blob/main/docs/FEE_INDEX_METHODOLOGY.md',
     now: () => Date.parse('2026-10-03T12:00:00Z'),
@@ -43,12 +45,17 @@ describe('FeeIndexEpochService (GET /v1/index/epochs/:epoch)', () => {
     const posts = { sigPost: 1_176 };
     expect(
       await service({ computed: posted, posts, points: { 1_176: { value: 1_400, status: 'proposed' } } }).epoch(1_051),
-    ).toMatchObject({ status: 'proposed', final: false, onChain: { programEpoch: 1_176, postSignature: 'sigPost' } });
+    ).toMatchObject({
+      status: 'proposed',
+      final: false,
+      onChain: { programEpoch: 1_176, postSignature: 'sigPost', finalizeSignature: null },
+    });
 
     const final = await service({
       computed: posted,
       posts,
       points: { 1_176: { value: 1_400, status: 'final' } },
+      finals: { 1_176: 'sigFinalize' },
     }).epoch(1_051);
     expect(final).toMatchObject({
       schemaVersion: 1,
@@ -64,6 +71,8 @@ describe('FeeIndexEpochService (GET /v1/index/epochs/:epoch)', () => {
         programId: PROGRAM.toBase58(),
         feeIndexAccount: findFeeIndexPda(PROGRAM, findPoolPda(PROGRAM)[0])[0].toBase58(),
         programEpoch: 1_176,
+        postSignature: 'sigPost',
+        finalizeSignature: 'sigFinalize',
       },
     });
     expect(final.asOf).toBe('2026-10-03T17:30:00+05:30');

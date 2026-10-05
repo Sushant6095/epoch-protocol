@@ -1,6 +1,8 @@
 /**
  * Panta API answers for tests, copied from the documented examples (https://docs.panta.market/api-reference/…, read
- * 3 Oct 2026) with the elided values ("…") filled in by deterministic test keys. Test data only: never served.
+ * 3 Oct 2026) with the elided values ("…") filled in by deterministic test keys, plus `live*` shapes taken from the
+ * types of Panta's playground (github.com/Kaito-HQ/panta-api-playground, `src/lib/types.ts`), which was written against
+ * the live API. Test data only: never served.
  */
 import { base58Encode } from '@epoch/epoch-sdk';
 import { PublicKey } from '@solana/web3.js';
@@ -28,6 +30,17 @@ export const account = {
   canCreateMarkets: true,
   createdAt: '2026-09-04T12:00:00.000000Z',
   apiKeyId: 'key_abc',
+};
+
+/** GET /account/dashboard/ · api-reference/account/dashboard.md */
+export const dashboard = {
+  account,
+  keys: { active: 1, revoked: 0, total: 1 },
+  metrics: {
+    creates: { total: 3, byStatus: { registered: 2, pending: 1 } },
+    trades: { total: 5, volumeUsdcBase: 125000000, byKind: { buy: 4, claim: 1 } },
+  },
+  permissions: { canCreateMarkets: true },
 };
 
 /** GET /account/metrics/ · api-reference/account/metrics.md */
@@ -130,6 +143,36 @@ const tapeRow = {
 /** GET /markets/{marketId}/trades/ · api-reference/markets/trades.md */
 export const marketTrades = { marketId: MARKET, items: [tapeRow] };
 
+/** live (playground `MarketCatalogItem`): the detail carries volume totals, the creation fee, creator and oracle. */
+export const liveMarket = {
+  ...market,
+  volumeUsdc: '8.60',
+  volumeUsdcBase: '8600000',
+  totalVolumeUsdc: '1250.40',
+  totalVolumeUsdcBase: 1250400000,
+  creationFee: 50,
+  creatorAddress: CREATOR,
+  oracle: 'https://api.example.com/v1/index/epochs/1051',
+};
+
+/** live (playground `CatalogTradeRow`): share and fee amounts in 1e6 base units, optional fields, kind and side. */
+export const liveTapeRow = {
+  marketId: MARKET,
+  wallet: WALLET,
+  isPrimary: true,
+  yesAmount: '38420000',
+  noAmount: 0,
+  feePaid: '400000',
+  blockTime: 1767225600,
+  signature: SIGNATURE,
+  quoteAsset: 'USDC',
+  kind: 'buy',
+  side: 'YES',
+  amountUsdc: '20.00',
+  amountUsdcBase: 20000000,
+};
+export const liveMarketTrades = { marketId: MARKET, items: [liveTapeRow, { blockTime: null }] };
+
 /** GET /wallets/{wallet}/trades/ · api-reference/markets/wallet-trades.md */
 export const walletTrades = { wallet: WALLET, items: [tapeRow] };
 
@@ -220,6 +263,9 @@ export const buyBuild = {
   expiresAt: '2026-09-04T16:28:00.000000Z',
   blockhashExpiryHintSec: 60,
 };
+
+/** live (playground `PrimaryBuildResponse`): `lastValidBlockHeight` and `derived` may be missing. */
+export const liveBuyBuild = (({ lastValidBlockHeight: _height, derived: _derived, ...rest }) => rest)(buyBuild);
 
 /** POST /primaryordersubmit/ · api-reference/orders/submit.md */
 export const submit = { orderId: 'ord_abc123', status: 'submitted', signature: SIGNATURE };

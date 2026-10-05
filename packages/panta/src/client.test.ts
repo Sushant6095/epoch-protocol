@@ -84,6 +84,7 @@ describe('PantaClient requests', () => {
     const { fake, client } = setup({ budget: new RequestBudget({ share: 1 }) });
     const cases: [() => Promise<unknown>, unknown, string, string][] = [
       [() => client.account(), fx.account, 'GET', '/account/'],
+      [() => client.dashboard(), fx.dashboard, 'GET', '/account/dashboard/'],
       [() => client.metrics({ limit: 10 }), fx.metrics, 'GET', '/account/metrics/?limit=10'],
       [() => client.creates({ status: 'registered' }), fx.creates, 'GET', '/account/creates/?status=registered'],
       [() => client.attributedTrades({ kind: 'buy' }), fx.attributedTrades, 'GET', '/account/trades/?kind=buy'],

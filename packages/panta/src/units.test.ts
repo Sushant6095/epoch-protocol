@@ -1,4 +1,4 @@
-import { baseToUsdc, baseUnits, decimalToNumber, isUsdcAmount, usdcToBase } from './units';
+import { baseToUsdc, baseUnits, catalogAmount, decimalToNumber, isUsdcAmount, usdcToBase } from './units';
 
 describe('USDC units', () => {
   it('converts the two formats Panta uses without floating point', () => {
@@ -22,5 +22,15 @@ describe('USDC units', () => {
     expect(() => baseUnits('50.5')).toThrow(RangeError);
     expect(decimalToNumber('0.52')).toBe(0.52);
     expect(decimalToNumber(null)).toBeNaN();
+  });
+
+  it('reads catalog tape amounts in either format (live base units, documented decimals)', () => {
+    expect(catalogAmount('38420000')).toBe('38.42');
+    expect(catalogAmount('10000000')).toBe('10');
+    expect(catalogAmount('0')).toBe('0');
+    expect(catalogAmount('10.00')).toBe('10.00');
+    expect(catalogAmount(null)).toBeNull();
+    expect(catalogAmount('-5')).toBeNull();
+    expect(catalogAmount('1e6')).toBeNull();
   });
 });

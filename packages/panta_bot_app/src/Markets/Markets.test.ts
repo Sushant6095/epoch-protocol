@@ -12,7 +12,7 @@ import {
   sourcesOfTruth,
   utcIso,
 } from './MarketText';
-import { ladderThresholds, quantile, roundThreshold } from './Thresholds';
+import { byCentrality, quantile, roundThreshold, strikeLadder, strikeQuantiles } from './Thresholds';
 
 const SEC = NOW / 1_000;
 
@@ -75,13 +75,28 @@ describe('Thresholds', () => {
     expect(roundThreshold(Number.NaN)).toBe(0);
   });
 
-  it('uses the last finished epoch for one market and quantiles for a ladder', () => {
-    expect(ladderThresholds([1_284, 990, 1_500], 1)).toEqual([1_300]);
-    expect(ladderThresholds([], 1)).toEqual([]);
-    const history = Array.from({ length: 16 }, (_, i) => 1_000 + i * 20);
-    expect(ladderThresholds(history, 3)).toEqual([1_100, 1_150, 1_250]);
-    expect(ladderThresholds([1_000, 1_000, 1_000], 3)).toEqual([1_000]);
+  it('takes strikes at quantiles 20 points apart around the median of recent final values', () => {
+    expect(strikeQuantiles(1)).toEqual([0.5]);
+    expect(strikeQuantiles(3)).toEqual([0.3, 0.5, 0.7]);
+    expect(strikeQuantiles(5)).toEqual([0.1, 0.3, 0.5, 0.7, 0.9]);
+    expect(strikeQuantiles(4)).toEqual([0.2, 0.4, 0.6, 0.8]);
+    expect(strikeLadder([1_284, 990, 1_500], 1)).toEqual([1_300]);
+    expect(strikeLadder([], 1)).toEqual([]);
+    expect(strikeLadder([0, -5], 1)).toEqual([]);
+    const history = Array.from({ length: 10 }, (_, i) => 1_000 + i * 20);
+    // p30 = 1,054 → 1,050; p50 = 1,090 → 1,100; p70 = 1,126 → 1,150
+    expect(strikeLadder(history, 3)).toEqual([1_050, 1_100, 1_150]);
+    // a flat stretch still gives three distinct strikes, one rounding step apart
+    expect(strikeLadder([1_000, 1_000, 1_000], 3)).toEqual([1_000, 1_050, 1_100]);
+    expect(strikeLadder([40, 41, 40], 2)).toEqual([40, 41]);
     expect(quantile([1, 2, 3, 4], 0.5)).toBe(2.5);
+  });
+
+  it('creates the middle strike first when the budget cannot pay for all', () => {
+    const rows = [{ threshold: 1_150 }, { threshold: 1_050 }, { threshold: 1_100 }];
+    expect(byCentrality(rows).map((row) => row.threshold)).toEqual([1_100, 1_050, 1_150]);
+    const four = [1, 2, 3, 4].map((threshold) => ({ threshold }));
+    expect(byCentrality(four).map((row) => row.threshold)).toEqual([2, 3, 1, 4]);
   });
 });
 

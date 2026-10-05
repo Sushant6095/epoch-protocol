@@ -14,6 +14,7 @@ import {
   FeeIndexEpochParamsDto,
   PantaBuildDto,
   PantaClaimDto,
+  PantaForecastQueryDto,
   PantaMarketParamsDto,
   PantaMarketsQueryDto,
   PantaPositionsQueryDto,
@@ -55,12 +56,18 @@ const tradingOn: Middleware = (_req, _res, next) => {
   );
 };
 
-/** Visitors from PANTA_BLOCKED_COUNTRIES (per the trusted proxy's geo header) may browse but not trade: 403. */
+/**
+ * Visitors from PANTA_BLOCKED_COUNTRIES (per the trusted proxy's geo header) may browse but not trade: 403. So may
+ * visitors whose country no trusted header names, when PANTA_GEO_FAIL_CLOSED=true.
+ */
 const geoGate: Middleware = (req, _res, next) => {
   const { config } = getPantaServices();
   const country = countryOf(req.headers, config.PANTA_GEO_HEADERS);
-  if (!isGeoBlocked(country, config.PANTA_BLOCKED_COUNTRIES)) return next();
-  next(new EpochException('Real-money trading is not available in your region', 'PANTA_GEO_BLOCKED', 403, { country }));
+  if (!isGeoBlocked(country, config.PANTA_BLOCKED_COUNTRIES, config.PANTA_GEO_FAIL_CLOSED)) return next();
+  const message = country
+    ? 'Real-money trading is not available in your region'
+    : 'Real-money trading needs your region, which could not be determined';
+  next(new EpochException(message, 'PANTA_GEO_BLOCKED', 403, { country }));
 };
 
 const readLimit = limit((l) => l.read, 'ip', 'Too many requests, try again shortly');
@@ -84,6 +91,8 @@ export const pantaRouter: HttpRouter = createRouter()
   .get('/categories', readLimit, handle(PantaController.categories))
   .get('/positions', readLimit, validate(PantaPositionsQueryDto, 'query'), handle(PantaController.positions))
   .get('/stats', readLimit, handle(PantaController.stats))
+  .get('/forecast', readLimit, validate(PantaForecastQueryDto, 'query'), handle(PantaController.forecast))
+  .get('/market-image.png', handle(PantaController.marketImage))
   .get('/status/:tradeId', readLimit, validate(PantaTradeParamsDto, 'params'), handle(PantaController.status))
   .post(
     '/quote',

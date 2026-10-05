@@ -4,9 +4,12 @@ import {
   type BuyQuoteRequest,
   type ListMarketsParams,
   type PantaApi,
+  type PantaAttributedTrades,
   type PantaBuyBuild,
   type PantaBuyQuote,
   type PantaCategories,
+  type PantaCreates,
+  type PantaDashboard,
   type PantaInstruction,
   type PantaMarket,
   type PantaMarketList,
@@ -53,6 +56,12 @@ export function pantaMarket(overrides: Partial<PantaMarket> = {}): PantaMarket {
     resolved: false,
     status: 'open',
     volumeUsdc: '1200.00',
+    volumeUsdcBase: null,
+    totalVolumeUsdc: null,
+    totalVolumeUsdcBase: null,
+    creationFee: null,
+    creatorAddress: null,
+    oracle: null,
     campaignId: null,
     createdByPartner: false,
     yesPrice: '0.52',
@@ -106,13 +115,24 @@ export class FakeApiPanta implements PantaApi {
 
   async listMarkets(params: ListMarketsParams = {}): Promise<PantaMarketList> {
     this.record('listMarkets', params);
-    const items = this.catalog.filter((m) => !params.category || m.category === params.category);
+    const items = this.catalog.filter(
+      (m) => (!params.category || m.category === params.category) && (params.createdBy !== 'me' || m.createdByPartner),
+    );
     const start = params.cursor ? items.findIndex((m) => m.marketId === params.cursor) + 1 : 0;
     const limit = params.limit ?? 20;
     const page = items.slice(start, start + limit);
     const more = start + limit < items.length;
     return {
-      items: page.map((m) => ({ ...m, yesPrice: null, noPrice: null })),
+      // List rows carry no prices (api-reference/markets/list.md).
+      items: page.map((m) => ({
+        ...m,
+        yesPrice: null,
+        noPrice: null,
+        primaryYesPrice: null,
+        primaryNoPrice: null,
+        secondaryYesPrice: null,
+        secondaryNoPrice: null,
+      })),
       nextCursor: more ? (page.at(-1)?.marketId ?? null) : null,
     };
   }
@@ -127,17 +147,22 @@ export class FakeApiPanta implements PantaApi {
     return {
       marketId,
       items: [
+        // live format (Panta's playground): share and fee amounts in 1e6 base units.
         {
           id: '1',
           marketId,
           wallet: pkey(70),
           isPrimary: true,
-          yesAmount: '10.00',
+          yesAmount: '10000000',
           noAmount: '0',
-          feePaid: '0.05',
+          feePaid: '50000',
           blockTime: 1_790_000_100,
           signature: 'sig-tape',
           quoteAsset: 'USDC',
+          kind: 'buy',
+          side: 'yes',
+          amountUsdc: null,
+          amountUsdcBase: '10200000',
         },
       ],
     };
@@ -237,9 +262,33 @@ export class FakeApiPanta implements PantaApi {
     };
   }
 
+  /** The account endpoints behind GET /v1/predict/panta/stats (traction). */
+  attributed: PantaAttributedTrades['items'] = [];
+  async dashboard(): Promise<PantaDashboard> {
+    this.record('dashboard', null);
+    return {
+      account: { userId: 'usr_epoch', name: 'Epoch', status: 'active', canCreateMarkets: true, apiKeyId: 'key_1' },
+      keys: { active: 1, revoked: 0, total: 1 },
+      metrics: {
+        creates: { total: 3, byStatus: { registered: 2, pending: 1 } },
+        trades: { total: 3, volumeUsdcBase: '60000000', byKind: { buy: 2, claim: 1 } },
+      },
+      permissions: { canCreateMarkets: true },
+    };
+  }
+  async creates(): Promise<PantaCreates> {
+    this.record('creates', null);
+    return { summary: { total: 3, byStatus: { registered: 2, pending: 1 } }, items: [] };
+  }
+  async attributedTrades(): Promise<PantaAttributedTrades> {
+    this.record('attributedTrades', null);
+    return {
+      summary: { total: 3, volumeUsdcBase: '60000000', byKind: { buy: 2, claim: 1 } },
+      items: this.attributed,
+    };
+  }
+
   account = notUsed('account');
-  creates = notUsed('creates');
-  attributedTrades = notUsed('attributedTrades');
   walletTrades = notUsed('walletTrades');
   quoteCreate = notUsed('quoteCreate');
   buildCreate = notUsed('buildCreate');
@@ -346,6 +395,10 @@ export class MemoryPantaTradeStore implements PantaTradeStore {
       lastTradeAt: rows.at(-1)?.createdAt ?? null,
     };
   }
+  async wallets(limit: number): Promise<string[]> {
+    const rows = [...this.rows.values()].filter((row) => ['submitted', 'confirmed'].includes(row.status));
+    return [...new Set(rows.map((row) => row.wallet))].slice(0, limit);
+  }
 }
 
 /** Epoch's market rows (what panta_bot_app wrote). */
@@ -357,6 +410,11 @@ export class MemoryPantaMarketReader implements PantaMarketReader {
       .filter((row) => row.status === 'registered' && row.marketId)
       .sort((a, b) => b.epoch - a.epoch)
       .slice(0, limit);
+  }
+  async forEpoch(epoch: number): Promise<PantaMarketRow[]> {
+    return this.rows
+      .filter((row) => row.epoch === epoch && row.status === 'registered' && row.marketId)
+      .sort((a, b) => a.threshold - b.threshold);
   }
   async byMarketId(marketId: string): Promise<PantaMarketRow | null> {
     return this.rows.find((row) => row.marketId === marketId) ?? null;

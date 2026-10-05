@@ -1,8 +1,11 @@
 /**
  * The Panta public API shapes this package relies on, as zod schemas. Written from the documentation pages cited on
- * each block (index: https://docs.panta.market/llms.txt, read 3 Oct 2026). Responses are validated leniently: unknown
- * fields are dropped, fields we do not use are optional, and numbers the docs show both as strings and as numbers
- * (prices, amounts, shares) are accepted either way and normalised to strings.
+ * each block (index: https://docs.panta.market/llms.txt, read 3 Oct 2026, unchanged on 5 Oct) and reconciled on 5 Oct
+ * with Panta's official playground, which was written against the live API
+ * (https://github.com/Kaito-HQ/panta-api-playground, `src/lib/types.ts`, `src/lib/accountApi.ts`, the flows in
+ * `src/components/`). Where the two differ the playground wins and the block says so ("live:"). Responses are
+ * validated leniently: unknown fields are dropped, fields we do not use are optional, and numbers the docs show both
+ * as strings and as numbers (prices, amounts, shares) are accepted either way and normalised to strings.
  */
 import { z } from '@epoch/common/pkg/zod';
 
@@ -17,6 +20,12 @@ const nullableString = z
   .nullish()
   .transform((value) => value ?? null);
 const countMap = z.record(z.string(), z.number()).default({});
+/** live: optional on every build (the playground types it `lastValidBlockHeight?: number`). */
+const nullableInt = z
+  .number()
+  .int()
+  .nullish()
+  .transform((value) => value ?? null);
 
 // ── Errors · https://docs.panta.market/guides/errors.md ──────────────────────────────────────────────
 
@@ -43,6 +52,8 @@ export const PantaAccountSchema = z.object({
   apiKeyId: nullableString,
 });
 export type PantaAccount = z.infer<typeof PantaAccountSchema>;
+
+const keyCounts = z.object({ active: z.number(), revoked: z.number(), total: z.number() });
 
 /** A create-session row · https://docs.panta.market/api-reference/account/creates.md */
 export const PantaCreateRowSchema = z.object({
@@ -89,12 +100,24 @@ export const PantaMetricsSchema = z.object({
   summary: z.object({
     creates: createSummary,
     trades: tradeSummary,
-    keys: z.object({ active: z.number(), revoked: z.number(), total: z.number() }).optional(),
+    keys: keyCounts.optional(),
   }),
   creates: z.array(PantaCreateRowSchema).default([]),
   trades: z.array(PantaAttributedTradeSchema).default([]),
 });
 export type PantaMetrics = z.infer<typeof PantaMetricsSchema>;
+
+/**
+ * GET /account/dashboard/ · https://docs.panta.market/api-reference/account/dashboard.md (the playground's Account tab
+ * reads it with metrics as the fallback for totals).
+ */
+export const PantaDashboardSchema = z.object({
+  account: PantaAccountSchema,
+  keys: keyCounts.optional(),
+  metrics: z.object({ creates: createSummary, trades: tradeSummary }),
+  permissions: z.object({ canCreateMarkets: z.boolean().optional() }).default({}),
+});
+export type PantaDashboard = z.infer<typeof PantaDashboardSchema>;
 
 /** https://docs.panta.market/api-reference/account/creates.md */
 export const PantaCreatesSchema = z.object({
@@ -161,8 +184,19 @@ export const PantaMarketSchema = z.object({
   region: nullableString,
   resolved: z.boolean().default(false),
   status: nullableString,
-  /** Human-readable volume ("1200.00"). */
+  /** Human-readable volume ("1200.00"); the playground labels it "active volume". */
   volumeUsdc: nullableDecimal,
+  /** live: the same in base units. */
+  volumeUsdcBase: nullableDecimal,
+  /** live: all-time volume, human decimal (the playground's "total"). */
+  totalVolumeUsdc: nullableDecimal,
+  totalVolumeUsdcBase: nullableDecimal,
+  /** live: the creation fee paid, USDC (human; the playground prints "create fee {creationFee} USDC"). */
+  creationFee: nullableDecimal,
+  /** live: the creator wallet (ours for Epoch's markets). */
+  creatorAddress: nullableString,
+  /** live: the oracle text (`oracle` of the quote; defaults to the sources joined by ","). */
+  oracle: nullableString,
   campaignId: nullableString,
   /** True when this API account created the market. */
   createdByPartner: z.boolean().default(false),
@@ -181,22 +215,36 @@ export const PantaMarketListSchema = z.object({
 });
 export type PantaMarketList = z.infer<typeof PantaMarketListSchema>;
 
-/** A catalog trade (the public tape) · https://docs.panta.market/api-reference/markets/trades.md */
+/**
+ * A catalog trade (the public tape) · https://docs.panta.market/api-reference/markets/trades.md. live: every field is
+ * optional, share and fee amounts are 1e6 base units ("10000000"; the docs example shows "10.00"; read them with
+ * `catalogAmount`), and rows may carry `kind`, `side` and `amountUsdc` / `amountUsdcBase`.
+ */
 export const PantaCatalogTradeSchema = z.object({
-  id: decimalLike,
-  marketId: z.string(),
-  wallet: z.string(),
-  isPrimary: z.boolean(),
-  yesAmount: decimalLike,
-  noAmount: decimalLike,
-  feePaid: decimalLike,
+  id: nullableDecimal,
+  marketId: nullableString,
+  wallet: nullableString,
+  isPrimary: z
+    .boolean()
+    .nullish()
+    .transform((value) => value ?? null),
+  yesAmount: nullableDecimal,
+  noAmount: nullableDecimal,
+  feePaid: nullableDecimal,
   /** Unix seconds. */
   blockTime: z
     .number()
     .nullish()
     .transform((value) => value ?? null),
-  signature: z.string(),
+  signature: nullableString,
   quoteAsset: nullableString,
+  kind: nullableString,
+  side: z
+    .string()
+    .nullish()
+    .transform((value) => (value ? value.toLowerCase() : null)),
+  amountUsdc: nullableDecimal,
+  amountUsdcBase: nullableDecimal,
 });
 export type PantaCatalogTrade = z.infer<typeof PantaCatalogTradeSchema>;
 
@@ -278,7 +326,7 @@ export const PantaCreateBuildSchema = z.object({
   /** Base64 unsigned VersionedTransaction. Never modify it: register checks the chain against the quote. */
   transaction: z.string().min(1),
   recentBlockhash: z.string(),
-  lastValidBlockHeight: z.number().int(),
+  lastValidBlockHeight: nullableInt,
   blockhashExpiryHintSec: z
     .number()
     .nullish()
@@ -361,7 +409,7 @@ export const PantaBuyBuildSchema = z.object({
   instructions: z.array(PantaInstructionSchema).min(1),
   derived: z.record(z.string(), z.string()).default({}),
   recentBlockhash: z.string(),
-  lastValidBlockHeight: z.number().int(),
+  lastValidBlockHeight: nullableInt,
   expiresAt: nullableString,
   blockhashExpiryHintSec: z
     .number()
@@ -426,7 +474,7 @@ export const PantaWinClaimSchema = z.object({
   instructions: z.array(PantaInstructionSchema).min(1),
   derived: z.record(z.string(), z.string()).default({}),
   recentBlockhash: z.string(),
-  lastValidBlockHeight: z.number().int(),
+  lastValidBlockHeight: nullableInt,
 });
 export type PantaWinClaim = z.infer<typeof PantaWinClaimSchema>;
 
@@ -438,7 +486,7 @@ export const PantaCreatorFeeClaimSchema = z.object({
   instructions: z.array(PantaInstructionSchema).min(1),
   derived: z.record(z.string(), z.string()).default({}),
   recentBlockhash: z.string(),
-  lastValidBlockHeight: z.number().int(),
+  lastValidBlockHeight: nullableInt,
 });
 export type PantaCreatorFeeClaim = z.infer<typeof PantaCreatorFeeClaimSchema>;
 
