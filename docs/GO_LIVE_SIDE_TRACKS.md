@@ -32,11 +32,14 @@ needs its own Superteam Earn form, filled in by a person.
    - A Panta market only resolves from an epoch whose status is `final`. If no final value exists 48 h after its
      resolution time, it resolves NO.
 4. **Program on mainnet.** The Meteora entry needs it and the Panta resolution source references it.
-   - `declare_id!` is still the placeholder. Create the program keypair and pick the upgrade authority (a Squads
-     multisig is safer than one key).
-   - Deploy the build, about 950 KB. A fresh deploy locks about **6.6 SOL** of rent in program data. The buffer's rent
-     is refunded.
-   - Then run `initialize_pool`. Details: [REVENUE_TOKENS_MAINNET.md](REVENUE_TOKENS_MAINNET.md).
+   - `declare_id!` is still the placeholder. Create the program keypair outside the repo, then run
+     `scripts/set-program-id.sh <ID>`; `scripts/check-program-id.sh` (also run by the tests) fails if any copy disagrees.
+   - Pick the upgrade authority (a Squads multisig is safer than one key).
+   - Deploy the build, about 957 KB, through a buffer. Program data locks about **6.7 SOL** of rent (about 8.4 SOL with
+     room to grow). The buffer's rent is refunded.
+   - Then `operator_cli init-pool`, `set-roles` and, per validator, `onboard-validator` (offline signing for the
+     validator's keys). Every command is a dry run until `--send`. Step by step: [scripts/mainnet/go-live.md](../scripts/mainnet/go-live.md)
+     and [REVENUE_TOKENS_MAINNET.md](REVENUE_TOKENS_MAINNET.md).
    - Ship the new SDK and apps before any later program upgrade. Old clients break against the new `sweep`,
      `release_validator` and `update_commission`.
 5. **Paid RPCs.**
@@ -54,19 +57,24 @@ needs its own Superteam Earn form, filled in by a person.
 2. **Set the env.** The key goes in `.env` only, never in chat or the repo.
    - Required: `SOLAMI_TOKEN`, `SOLAMI_RPC_URL`, `SLOT_SOURCE=auto`.
    - Optional: `INDEXER_BACKFILL_EPOCH=true` with `GAP_FILL_RPS=30`.
-   - For the publisher's mainnet `post_index`: `SOLAMI_BEAM_URL`.
+   - Beam for every mainnet transaction we sign (publisher, cranks, treasury claims): `SOLAMI_BEAM_URL`, set to your
+     Solami RPC URL. Each send tips a Solami tip address (at least 0.0001 SOL), so keep SOL in those wallets.
+   - gRPC: the Pro plan includes two streams, one for the indexer and one for the API.
    - Values and examples: [packages/indexer_app/README.md](../packages/indexer_app/README.md).
-3. **Check the key.** Run `pnpm solami:check`. It streams slots, compares latency against RPC, checks the RPC and
-   never prints the token.
+3. **Check the key.** Run `pnpm solami:check --compression zstd`. It streams slots, compares latency against RPC, checks
+   the RPC, Beam and the tip addresses, and never prints the token.
 4. **Run it.**
    - Start `indexer_app` and `api_app` (pm2: `pm2 start pm2.config.js --env mainnet`).
    - `GET /v1/live/summary` must show `live: true`, data source Solami, and a lag of a few slots.
+   - `GET /v1/live/solami` is the usage report for judges: each Solami product in use, with health, latency and counts.
+   - `pnpm demo:solami` prints live stream stats for the video; the indexer README has a 2–3 minute demo outline.
 5. **Submit.**
    - The repo must be public, with the "run with your own key" README (done).
    - Record a 2–3 minute mainnet demo: the Live page streaming, the `solami:check` output and the README.
 
-**Verified so far:** on 4 Oct, 09:09–09:12 IST, in `rpc` mode on public mainnet RPC: 68 blocks, no lost slots, 3–6
-slots behind the tip. Not yet tested: streaming with a real Solami key, and Beam sends.
+**Verified so far:** on public mainnet RPC without a key: 68 blocks with no lost slots (4 Oct, 09:09–09:12 IST); a
+smoke run that crossed epoch 1049→1050 live (5 Oct, 19:30 IST); Solami's gRPC endpoint accepted zstd and gzip and its
+tip-address API answered. Not yet tested: streaming with a real key, and real Beam sends.
 
 ## 3. Panta: the Predict page (real USDC)
 
@@ -83,13 +91,15 @@ slots behind the tip. Not yet tested: streaming with a real Solami key, and Beam
 3. **Bot wallet.**
    - Keep the keypair file outside the repo, for example `~/.config/solana/epoch-panta-bot.json`.
    - Fund it on mainnet with USDC for at least one creation fee per market. The docs example is 50 USDC; our default
-     cap is 100 USDC per 24 h.
+     cap is 100 USDC per 24 h. With a strike ladder (`PANTA_STRIKES_PER_EPOCH`, up to 5 markets per epoch, which also
+     powers the crowd forecast), raise `PANTA_MAX_CREATE_USDC_PER_DAY` to match.
    - Add 0.1–0.2 SOL.
 4. **Env:**
    - `PANTA_BOT_KEYPAIR_PATH`.
-   - `PANTA_MARKET_IMAGE_URL`: a public https image, 1024×1024.
+   - `PANTA_MARKET_IMAGE_URL`: leave unset to use the API's own image, `{PUBLIC_API_URL}/v1/predict/panta/market-image.png`.
    - `PUBLIC_API_URL`, `PANTA_RPC_URL`.
    - `PANTA_BLOCKED_COUNTRIES`, and `API_TRUST_PROXY` behind a proxy that sets the country header.
+     `PANTA_GEO_FAIL_CLOSED=true` refuses trades when no trusted country header is present.
 5. **Dry run.** Start the bot with `PANTA_DRY_RUN=true` and read the `DRY RUN: would create` lines.
 6. **Go live.**
    - The log should show `creating market`, then `market registered on Panta`.
@@ -101,7 +111,8 @@ slots behind the tip. Not yet tested: streaming with a real Solami key, and Beam
    - Require explicit consent before every transaction.
    - Never show stale prices as live.
 
-Don't go live until mainnet epochs reliably reach `final`.
+Don't go live until mainnet epochs reliably reach `final`. The path from computed to posted to final was proven on a
+local chain (`scripts/e2e/index-to-final.mts`, 13 of 13 checks).
 
 ## 4. Meteora: the Launch page (real SOL)
 
@@ -128,8 +139,14 @@ Don't go live until mainnet epochs reliably reach `final`.
    geo-restricted front end ([ADR 0006](adr/0006-revenue-tokens-on-meteora.md)).
 
 **Verified so far:** on a local validator running Meteora's real mainnet DBC, DAMM v2 and Metaplex binaries:
-- the full lifecycle: launch, sweep, buyback on the curve, graduation, buybacks on DAMM v2, redeem and the end of term;
-- every treasury claim, with exact amounts.
+- the full lifecycle: launch, sweep, buyback on the curve, graduation, buybacks on DAMM v2, redeem and the end of term
+  (70 of 70 checks after the security fixes);
+- every treasury claim, with exact amounts;
+- the whole loop through the API: every Launch page endpoint, the activity feed and the WS frames checked against the
+  chain (46 of 46);
+- the mainnet-day commands (`init-pool`, roles, pause, offline onboarding, collectors, register): 16 of 16.
+
+The security review and its fixes are in [security/revenue-tokens-review.md](security/revenue-tokens-review.md).
 
 Public devnet was not used because its faucet refused airdrops and it runs different Meteora builds.
 
@@ -161,6 +178,8 @@ Public devnet was not used because its faucet refused airdrops and it runs diffe
 4. **The design-partner validator** for the mainnet launch.
 5. **Program upgrade authority:** one key or a Squads multisig.
 6. **Solami plan** through judging: the trial, or paid.
+7. **Unredeemed escrow.** Holders have 30 epochs after the term to redeem; after that, what they leave becomes pool
+   income (as built). The alternatives are sending it to the validator or never closing the token.
 
 ## 7. Money needed (approximate)
 

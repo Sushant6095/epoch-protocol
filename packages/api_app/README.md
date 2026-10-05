@@ -71,6 +71,10 @@ it had not stored yet, drops the program caches the event makes stale and emits 
   (block time = arrival time). Live events never move the cursor, so the next poll still walks every signature after
   it: a dropped websocket loses nothing, and `(signature, ix)` dedupes. When a poll finds transactions the websocket
   never delivered, the ingester reconnects and resubscribes.
+- _Live over Solami gRPC_ (when `EPOCH_CLUSTER=mainnet` and `SOLAMI_TOKEN` is set): the program's transactions arrive
+  over Yellowstone (`account_include` = the program, `failed = false`, `confirmed`) on the API's one Solami stream
+  (`Sources/SolamiStream.ts`), instead of `logsSubscribe`; the websocket takes over while that stream is down for 30 s
+  or refused, and steps back when it streams again. Duplicates are dropped by signature and `(signature, ix)`.
 - Only `Program data:` lines written while the Epoch program is the innermost frame count (epoch-sdk
   `parseEventsFromLogs`): other programs' data in the same transaction is ignored. `ix` is the event's position among
   its transaction's events; `epoch` is the program cluster's epoch of the slot; `payload` is `eventToJson(event).data`.
@@ -161,7 +165,7 @@ current set; data frames carry `channel`, `data` and `at` (when the data was rea
 
 | Channel    | `data`                                                                                                                                                   | When                                                                                                                                                                                 |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `slot`     | MAINNET `{ slot, epoch, slotIndex, slotsInEpoch, leader, leaderName }` (leader = identity key; `leaderName` from the validator table, null when unknown) | every `STREAM_SLOT_INTERVAL_MS` when the slot moved; polled only while someone subscribes; the last value right away to a new subscriber                                             |
+| `slot`     | MAINNET `{ slot, epoch, slotIndex, slotsInEpoch, leader, leaderName, source }` (leader = identity key; `leaderName` from the validator table, null when unknown; `source`: `grpc` pushed by Solami, `rpc` polled) | with `SOLAMI_TOKEN`: each confirmed slot as Solami gRPC pushes it; otherwise (or while that stream is quiet) every `STREAM_SLOT_INTERVAL_MS` when the slot moved; only while someone subscribes; the last value right away to a new subscriber |
 | `activity` | one `ActivityEvent` (as `GET /v1/activity`)                                                                                                              | each new program event the feed shows and each Predict call; events older than 10 minutes (a backfill after downtime) only appear in `GET /v1/activity`                              |
 | `vault`    | the vault provider's snapshot (`VaultSnapshot`)                                                                                                          | on subscribe, then 2 s after the last pool event (`Deposited`, `Withdraw*`, `Accrued`, `AdvanceOpened`, `Swept`, `AdvanceRepaid`, `AdvanceDefaulted`, `BondPosted`, `BondWithdrawn`) |
 | `feeIndex` | `{ points: FeeIndexPoint[16], final, proposed, avg8 }`                                                                                                   | on subscribe, then after `IndexProposed` / `IndexFinalized` / `IndexVetoed`                                                                                                          |
@@ -524,17 +528,20 @@ for the app is [docs/pages/predict.md](../../docs/pages/predict.md); response ty
 | Method and path | Returns | Who | Panta calls |
 | --- | --- | --- | --- |
 | `GET /v1/predict/panta/markets?category=&status=&q=&cursor=&limit=` | `PantaMarketsPage`: `access`, `ours` (our markets with prices and `intelligence`), `discover` (the catalog) | public | `GET /markets/{id}/` per our market, `GET /markets/` (cached) |
-| `GET /v1/predict/panta/markets/:marketId` | `PantaMarketDetail`: the card and its public tape | public | `GET /markets/{id}/`, `GET /markets/{id}/trades/` |
+| `GET /v1/predict/panta/markets/:marketId` | `PantaMarketDetail`: the card and its public tape (share and fee amounts as decimals: Panta's live tape sends 1e6 base units) | public | `GET /markets/{id}/`, `GET /markets/{id}/trades/` |
 | `GET /v1/predict/panta/categories` | `PantaCategoriesView` | public | `GET /categories/` (1 h) |
 | `GET /v1/predict/panta/positions?wallet=` | `PantaPositionsView`: shares, `state` (open, claimable, won, lost, claimed, cancelled), display-only value | public | `GET /positions/`, `GET /markets/{id}/` |
-| `GET /v1/predict/panta/stats` | `PantaStatsView`: our trades, wallets, volume, attribution, markets created, fees; Panta's account metrics | public | `GET /account/metrics/` (60 s) |
+| `GET /v1/predict/panta/stats` | `PantaStatsView`: our trades, wallets, volume, attribution, markets created, fees; Panta's account metrics; `traction` (Epoch on Panta: markets created, attributed volume, volume on our markets, traders, attributed trades, creator fees claimed, estimated protocol fees) | public | `GET /account/dashboard/`, `/account/metrics/`, `/account/creates/`, `/account/trades/`, `GET /markets/?createdBy=me` (together, cached 2 min, stale copy up to 30 min) |
+| `GET /v1/predict/panta/forecast?epoch=` | `PantaForecastView`: the crowd's forecast of one epoch's index from its strikes' YES prices (implied, monotonic fit, lognormal curve and empirical probability per strike; median, expected value, 80% band) | public | `GET /markets/{id}/` per strike (cached) |
+| `GET /v1/predict/panta/market-image.png` | the 1024×1024 PNG catalog image of our markets (the bot's default `PANTA_MARKET_IMAGE_URL`) | public | — |
 | `POST /v1/predict/panta/quote` `{ wallet, marketId, side, amountUsdc }` | `PantaQuoteView` (~90 s quote, summary) | public | `POST /primaryorderquote/` |
 | `POST /v1/predict/panta/build` `{ quoteId, wallet, consent: true, maxSlippageBps? }` | `PantaBuildView`: unsigned v0 transaction (base64), `tradeId`, summary, review | SIWS session of `wallet` | `POST /primaryorderbuild/` |
 | `POST /v1/predict/panta/submit` `{ tradeId, signedTransaction }` or `{ tradeId, signature }` | `PantaSubmitView` | SIWS session of the trade's wallet | `POST /primaryordersubmit/` (buys) |
 | `GET /v1/predict/panta/status/:tradeId` | `PantaTradeStatusView`: chain status, Panta's order status, attribution | public | `POST /primaryorderverify/` (5 s), `POST /trades/` |
 | `POST /v1/predict/panta/claim/build` `{ wallet, marketId, consent: true }` | `PantaBuildView` for a win claim | SIWS session of `wallet` | `POST /claim/build/` |
-| `GET /v1/index/epochs/:epoch` | `FeeIndexEpochView`: one MAINNET epoch's value and `status` (`pending` · `computed` · `proposed` · `final` · `vetoed`) | public | — (the resolution source of our markets) |
-| `WS /v1/stream` channel `predict:panta` | `PantaStreamData`: our markets' prices, implied vs model probability | — | `GET /markets/{id}/` every `PANTA_STREAM_INTERVAL_SECONDS` (≥ 10 s) while someone listens; doubles on failure up to 5 min |
+| `GET /v1/index/epochs/:epoch` | `FeeIndexEpochView`: one MAINNET epoch's value and `status` (`pending` · `computed` · `proposed` · `final` · `vetoed`), the program epoch, the `post_index` and `finalize_index` signatures | public | — (the resolution source of our markets) |
+| `GET /v1/index/forecast` | `FeeIndexForecastCard`: the crowd forecast of the next epoch with markets, for the Terminal's Fee Index card (`available: false` with a reason instead of an error) | public | as `forecast` |
+| `WS /v1/stream` channel `predict:panta` | `PantaStreamData`: our markets' prices, implied vs model probability, and each epoch's crowd forecast (`forecasts`) | — | `GET /markets/{id}/` every `PANTA_STREAM_INTERVAL_SECONDS` (≥ 10 s) while someone listens; doubles on failure up to 5 min |
 
 **Attribution and freshness (Panta Terms of Use).** Every Panta-derived payload carries `poweredBy: "Panta"`,
 `poweredByUrl`, `asOf` (when Panta answered, IST), `ageSeconds` and `stale`. Reads are cached `PANTA_CACHE_SECONDS`
@@ -564,7 +571,9 @@ fast with `429 PANTA_BUSY` rather than queue.
 **Geo and eligibility.** `PANTA_BLOCKED_COUNTRIES` (ISO codes) blocks trading (`403 PANTA_GEO_BLOCKED`, details
 `country`) for visitors whose country the trusted proxy header names (`PANTA_GEO_HEADERS`: `cf-ipcountry`,
 `x-vercel-ip-country`; with any blocklist, Tor exits `T1` too). They can still browse; `access.geoBlocked` tells the
-page. Set the headers only behind a proxy that overwrites them. Panta's own restrictions come back as
+page. Set the headers only behind a proxy that overwrites them. A request no trusted header places is allowed by
+default; `PANTA_GEO_FAIL_CLOSED=true` refuses it as well (`403 PANTA_GEO_BLOCKED`, `country: null`, "needs your
+region"), so a deployment without a geo-aware proxy cannot trade by mistake. Panta's own restrictions come back as
 `403 PANTA_FORBIDDEN` (and `PANTA_CREATE_NOT_PERMITTED`) and are never worked around.
 
 **Errors.** `503 PANTA_NOT_CONFIGURED` (no key) · `503 PANTA_TRADING_DISABLED` · `503 PANTA_AUTH_FAILED` (Panta refused
@@ -574,6 +583,20 @@ our key) · `400 CONSENT_REQUIRED` · `400 PANTA_AMOUNT_OUT_OF_RANGE` · `400 TX
 Panta's codes as `PANTA_*`: `AMOUNT_TOO_SMALL`, `INVALID_PARAMS` (details `field`, `fields`), `MARKET_NOT_FOUND`,
 `MARKET_CLOSED` (not in primary), `QUOTE_EXPIRED`, `QUOTE_STALE`, `NOT_CLAIMABLE`, `TX_NOT_FOUND`, `TX_FAILED`,
 `TX_MISMATCH`, `TX_FEE_MISMATCH`, `FORBIDDEN` (details carry `pantaCode` and `pantaMessage`).
+
+**Crowd forecast** (`Services/Panta/CrowdForecast.ts`, informational). Each of our markets on an epoch is one strike K
+(the bot's ladder, `PANTA_STRIKES_PER_EPOCH`). P(index > K) = YES / (YES + NO); a weighted pool-adjacent-violators fit
+makes it non-increasing in K (weights grow with volume); a lognormal goes through the fitted points: with two or more
+strikes, weighted least squares of Φ⁻¹(1 − p) on ln K gives μ and σ; with one strike (or a flat fit) σ is the index's
+own log-change volatility over recent epochs. `median` = e^μ, `expected` = e^(μ + σ²/2), `band` = the 80% interval
+e^(μ ± 1.2816σ). Without prices, `reason` says why and the numbers are null.
+
+**Traction** (`stats.traction`). `marketsCreated` = Panta's registered creates for our account; `attributedVolumeUsdc` /
+`attributedTrades` / `tradesByKind` = what Panta credits to Epoch; `marketsVolumeUsdc` = all-time volume on our own
+markets in Panta's catalog (anyone, any app); `traders` = distinct wallets among Panta's attributed rows and
+`panta_trades` (`tradersComplete: false` when Panta holds more rows than it returns); `creatorFeesClaimedUsdc` and
+`creationFeesPaidUsdc` from `panta_markets`; `estimatedProtocolFeesUsdc` = our confirmed buy volume × 200 bps, as
+Panta's metrics docs suggest. `sources` says which endpoints answered; `asOf` / `stale` as everywhere.
 
 **Fee Index intelligence** (on our markets, labelled `informational`): `impliedProbability` = the YES price;
 `modelProbability` = the share of the last `PANTA_MODEL_LOOKBACK_EPOCHS` (30) finished epochs whose index was strictly
@@ -589,6 +612,7 @@ running epoch's median of slot medians so far: unofficial).
 | `PANTA_TRADING_ENABLED` | on when `PANTA_API_KEY` is set | Replaces `PREDICT_REAL_SOL`'s "must be false" (3 Oct 2026). `false`: browse only. |
 | `PANTA_BLOCKED_COUNTRIES` | — | e.g. `US,GB` |
 | `PANTA_GEO_HEADERS` | `cf-ipcountry,x-vercel-ip-country` | trusted proxy headers, first present wins |
+| `PANTA_GEO_FAIL_CLOSED` | `false` | `true`: refuse trades when no trusted header names a country |
 | `PANTA_MIN_TRADE_USDC` / `PANTA_MAX_TRADE_USDC` | `1` / `500` | per buy |
 | `PANTA_RPC_URL`, `PANTA_RPC_FALLBACK_URL` | `DATA_RPC_URL`, else public mainnet | broadcast and confirmation |
 | `PANTA_CACHE_SECONDS` | `15` | catalog freshness |
@@ -694,8 +718,17 @@ signing flow, is [docs/pages/launch.md](../../docs/pages/launch.md). Code: `Rout
   `launch_trades:<pool>`), oldest first. `@epoch/meteora` decodes the Anchor CPI events (DBC `EvtSwap2`, DAMM v2
   `EvtSwap2`, claims, `EvtCurveComplete`, `EvtInitializePool`) into `launch_trades` and `launch_fee_events` (Postgres;
   memory without `DATABASE_URL`). A graduation adds the DAMM v2 pool to the watch list. HTTP 429 backs off up to a
-  minute; a transaction the node lists but cannot return holds the cursor for three polls. New rows go out on WS
-  `launch:<mint>`. Run one ingester per database (`LAUNCH_TRADES_INGEST=false` on other replicas).
+  minute; a transaction the node lists but cannot return holds the cursor for three polls; a cursor whose transaction
+  the node no longer has (trimmed history) is read back to its slot. New rows go out on WS `launch:<mint>`. Run one
+  ingester per database (`LAUNCH_TRADES_INGEST=false` on other replicas).
+- **Realtime feed** (`Services/Launch/LaunchRealtime.ts`, `LAUNCH_REALTIME`). Each pool's transactions are pushed as
+  they confirm, decoded with the same decoder and deduped on (signature, ix) with the polling, which stays as the
+  backstop (every `LAUNCH_TRADES_BACKSTOP_SECONDS` while the push is healthy, `LAUNCH_TRADES_POLL_SECONDS` when it is
+  down).
+  - Mainnet launches with `SOLAMI_TOKEN` use a Yellowstone gRPC transaction subscription (`accountInclude` = the
+    launch pools; RPC Fast as failover) through `@epoch/solana`'s `GrpcStream`.
+  - Otherwise the launch RPC's websocket: `logsSubscribe` per pool, then `getTransaction`.
+  - `/page` and `/trades` report it in `ingest.mode`, `lagSeconds` and `pollSeconds`.
 - **Market** (`/market`): a fresh read of the curve and the DAMM v2 pool, cached `LAUNCH_MARKET_CACHE_SECONDS` and
   dropped on every new trade; venue, price (SOL and USD), fully diluted market cap, raise progress, liquidity,
   graduation state, implied yield per epoch (live share revenue ÷ market cap, never annualised) next to the share
@@ -703,7 +736,8 @@ signing flow, is [docs/pages/launch.md](../../docs/pages/launch.md). Code: `Rout
 - **Candles** (`/candles`): OHLC bucketed in SQL from `launch_trades` (1m to 1d, at most 1,000), empty buckets flat at
   the previous close; `launch_price_samples` before the first trade.
 - **Holders** (`/holders`): `getTokenLargestAccounts` and the accounts' owners, labelled (curve vault, DAMM v2 pool,
-  buyback escrow, Epoch's treasury PDA, leftover receiver, pool creator).
+  buyback escrow, Epoch's treasury PDA, leftover receiver, pool creator); kept 2 minutes, or read again on the next
+  request after a trade or claim (at most every 5 s).
 - **Fees** (`/fees`): partner (the treasury PDA), creator, LP position and leftover from the pools' state
   (`readLaunchClaims`), what is pending and claimed for lenders, and the claim history from `launch_fee_events`.
 - **Ticket** (`/quote`, `/build`): quotes and unsigned transactions on the curve or, after graduation, DAMM v2;
@@ -724,6 +758,9 @@ signing flow, is [docs/pages/launch.md](../../docs/pages/launch.md). Code: `Rout
 | ---------------------------------- | ------- | --------------------------------------------------------------------- |
 | `LAUNCH_TRADES_INGEST`             | `true`  | Read the pools into `launch_trades` in this process (needs `LAUNCHES_PATH`). |
 | `LAUNCH_TRADES_POLL_SECONDS`       | `10`    | 2–600.                                                                |
+| `LAUNCH_REALTIME`                  | `auto`  | `grpc` (Solami; mainnet launches), `websocket`, `auto` (gRPC when usable, else websocket) or `off` (polling only). |
+| `LAUNCH_RPC_WS_URL`                | derived | The launch RPC's websocket; unset = from `LAUNCH_RPC_URL`.            |
+| `LAUNCH_TRADES_BACKSTOP_SECONDS`   | `60`    | 10–600: the polling interval while the realtime feed is healthy.      |
 | `LAUNCH_TRADES_BACKFILL_LIMIT`     | `1000`  | Per pool on a first start; 0 = from the newest transaction on.        |
 | `LAUNCH_MARKET_CACHE_SECONDS`      | `10`    |                                                                       |
 | `LAUNCH_STALE_SECONDS`             | `120`   | Older reads are flagged `stale`.                                      |
@@ -812,8 +849,9 @@ page contract, with example responses and the loading, empty, stale and error st
 | `GET /v1/live/slots` | `limit` 1–500 (60) | the newest blocks with median, p25/p75/p90 and priced / unpriced / leader-paid / failed counts | no-store |
 | `GET /v1/live/leaders` | `epoch` (current), `limit` 1–5,000 (200) | per-leader median, slots, stake, weight, rank, and the leader whose median is the index | 5 s (10 s server) |
 | `GET /v1/live/epochs/:epoch/distribution` | — | log-bucket histogram and percentiles of the epoch's slot medians, index marker | 5 s (10 s server) |
+| `GET /v1/live/solami` | — | what Epoch uses of Solami, per component (indexer, api, publisher, cranks): gRPC streams (status, bytes, lag), RPC calls by method (p50/p95, errors, rate limits), Beam sends (landed, tips spent), the last error | no-store |
 
-All four answer `503 DATABASE_NOT_CONFIGURED` without `DATABASE_URL`. Data is never presented as live when it is not:
+All five answer `503 DATABASE_NOT_CONFIGURED` without `DATABASE_URL`. Data is never presented as live when it is not:
 `live` is true only while the indexer has processed a slot within `LIVE_STALE_AFTER_SECONDS` (default 20); otherwise
 the last known state is served with `live: false` and `asOf` = when it was written. Types: `src/types/Live.types.ts`.
 
@@ -828,6 +866,13 @@ WS `/v1/stream` gains two channels, listed in `hello` when the API has a databas
 | --- | --- | --- |
 | `LIVE_STALE_AFTER_SECONDS` | `20` | older data is served with `live: false` |
 | `LIVE_FEED_ENABLED` | `true` | LISTEN for the indexer's feed (needs `DATABASE_URL`) |
+| `SOLAMI_TOKEN`, `SOLAMI_GRPC_URL`, `SOLAMI_GRPC_COMPRESSION` | unset, `grpc.solami.dev`, `none` | the API's own Solami stream: confirmed slots for the `slot` channel and, on mainnet, the program's transactions (one plan stream; Pro includes two: one for indexer_app, one here) |
+| `SOLAMI_API_STREAM` | `true` | `false`: poll slots and use `logsSubscribe` even with a key |
+| `SOLAMI_USAGE_STALE_SECONDS` | `120` | `GET /v1/live/solami` marks a component whose counters are older as stale (`offline`) |
+
+The usage report comes from `solami_usage` (one row per component, rewritten every 10–30 s by indexer_app,
+publisher_app and cranks_app from `@epoch/solana`'s `SolamiUsage` counters) plus this process's own counters (its
+gRPC stream and every JSON-RPC call through `Lib/Http.ts`). Hosts are kept, keys never are.
 
 ## India page (Superteam India track)
 

@@ -46,6 +46,12 @@ Everything is served by `packages/api_app`:
 The same API also answered for `rREH` with the program: its "not registered" revenue-token block and buyback feed are
 from that run.
 
+**Checked end to end.** On 5 Oct 2026 a full run on the stand-in (`rR2E`: launch, trades through `/quote` and
+`/build`, graduation, a sweep, four buyback slices and the treasury's claims through the program) compared every
+endpoint below, the activity feed and the WS frames with the chain to the lamport and the token unit: 46 of 46 checks
+passed ([the runbook's round-2 section](../runbooks/meteora-devnet-rehearsal.md#10-round-2-the-whole-loop-through-the-program-5-oct-2026)).
+The `ingest` feed fields in the examples are from that run (`LAUNCH_TRADES_BACKSTOP_SECONDS=30`).
+
 ## Rules the page follows
 
 - **Words.**
@@ -55,7 +61,7 @@ from that run.
 - **Times are IST** (`2026-10-03T19:08:39+05:30`). Charting libraries get unix seconds in `time`.
 - **Nothing cached is shown as live.**
   - Every live block carries `freshness: { asOf, ageSeconds, stale }`; the trade feed carries
-    `ingest: { running, lastPollAt, stale }`.
+    `ingest: { running, lastPollAt, stale, mode, lagSeconds, pollSeconds }` (see [2. Trade](#2-trade)).
   - When `stale` is true, show the block with its age ("as of 19:08 IST") in a muted style, never as live.
   - `asOf: null` means the block has never been read: show it as unavailable, not as zero.
 - **Unavailable is not empty.** The first-paint bundle lists the blocks it could not read in `unavailable`. Those are
@@ -89,7 +95,7 @@ from that run.
 | `GET /v1/launches/:mint/market` | `LaunchMarket` | `no-store` | Pool read cached 10 s, dropped on every new trade |
 | `GET /v1/launches/:mint/trades` | `LaunchTradeList` | `no-store` | `?limit=1–200` (50), `?before=<nextCursor>` |
 | `GET /v1/launches/:mint/candles` | `LaunchCandles` | `public, max-age=5` | `?interval=1m…1d` (15m), `?from=&to=` unix s |
-| `GET /v1/launches/:mint/holders` | `LaunchHolders` | `public, max-age=30` | Largest 20 accounts, cached 2 min |
+| `GET /v1/launches/:mint/holders` | `LaunchHolders` | `public, max-age=30` | Largest 20 accounts, cached 2 min; read again after a trade or claim (at most every 5 s) |
 | `GET /v1/launches/:mint/fees` | `LaunchFees` | `public, max-age=15` | Pools' state cached 60 s, plus claim events |
 | `GET /v1/launches/:mint/buybacks` | `LaunchBuybackFeed` | `public, max-age=30` | Base58 mint only; from the program's cluster |
 | `POST /v1/launches/:mint/quote` | `LaunchQuoteResponse` | `no-store` | Rate-limited per IP (30/min) |
@@ -137,7 +143,8 @@ unchanged; the first-paint bundle includes the detail.
   "fees": { "partner": { "…": "…" }, "creator": { "…": "…" }, "lp": { "…": "…" }, "leftover": { "…": "…" },
             "toLenders": { "…": "…" }, "history": [], "freshness": { "…": "…" } },
   "ingest": { "running": true, "lastPollAt": "2026-10-04T11:49:53+05:30", "stale": false,
-              "pools": [{ "address": "AYr4ALrNGSqnxCFuv52NKBfhtXFeQi197bktKEH9NsVp", "venue": "dbc" }] },
+              "pools": [{ "address": "AYr4ALrNGSqnxCFuv52NKBfhtXFeQi197bktKEH9NsVp", "venue": "dbc" }],
+              "mode": "websocket", "lagSeconds": 0.7, "pollSeconds": 30 },
   "stream": { "channel": "launch:G1MVHrAaAyPPnRNe6YQadsdmHTvdduxyXBtxj9kGpYEq" },
   "links": {
     "buybacks": "/v1/launches/G1MVHrAaAyPPnRNe6YQadsdmHTvdduxyXBtxj9kGpYEq/buybacks",
@@ -270,7 +277,8 @@ The curve itself (band, value per token, threshold, the 70% upfront, locked liqu
     }
   ],
   "nextCursor": "3775:2BbeEkGz5TGgU8J2vczBaqW31v1HmEsM3GCfRGsjfUxzbj3JzMyhfpjHEqy6wKteQS4Z4GsWr4j74harqdThYExX:0",
-  "ingest": { "running": true, "lastPollAt": "2026-10-04T09:41:55+05:30", "stale": false, "pools": ["…"] }
+  "ingest": { "running": true, "lastPollAt": "2026-10-04T09:41:55+05:30", "stale": false, "pools": ["…"],
+              "mode": "websocket", "lagSeconds": 0.7, "pollSeconds": 30 }
 }
 ```
 
@@ -280,8 +288,19 @@ The curve itself (band, value per token, threshold, the 70% upfront, locked liqu
 - `trader` is the account that paid for the swap. **Buybacks** are swaps the program makes from the buyback escrow: their
   `trader` is `revenueToken.buybackEscrow`. Label those rows "Buyback (burned)".
 - `nextCursor` is null at the end. A cursor the API did not make answers `400 BAD_REQUEST`.
-- `ingest.stale` means no successful read of the pools within `LAUNCH_STALE_SECONDS` (120 s), or no ingester in this
-  API. Show "feed delayed" and keep showing what is there.
+- `ingest` is the feed's state:
+  - `mode` is how new trades reach the API. With `grpc` (a Yellowstone stream of the pools' transactions, for mainnet
+    launches) or `websocket` (the launch RPC's `logsSubscribe` on each pool), every transaction is pushed as it
+    confirms. Polling stays as the backstop, slowed to `LAUNCH_TRADES_BACKSTOP_SECONDS` (60 s) while the push is
+    healthy. `polling` means no push source, or it is down: the pools are read every `LAUNCH_TRADES_POLL_SECONDS`
+    (10 s).
+  - `pollSeconds` is the polling interval now.
+  - `lagSeconds` runs from the newest stored row's block time to when the API stored it: about a second on a push, up
+    to a poll interval on `polling`. It is null until a new row arrives (a first start's backfill does not count). On
+    `grpc` the block time is when the node confirmed the transaction.
+  - `stale` means no successful read of the pools within `LAUNCH_STALE_SECONDS` (120 s; at least two `pollSeconds`), or
+    no ingester in this API. Show "feed delayed" and keep showing what is there.
+  - A "live" badge fits `grpc` or `websocket` with `stale: false`; on `polling`, say "updates every `pollSeconds` s".
 
 ### The buy/sell ticket
 
@@ -350,8 +369,9 @@ quote ──► review (amounts, price impact, fee, min out, warnings, consent) 
 
    - `connection` is the launch cluster's RPC (`network`).
    - Link the signature with `explorerCluster` (`?cluster=devnet`; `null` means mainnet).
-   - The trade appears on WS `launch:<mint>` within one ingest poll (10 s by default). Show the signed trade as pending
-     until its `trade` frame (same `signature`) arrives.
+   - The trade appears on WS `launch:<mint>` about a second after it confirms while `ingest.mode` is `grpc` or
+     `websocket`, and within one poll (`ingest.pollSeconds`) on `polling`. Show the signed trade as pending until its
+     `trade` frame (same `signature`) arrives.
 
 5. If the blockhash expires (`lastValidBlockHeight` passed), or the user waited longer than `validForSeconds`, quote and
    build again.
@@ -614,8 +634,8 @@ How the program runs it:
   the countdown to `nextSlice`.
 - **Table:** the `buybacks` rows grouped by epoch (slice `i` of `slices`), with the venue badge and the explorer link.
 - **Redeem:** when `escrow.mode` is `redeem`, show the redeem action. It calls `redeem({ amount })` from
-  `@epoch/epoch-sdk` and pays `escrow × amount ÷ circulating`. Circulating is the supply minus the tokens in the pool
-  vaults, the escrow's token account and the treasury's. `redeemPayout` gives the exact figure.
+  `@epoch/epoch-sdk` and pays `escrow × amount ÷ circulating`. Circulating is the supply minus the escrow's token
+  account and the treasury's (`circulatingSupply`; tokens in the pools count). `redeemPayout` gives the exact figure.
 - Keep to what the data says. Show no annualised yields, and promise nothing beyond the immutable share and term
   (decision 22).
 
@@ -725,8 +745,9 @@ Data frames (`at` is when the server sent it, IST):
   - on `curveComplete`, switch the ticket to "graduating";
   - on `dammPoolCreated`, re-fetch `/page` (the venue is DAMM v2 from now on);
   - on any `fee` frame, re-fetch `/fees`.
-- The feed is polled from the chain (`getSignaturesForAddress` + `getTransaction` every `LAUNCH_TRADES_POLL_SECONDS`),
-  so frames lag the chain by up to one poll.
+- Frames follow the feed's `ingest.mode`: about a second after a transaction confirms when it is pushed (`grpc`,
+  `websocket`), up to one poll behind on `polling`. Each row is sent once: the push and the backstop poll dedupe on
+  (signature, event index).
 - There is no buyback channel. Buyback events are on the protocol-wide `activity` channel (kind `buyback`), without
   the mint.
 
