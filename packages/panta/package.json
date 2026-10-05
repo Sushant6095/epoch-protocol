@@ -1,8 +1,8 @@
 {
-  "name": "@epoch/panta_bot_app",
+  "name": "@epoch/panta",
   "version": "0.1.0",
   "private": true,
-  "description": "Creates Panta markets (USDC, Solana mainnet) on the Solana Fee Index every epoch and claims their creator fees",
+  "description": "Typed, rate-budgeted client for the Panta public API (USDC prediction markets on Solana): zod-validated responses, typed errors, unsigned-transaction helpers",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,21 +15,13 @@
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "lint": "eslint src --max-warnings=0",
     "lint:fix": "eslint --fix src",
-    "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests",
-    "start": "node dist/index.js",
-    "watch": "tsx watch src/index.ts"
+    "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests"
   },
   "dependencies": {
     "@epoch/common": "workspace:*",
-    "@epoch/config-sdk": "workspace:*",
     "@epoch/epoch-sdk": "workspace:*",
-    "@epoch/exceptions": "workspace:*",
     "@epoch/logger": "workspace:*",
-    "@epoch/panta": "workspace:*",
-    "@epoch/pg_models": "workspace:*",
-    "@epoch/solana": "workspace:*",
-    "@solana/web3.js": "^1.98.0",
-    "drizzle-orm": "^0.45.3"
+    "@solana/web3.js": "^1.98.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.0"

@@ -5,7 +5,4 @@ export const KeeperConfigSchema = z.object({
   PUBLISHER_KEYPAIR_PATH: z.string().optional(),
 });
 
-export const PantaConfigSchema = z.object({
-  PANTA_API_URL: z.string().url(),
-  PANTA_API_KEY: z.string().min(1),
-});
+// The Panta settings moved to Panta.config.ts (PantaApiConfigSchema, PantaTradingConfigSchema, PantaBotConfigSchema).

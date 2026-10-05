@@ -23,7 +23,11 @@ export const AlertsConfigSchema = z.object({
 
 /** Predict in points mode (request #11, decisions 2 and 3). */
 export const PredictConfigSchema = z.object({
-  /** Real-SOL Predict through Panta stays off until there is legal advice. Must be false. */
+  /**
+   * Superseded on 3 Oct 2026: real-money Predict trades USDC through Panta at /v1/predict/panta, switched by
+   * PANTA_TRADING_ENABLED (Panta.config.ts; on when PANTA_API_KEY is set). This flag no longer gates anything and
+   * points mode is unchanged; it is still parsed so existing env files keep loading.
+   */
   PREDICT_REAL_SOL: flag('false'),
   PREDICT_POINTS_PER_EPOCH: z.coerce.number().int().min(10).max(10_000).default(100),
   PREDICT_LEADERBOARD_EPOCHS: z.coerce.number().int().min(1).max(365).default(30),

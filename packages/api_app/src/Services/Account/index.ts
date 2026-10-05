@@ -99,7 +99,10 @@ export function buildAccountServices(deps: AccountDeps): AccountServices {
   const db = deps.db ?? requireDb;
   const now = deps.now ?? Date.now;
   if (config.predict.PREDICT_REAL_SOL) {
-    logger.warn('PREDICT_REAL_SOL=true is ignored: the real-SOL path is not implemented, Predict stays in points mode');
+    logger.warn(
+      'PREDICT_REAL_SOL is superseded (3 Oct 2026): real-money Predict is USDC through Panta at /v1/predict/panta, ' +
+        'switched by PANTA_TRADING_ENABLED; points mode is unchanged',
+    );
   }
 
   const telegramClient = config.alerts.TELEGRAM_BOT_TOKEN

@@ -57,9 +57,9 @@ export interface AlertTestResult {
 
 // ── Predict ─── points mode (decisions 2 and 3, 1 Oct) · GET /v1/predict/markets, GET /v1/predict/leaderboard,
 //               POST /v1/predict/calls
-// v1 is points only: Fee Index markets, no SOL, no fee, no wallet transaction (a call needs the sign-in session).
-// The Panta / real-SOL path stays behind PREDICT_REAL_SOL (off) until there is legal advice; its SOL fields are
-// optional below and never sent.
+// Points mode is the free tier: Fee Index markets, no SOL, no fee, no wallet transaction (a call needs the sign-in
+// session). Real money (decision of 3 Oct 2026) is USDC through Panta at /v1/predict/panta (types/Panta.types.ts);
+// the optional SOL fields below belonged to the dropped real-SOL design and are never sent.
 export type CallSide = 'yes' | 'no';
 /** A call puts one of these on YES or NO. */
 export type CallPoints = 10 | 25 | 50 | 100;
