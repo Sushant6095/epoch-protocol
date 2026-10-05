@@ -22,15 +22,25 @@ export function slotMedianCuPrice(txs: TxFee[], leaderIdentity: string): number 
   return median(txs.filter((tx) => tx.feePayer !== leaderIdentity).map((tx) => tx.cuPrice));
 }
 
-/** Stake-weighted median of per-leader medians: the epoch's Solana Fee Index. */
-export function stakeWeightedMedian(leaders: LeaderMedian[]): number {
-  const entries = leaders.filter((l) => l.stake > 0n).sort((a, b) => a.medianCuPrice - b.medianCuPrice);
-  if (entries.length === 0) return 0;
+/**
+ * The leader whose median sets the stake-weighted median: leaders with stake, by median (ties by key, so the answer
+ * is deterministic), the first at which the running stake reaches half the total. Null when no leader has stake.
+ */
+export function stakeWeightedMedianLeader(leaders: LeaderMedian[]): LeaderMedian | null {
+  const entries = leaders
+    .filter((l) => l.stake > 0n)
+    .sort((a, b) => a.medianCuPrice - b.medianCuPrice || (a.leader < b.leader ? -1 : a.leader > b.leader ? 1 : 0));
+  if (entries.length === 0) return null;
   const total = entries.reduce((sum, l) => sum + l.stake, 0n);
   let running = 0n;
   for (const entry of entries) {
     running += entry.stake;
-    if (running * 2n >= total) return entry.medianCuPrice;
+    if (running * 2n >= total) return entry;
   }
-  return entries[entries.length - 1].medianCuPrice;
+  return entries[entries.length - 1];
+}
+
+/** Stake-weighted median of per-leader medians: the epoch's Solana Fee Index. */
+export function stakeWeightedMedian(leaders: LeaderMedian[]): number {
+  return stakeWeightedMedianLeader(leaders)?.medianCuPrice ?? 0;
 }

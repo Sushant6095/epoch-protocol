@@ -3,6 +3,7 @@ import { TransactionFailedException } from '@epoch/exceptions';
 import { Logger } from '@epoch/logger';
 import {
   ComputeBudgetProgram,
+  Connection,
   type Keypair,
   PublicKey,
   type Signer,
@@ -14,6 +15,7 @@ import {
   sendAndConfirmTransaction,
 } from '@solana/web3.js';
 
+import { beamLanding, type BeamRoute, beamTipInstruction } from './Beam';
 import { type ConnectionManager } from './ConnectionManager';
 
 export interface SendOptions {
@@ -59,11 +61,28 @@ export function isExecutionFailure(failure: { err?: unknown; logs?: readonly str
   return EXECUTION_FAILURE_TEXT.test(message);
 }
 
+export interface TransactionSenderOptions {
+  /**
+   * Send through Solami Beam (mainnet only): each transaction gets a tip transfer to a current tip address and is
+   * submitted to the Beam URL (Solami RPC, which simulates it first, so a failing transaction never spends a tip);
+   * confirmation is read through the normal connections. Without tip addresses it falls back to the normal path.
+   */
+  beam?: BeamRoute;
+}
+
 export class TransactionSender {
+  private beamConnection?: Connection;
+
   constructor(
     private readonly connections: ConnectionManager,
     private readonly payer: Keypair,
+    private readonly options: TransactionSenderOptions = {},
   ) {}
+
+  /** True when transactions go through Solami Beam. */
+  get usesBeam(): boolean {
+    return this.options.beam !== undefined;
+  }
 
   /** The fee payer (and first signer) of every transaction this sender builds. */
   get payerKey(): PublicKey {
@@ -84,12 +103,8 @@ export class TransactionSender {
       const signature = await retry(
         async () => {
           try {
-            return await this.connections.withFailover((connection) =>
-              sendAndConfirmTransaction(connection, new Transaction().add(...budget, ...instructions), [
-                this.payer,
-                ...signers,
-              ]),
-            );
+            if (this.options.beam) return await this.sendViaBeam(this.options.beam, budget, instructions, signers);
+            return await this.sendDirect(budget, instructions, signers);
           } catch (error) {
             if (shouldRetry && !shouldRetry(error)) {
               abort.aborted = true;
@@ -135,6 +150,65 @@ export class TransactionSender {
       logs: value.logs ?? [],
       unitsConsumed: value.unitsConsumed,
     };
+  }
+
+  private sendDirect(
+    budget: TransactionInstruction[],
+    instructions: TransactionInstruction[],
+    signers: Signer[],
+  ): Promise<string> {
+    return this.connections.withFailover((connection) =>
+      sendAndConfirmTransaction(connection, new Transaction().add(...budget, ...instructions), [
+        this.payer,
+        ...signers,
+      ]),
+    );
+  }
+
+  private async sendViaBeam(
+    beam: BeamRoute,
+    budget: TransactionInstruction[],
+    instructions: TransactionInstruction[],
+    signers: Signer[],
+  ): Promise<string> {
+    let tipAccount: PublicKey;
+    try {
+      tipAccount = await beam.tipAccounts.pick();
+    } catch (error) {
+      logger.warn('Beam tip addresses unavailable; sending without Beam', { error: String(error) });
+      return this.sendDirect(budget, instructions, signers);
+    }
+    const tip = beamTipInstruction(this.payer.publicKey, tipAccount, beam.tipLamports);
+    const { blockhash, lastValidBlockHeight } = await this.connections.withFailover((connection) =>
+      connection.getLatestBlockhash('confirmed'),
+    );
+    const transaction = new Transaction({ feePayer: this.payer.publicKey, blockhash, lastValidBlockHeight }).add(
+      ...budget,
+      ...instructions,
+      tip,
+    );
+    transaction.sign(this.payer, ...signers);
+    this.beamConnection ??= new Connection(beam.url, 'confirmed');
+    // Preflight on Solami RPC: a transaction that would fail is refused here and never spends its tip.
+    const signature = await this.beamConnection.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+      maxRetries: 0,
+    });
+    const { value } = await this.connections.withFailover((connection) =>
+      connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed'),
+    );
+    if (value.err) {
+      throw Object.assign(new Error(`Transaction ${signature} failed: ${JSON.stringify(value.err)}`), {
+        err: value.err,
+        signature,
+      });
+    }
+    logger.info('sent via Beam', { signature, tipLamports: beam.tipLamports, tipAccount: tipAccount.toBase58() });
+    beamLanding(signature)
+      .then((landing) => logger.debug('Beam landing', { ...landing }))
+      .catch(() => undefined);
+    return signature;
   }
 
   private budget(options: SendOptions): TransactionInstruction[] {

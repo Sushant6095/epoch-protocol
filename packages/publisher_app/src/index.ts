@@ -1,12 +1,12 @@
 import '@epoch/common/first-module';
 
 import { GracefulShutdown } from '@epoch/common';
-import { loadConfig, PublisherConfigSchema } from '@epoch/config-sdk';
+import { BeamConfigSchema, loadConfig, PublisherConfigSchema } from '@epoch/config-sdk';
 import { solToLamports } from '@epoch/epoch-sdk';
 import { ConfigException } from '@epoch/exceptions';
 import { Logger } from '@epoch/logger';
 import { PostgresConnectionManager } from '@epoch/pg_models';
-import { ConnectionManager, loadKeypair, TransactionSender } from '@epoch/solana';
+import { beamRoute, ConnectionManager, loadKeypair, TransactionSender } from '@epoch/solana';
 import { PublicKey } from '@solana/web3.js';
 
 import { PublisherClient } from './Chain/PublisherClient';
@@ -40,11 +40,19 @@ async function main(): Promise<void> {
 
   const programId = new PublicKey(config.EPOCH_PROGRAM_ID);
   const connections = new ConnectionManager(config.EPOCH_RPC_URL, config.EPOCH_RPC_FALLBACK_URL);
+  // Solami Beam for post_index on mainnet (SOLAMI_BEAM_URL): tipped, stake-weighted landing; off elsewhere.
+  const beamConfig = loadConfig(BeamConfigSchema);
+  const beam = beamRoute({
+    url: beamConfig.SOLAMI_BEAM_URL,
+    tipLamports: beamConfig.SOLAMI_BEAM_TIP_LAMPORTS,
+    tipAddressesUrl: beamConfig.SOLAMI_TIP_ADDRESSES_URL,
+    cluster: config.EPOCH_CLUSTER,
+  });
   const chain = new PublisherClient({
     programId,
     connections,
     senders: {
-      publisher: publisher ? new TransactionSender(connections, publisher) : undefined,
+      publisher: publisher ? new TransactionSender(connections, publisher, { beam }) : undefined,
       maker: maker ? new TransactionSender(connections, maker) : undefined,
     },
     computeUnitPriceMicroLamports: config.PUBLISHER_CU_PRICE_MICROLAMPORTS,
@@ -75,6 +83,7 @@ async function main(): Promise<void> {
     maker: maker?.publicKey.toBase58() ?? null,
     feeIndexEpochOffset: config.FEE_INDEX_EPOCH_OFFSET,
     dryRun: config.DRY_RUN,
+    beam: beam !== undefined,
     programEpoch: clock.epoch.toString(),
   });
   const loop = new PublisherLoop(steps, config.PUBLISHER_INTERVAL_SECONDS * 1_000);
