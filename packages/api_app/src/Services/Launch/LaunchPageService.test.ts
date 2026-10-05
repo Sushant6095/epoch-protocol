@@ -229,6 +229,9 @@ describe('LaunchPageService', () => {
         lastPollAt: null,
         stale: true,
         pools: [{ address: DBC_POOL, venue: 'dbc' }],
+        mode: 'polling',
+        lagSeconds: null,
+        pollSeconds: null,
       });
     });
 
@@ -275,6 +278,17 @@ describe('LaunchPageService', () => {
           { address: DBC_POOL, venue: 'dbc' },
           { address: DAMM_POOL, venue: 'damm-v2' },
         ],
+        mode: 'polling',
+        lagSeconds: null,
+        pollSeconds: 10,
+      });
+      // With a realtime source up: its mode, the lag of the newest row, polling at the backstop pace.
+      jest.spyOn(ingester, 'feedStatus').mockReturnValue({ mode: 'grpc', lagSeconds: 0.8, pollSeconds: 60 });
+      expect((await h.page.trades(MINT, {})).ingest).toMatchObject({
+        mode: 'grpc',
+        lagSeconds: 0.8,
+        pollSeconds: 60,
+        stale: false,
       });
     });
   });
@@ -363,6 +377,35 @@ describe('LaunchPageService', () => {
         })),
       );
       expect((await h.page.holders(MINT)).count).toEqual({ all: 7, buyers: 4 });
+    });
+
+    it('reads the holders again after a trade or claim, at most every 5 s; otherwise keeps them 2 minutes', async () => {
+      setup();
+      await h.page.holders(MINT);
+      expect(h.live.topHolders).toHaveBeenCalledTimes(1);
+      // No trade: the list is kept.
+      h.clock.now += 30_000;
+      await h.page.holders(MINT);
+      expect(h.live.topHolders).toHaveBeenCalledTimes(1);
+      // A trade: read again on the next request.
+      h.page.onTrades(MINT, [storedTrade(1, h.clock.now)]);
+      const after = await h.page.holders(MINT);
+      expect(h.live.topHolders).toHaveBeenCalledTimes(2);
+      expect(after.freshness).toMatchObject({ ageSeconds: 0, stale: false });
+      // Another trade within 5 s of that read: kept until 5 s have passed.
+      h.clock.now += 2_000;
+      h.page.onTrades(MINT, [storedTrade(2, h.clock.now)]);
+      await h.page.holders(MINT);
+      expect(h.live.topHolders).toHaveBeenCalledTimes(2);
+      h.clock.now += 3_000;
+      await h.page.holders(MINT);
+      expect(h.live.topHolders).toHaveBeenCalledTimes(3);
+      // A claim (the leftover burn, a fee claim) moves balances too; a failed re-read serves the last list.
+      h.clock.now += 5_000;
+      h.page.onFeeEvents(MINT, [feeRow(0, 'leftover', { blockTime: new Date(h.clock.now) })]);
+      h.live.topHolders.mockRejectedValueOnce(new Error('429'));
+      expect((await h.page.holders(MINT)).count).toEqual({ all: 4, buyers: 1 });
+      expect(h.live.topHolders).toHaveBeenCalledTimes(4);
     });
   });
 

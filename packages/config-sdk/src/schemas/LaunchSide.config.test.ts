@@ -53,10 +53,28 @@ describe('LaunchClaimsConfigSchema', () => {
 });
 
 describe('LaunchPageConfigSchema', () => {
+  it('reads the realtime feed settings', () => {
+    const config = loadConfig(LaunchPageConfigSchema, {
+      LAUNCH_REALTIME: 'websocket',
+      LAUNCH_RPC_WS_URL: ' ws://127.0.0.1:38900 ',
+      LAUNCH_TRADES_BACKSTOP_SECONDS: '90',
+    });
+    expect(config).toMatchObject({
+      LAUNCH_REALTIME: 'websocket',
+      LAUNCH_RPC_WS_URL: 'ws://127.0.0.1:38900',
+      LAUNCH_TRADES_BACKSTOP_SECONDS: 90,
+    });
+    expect(() => loadConfig(LaunchPageConfigSchema, { LAUNCH_REALTIME: 'firehose' })).toThrow('LAUNCH_REALTIME');
+    expect(loadConfig(LaunchPageConfigSchema, { LAUNCH_RPC_WS_URL: '' }).LAUNCH_RPC_WS_URL).toBeUndefined();
+  });
+
   it('defaults the ingest, caches and ticket guardrails', () => {
     expect(loadConfig(LaunchPageConfigSchema, {})).toEqual({
       LAUNCH_TRADES_INGEST: true,
       LAUNCH_TRADES_POLL_SECONDS: 10,
+      LAUNCH_REALTIME: 'auto',
+      LAUNCH_RPC_WS_URL: undefined,
+      LAUNCH_TRADES_BACKSTOP_SECONDS: 60,
       LAUNCH_TRADES_BACKFILL_LIMIT: 1_000,
       LAUNCH_MARKET_CACHE_SECONDS: 10,
       LAUNCH_STALE_SECONDS: 120,

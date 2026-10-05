@@ -8,6 +8,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import {
+  base58Decode,
   cpAmmClient,
   dammPositionClaim,
   type DammPoolState,
@@ -25,6 +26,7 @@ import {
   type TopHolder,
   type TradeSide,
 } from '@epoch/meteora';
+import { type SubscribeUpdateTransaction } from '@epoch/solana';
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 
 import { type LaunchChainReader } from '../Services/Launch/LaunchChain';
@@ -76,6 +78,91 @@ export const REHEARSAL_TXS = [
   };
 });
 export type RehearsalTx = (typeof REHEARSAL_TXS)[number];
+
+interface RpcInstruction {
+  programIdIndex: number;
+  accounts: number[];
+  data: string;
+  stackHeight?: number | null;
+}
+
+/**
+ * A rehearsal transaction as Yellowstone gRPC streams it (`SubscribeUpdateTransaction`: keys, signatures and
+ * instruction data as bytes), rebuilt from its recorded JSON-RPC form.
+ */
+export function rehearsalGrpcUpdate(name: string): SubscribeUpdateTransaction {
+  const raw = rehearsalFixture(name) as {
+    slot: number;
+    meta: {
+      fee: number;
+      innerInstructions: { index: number; instructions: RpcInstruction[] }[];
+      loadedAddresses?: { writable: string[]; readonly: string[] };
+      logMessages?: string[];
+    };
+    transaction: {
+      signatures: string[];
+      message: {
+        accountKeys: string[];
+        header: {
+          numRequiredSignatures: number;
+          numReadonlySignedAccounts: number;
+          numReadonlyUnsignedAccounts: number;
+        };
+        recentBlockhash: string;
+        instructions: RpcInstruction[];
+      };
+    };
+  };
+  const bytes = (key: string) => base58Decode(key);
+  const instruction = (ix: RpcInstruction) => ({
+    programIdIndex: ix.programIdIndex,
+    accounts: Uint8Array.from(ix.accounts),
+    data: base58Decode(ix.data),
+  });
+  const message = raw.transaction.message;
+  return {
+    slot: String(raw.slot),
+    transaction: {
+      signature: bytes(raw.transaction.signatures[0]),
+      isVote: false,
+      index: '0',
+      transaction: {
+        signatures: raw.transaction.signatures.map(bytes),
+        message: {
+          header: message.header,
+          accountKeys: message.accountKeys.map(bytes),
+          recentBlockhash: bytes(message.recentBlockhash),
+          instructions: message.instructions.map(instruction),
+          versioned: false,
+          addressTableLookups: [],
+        },
+      },
+      meta: {
+        err: undefined,
+        fee: String(raw.meta.fee),
+        preBalances: [],
+        postBalances: [],
+        innerInstructions: raw.meta.innerInstructions.map((group) => ({
+          index: group.index,
+          instructions: group.instructions.map((ix) => ({
+            ...instruction(ix),
+            stackHeight: ix.stackHeight ?? undefined,
+          })),
+        })),
+        innerInstructionsNone: false,
+        logMessages: raw.meta.logMessages ?? [],
+        logMessagesNone: false,
+        preTokenBalances: [],
+        postTokenBalances: [],
+        rewards: [],
+        loadedWritableAddresses: (raw.meta.loadedAddresses?.writable ?? []).map(bytes),
+        loadedReadonlyAddresses: (raw.meta.loadedAddresses?.readonly ?? []).map(bytes),
+        returnData: undefined,
+        returnDataNone: true,
+      },
+    },
+  };
+}
 export const rehearsalTx = (name: string): RehearsalTx => {
   const tx = REHEARSAL_TXS.find((candidate) => candidate.name === name);
   if (!tx) throw new Error(`no rehearsal transaction ${name}`);

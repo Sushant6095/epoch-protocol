@@ -99,6 +99,15 @@ export interface LaunchIngestStatus {
   stale: boolean;
   /** Pools watched: the curve, and the DAMM v2 pool once graduated. */
   pools: { address: string; venue: LaunchVenue }[];
+  /**
+   * How new transactions reach the feed: `grpc` (Yellowstone, pushed), `websocket` (the RPC's logsSubscribe, pushed)
+   * or `polling` (no realtime source, or it is down). Polling always runs as the backstop.
+   */
+  mode: 'grpc' | 'websocket' | 'polling';
+  /** From the block time of the newest stored trade or fee event to when the API stored it, seconds; null before any. */
+  lagSeconds: number | null;
+  /** How often the pools are polled now: slower while a realtime source is healthy. Null without an ingester. */
+  pollSeconds: number | null;
 }
 
 export type LaunchCandleInterval = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';

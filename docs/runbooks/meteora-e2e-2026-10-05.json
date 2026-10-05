@@ -1,0 +1,782 @@
+{
+  "about": "Round 2 end to end on the local stand-in (Meteora mainnet binaries, programs/epoch under a throwaway id): every Launch endpoint, the activity feed and the WS frames checked against the chain. Runbook: meteora-devnet-rehearsal.md, section 10. Times IST.",
+  "at": "2026-10-05T22:51:41+05:30",
+  "passed": 46,
+  "failed": 0,
+  "cluster": "local stand-in (solana-test-validator 4.3, Meteora mainnet DBC/DAMM v2/Metaplex binaries), 64-slot epochs",
+  "programId": "8iavauBSyvtsM9iaNbtqmaU62jWP8U1wAr1SQGftHhfQ",
+  "accounts": {
+    "pool": "CrSBeKMoSBEsjFHf98Aq6ioascraPai3DqsVvnhq3rvd",
+    "treasury": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+    "vault": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+    "mint": "9rgrjLnvaztGut7iGaGnx3peJ2vyHccpkaCStmA54GLL",
+    "revenueToken": "BKnweefs2va1DBqSRzEEYLefHePUkzFvnmaySZHPeDaj",
+    "escrow": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo",
+    "dbcPool": "9KiWryqrEszzWLDNnr3hn4x7ezQAYiYFd4yXkoyu5hAF",
+    "dammPool": "67RY3gT3ipjqhpyRAbR5ZeCxBZDgYgWuJ5MvKMbtYXZ1"
+  },
+  "steps": {
+    "initializePool": "4hNRaZBhh87E6RB82Xh1HSYTzunQa5GTdYTCWWxST5w5HR4D15XVcyDYV2HuxTLtmTSWsrbyPDYyfXobcJkvNqh7",
+    "fundVoteFloor": "3JsYGANvPUYCG6zACK1WoX81iRxUkNE94cfZzHRnMBftoXBboRGmgF6AKWE25376wfurS3HCrDG4gmrGMxxc9RYF",
+    "onboardWithBond": "5YyHXJ5H3wPaNpNKjgwpgQLEvk14383Fackz2ccReLUm22xvMNpnEvh7DSc6XhfKkPBkJWZ53pTFh5DD2c6AqBvh",
+    "createConfig": "4sysN4PT9fknigvTCdN5yz9Q87BJhaYNBTJ2mqZhqjK7wuSjDLLGqauXrnVynZk83fipjd41iCENS5nwKZuevyA4",
+    "createPoolWithFirstBuy": "5XDRkGDWv5xtH4JmMNFFGvAFiPGNMFG6R6rWHfHwQYiy72eGgGA9j3QGj1nojxmvsxvK65PNXvzuqDxjcAWP5zr3",
+    "transferCreator": "36ejBtpdZL4AznT1MZ4oizgU38SBgckVPbzyHZdUAdTdgk7Ku75FoWgtmsRDydKcTev6ZFkPtnxQov1F4gkVdZEU",
+    "registerRevenueToken": "3PG2UFQbFX8SNkWtkmPX5rS2oQi4meD3vEBCYMbCyhvgYXmYq8HbWD6GXEYv4hF4xxjj38qj8SLq38p9iua7HxZF",
+    "configureRevenueToken": "2pvte9fJwZvHVcVPMP4hJdmxuirmqL17d1Hwc5fFnN7sbRDwGXGfRFSxD7oRXMnZ9NgYiz5XUryoEc8YpTC2i5mh",
+    "migrateToDammV2": "4ov8xQvpAhxjWLF3sCvREX5tF3wXBGky1ZVdxbQgoYMAGTdXSA1RJPQiChPLcXXnN2Mj9uwEiy512UFX4SHjMo5a"
+  },
+  "trades": [
+    {
+      "t": "2026-10-05T22:46:01+05:30",
+      "slot": 44,
+      "signature": "5XDRkGDWv5xtH4JmMNFFGvAFiPGNMFG6R6rWHfHwQYiy72eGgGA9j3QGj1nojxmvsxvK65PNXvzuqDxjcAWP5zr3",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.02,
+      "tokenAmount": 3446.558893,
+      "trader": "8pAZsL1VyssU1eAZqCgxmZPFGg2bLC5o6yys1ViJDrf5"
+    },
+    {
+      "t": "2026-10-05T22:46:50+05:30",
+      "slot": 235,
+      "signature": "MygKiDsPPoC1FJSarecyKFeKz1h8RKV3ZuWu2H3T219xiXtmthva9kVmJvDzWVLxTL9CLXkyxxJhCTVbRP35NCV",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.15,
+      "tokenAmount": 23781.498065,
+      "trader": "CJ8YPaCqzvfHBNuxts3QaTLGYr2RB59cAkXceXcfsYWd"
+    },
+    {
+      "t": "2026-10-05T22:46:55+05:30",
+      "slot": 254,
+      "signature": "5aeUkNWy8WDXQHzXzAQZZT5ttLWFGdurN8VjtATuhNoBXG4D9BP3YSPb6vG1QN8KfaS8U4hC2xGBXLR1jXtJHQJ9",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.12,
+      "tokenAmount": 16737.343094,
+      "trader": "Ev4XG6dsDw3sC9MZHwBYjdCGujJtY9V1APuDbyzHYEHD"
+    },
+    {
+      "t": "2026-10-05T22:47:00+05:30",
+      "slot": 276,
+      "signature": "2LAHEasDZD3k1rb9pc8baGTFnrjQL8GK8T8vpLM4ASkdt1AaX79AUkudZX23qYcKgAkRos7JFpbYFn5CJcnsJjqK",
+      "venue": "dbc",
+      "side": "sell",
+      "solAmount": 0.139089343,
+      "tokenAmount": 20000,
+      "trader": "CJ8YPaCqzvfHBNuxts3QaTLGYr2RB59cAkXceXcfsYWd"
+    },
+    {
+      "t": "2026-10-05T22:47:04+05:30",
+      "slot": 294,
+      "signature": "3uZA7KorKhDgt5fqbtQ17cesFqbDtyqdGPEWerNxJioMXuH2QTiGqtjPA45u5bSkJaEP3RgBpMPVaEnV51QKX8kV",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.3,
+      "tokenAmount": 39498.25135,
+      "trader": "LARMe5ZxjmuT8RjsLtBvAngkNYj7d8nJXxdDcaerD7E"
+    },
+    {
+      "t": "2026-10-05T22:47:09+05:30",
+      "slot": 313,
+      "signature": "qCwKbkYcLi9VQeTHJGoRmkxUazu3rztXLgocPKEapQWMAXnS3rXTpPCa4rq4unjR1QRmM76scMtppqbBbBJmBc6",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.056965304,
+      "tokenAmount": 6411.909041,
+      "trader": "Ev4XG6dsDw3sC9MZHwBYjdCGujJtY9V1APuDbyzHYEHD"
+    },
+    {
+      "t": "2026-10-05T22:47:35+05:30",
+      "slot": 419,
+      "signature": "33khehdnANYh9meLGTAZvVYsSJUqfrkhkJREeHSDo9VhhinbRJV3zkT5WJ5Zr4T6cjeQpAW3z3FPvtSN3igpvHyz",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.05,
+      "tokenAmount": 4131.482324,
+      "trader": "Ev4XG6dsDw3sC9MZHwBYjdCGujJtY9V1APuDbyzHYEHD"
+    },
+    {
+      "t": "2026-10-05T22:47:40+05:30",
+      "slot": 439,
+      "signature": "oyh6KYtnaVTnQ2mR18hMBMxJxW3c2SM5oRUq9wUxWSFrVLP9QGhrp1gTa9bF4mAqHiQ1YxBVSstxjWeu3uWm12W",
+      "venue": "damm-v2",
+      "side": "sell",
+      "solAmount": 0.056248724,
+      "tokenAmount": 5000,
+      "trader": "LARMe5ZxjmuT8RjsLtBvAngkNYj7d8nJXxdDcaerD7E"
+    },
+    {
+      "t": "2026-10-05T22:47:59+05:30",
+      "slot": 515,
+      "signature": "4dJmQfFFnomgU9Rug1uqkVFyd1btk2iNNprKDyFttKQGq5Ht9VMmv9Kpob5Q1m5QGsPuPFG2tZ8Es1gWNnB5Kefa",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.007113428,
+      "tokenAmount": 824.312518,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    },
+    {
+      "t": "2026-10-05T22:48:03+05:30",
+      "slot": 533,
+      "signature": "2t1kLupbXLkTzApGcQndK1tGHTmjLCUPXsku4HBNHgVA6MbAu1hYyQ8ijcVYrPisZzFgcowPdNYSE4eRYdts6jyf",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.007465172,
+      "tokenAmount": 784.748357,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    },
+    {
+      "t": "2026-10-05T22:48:05+05:30",
+      "slot": 542,
+      "signature": "2QWaeWx5g54GZJttZeNSzcAzjRTeLLGBba7RWFRMUE1EHXg8jBQPBwAjTRnEzPDingWhaet2iQiGSoeKvBRRHLdw",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.007833952,
+      "tokenAmount": 747.806675,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    },
+    {
+      "t": "2026-10-05T22:48:08+05:30",
+      "slot": 552,
+      "signature": "2BdabRK38zDarKV4Wvw5dFQKbMftDwUwbFqSwu1QRuTaPTEXNfgonrseraW9SwCTtFKDLrY3f9Zeno4mDddXWp7p",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.008220949,
+      "tokenAmount": 712.603909,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    }
+  ],
+  "quotes": [
+    {
+      "signature": "MygKiDsPPoC1FJSarecyKFeKz1h8RKV3ZuWu2H3T219xiXtmthva9kVmJvDzWVLxTL9CLXkyxxJhCTVbRP35NCV",
+      "venue": "dbc",
+      "side": "buy",
+      "quoted": {
+        "in": 0.15,
+        "out": 23781.498065,
+        "minimumOut": 23543.683084,
+        "priceImpactPct": 7.594
+      },
+      "filledRaw": {
+        "in": "150000000",
+        "out": "23781498065"
+      },
+      "equal": true
+    },
+    {
+      "signature": "5aeUkNWy8WDXQHzXzAQZZT5ttLWFGdurN8VjtATuhNoBXG4D9BP3YSPb6vG1QN8KfaS8U4hC2xGBXLR1jXtJHQJ9",
+      "venue": "dbc",
+      "side": "buy",
+      "quoted": {
+        "in": 0.12,
+        "out": 16737.343094,
+        "minimumOut": 16569.969663,
+        "priceImpactPct": 5.6464
+      },
+      "filledRaw": {
+        "in": "120000000",
+        "out": "16737343094"
+      },
+      "equal": true
+    },
+    {
+      "signature": "2LAHEasDZD3k1rb9pc8baGTFnrjQL8GK8T8vpLM4ASkdt1AaX79AUkudZX23qYcKgAkRos7JFpbYFn5CJcnsJjqK",
+      "venue": "dbc",
+      "side": "sell",
+      "quoted": {
+        "in": 20000,
+        "out": 0.139089343,
+        "minimumOut": 0.137698449,
+        "priceImpactPct": 6.3206
+      },
+      "filledRaw": {
+        "in": "20000000000",
+        "out": "139089343"
+      },
+      "equal": true
+    },
+    {
+      "signature": "3uZA7KorKhDgt5fqbtQ17cesFqbDtyqdGPEWerNxJioMXuH2QTiGqtjPA45u5bSkJaEP3RgBpMPVaEnV51QKX8kV",
+      "venue": "dbc",
+      "side": "buy",
+      "quoted": {
+        "in": 0.3,
+        "out": 39498.25135,
+        "minimumOut": 39103.268836,
+        "priceImpactPct": 14.2631
+      },
+      "filledRaw": {
+        "in": "300000000",
+        "out": "39498251350"
+      },
+      "equal": true
+    },
+    {
+      "signature": "qCwKbkYcLi9VQeTHJGoRmkxUazu3rztXLgocPKEapQWMAXnS3rXTpPCa4rq4unjR1QRmM76scMtppqbBbBJmBc6",
+      "venue": "dbc",
+      "side": "buy",
+      "quoted": {
+        "in": 0.056965304,
+        "out": 6411.909041,
+        "minimumOut": 6347.78995,
+        "priceImpactPct": 2.3703
+      },
+      "filledRaw": {
+        "in": "56965304",
+        "out": "6411909041"
+      },
+      "equal": true
+    },
+    {
+      "signature": "33khehdnANYh9meLGTAZvVYsSJUqfrkhkJREeHSDo9VhhinbRJV3zkT5WJ5Zr4T6cjeQpAW3z3FPvtSN3igpvHyz",
+      "venue": "damm-v2",
+      "side": "buy",
+      "quoted": {
+        "in": 0.05,
+        "out": 4131.482324,
+        "minimumOut": 4090.1675,
+        "priceImpactPct": 33.066
+      },
+      "filledRaw": {
+        "in": "50000000",
+        "out": "4131482324"
+      },
+      "equal": true
+    },
+    {
+      "signature": "oyh6KYtnaVTnQ2mR18hMBMxJxW3c2SM5oRUq9wUxWSFrVLP9QGhrp1gTa9bF4mAqHiQ1YxBVSstxjWeu3uWm12W",
+      "venue": "damm-v2",
+      "side": "sell",
+      "quoted": {
+        "in": 5000,
+        "out": 0.056248724,
+        "minimumOut": 0.055686236,
+        "priceImpactPct": 28.5802
+      },
+      "filledRaw": {
+        "in": "5000000000",
+        "out": "56248724"
+      },
+      "equal": true
+    }
+  ],
+  "programEvents": [
+    {
+      "name": "PoolInitialized",
+      "signature": "4hNRaZBhh87E6RB82Xh1HSYTzunQa5GTdYTCWWxST5w5HR4D15XVcyDYV2HuxTLtmTSWsrbyPDYyfXobcJkvNqh7",
+      "slot": 12
+    },
+    {
+      "name": "ValidatorOnboarded",
+      "signature": "5YyHXJ5H3wPaNpNKjgwpgQLEvk14383Fackz2ccReLUm22xvMNpnEvh7DSc6XhfKkPBkJWZ53pTFh5DD2c6AqBvh",
+      "slot": 15
+    },
+    {
+      "name": "CollectorsSet",
+      "signature": "5YyHXJ5H3wPaNpNKjgwpgQLEvk14383Fackz2ccReLUm22xvMNpnEvh7DSc6XhfKkPBkJWZ53pTFh5DD2c6AqBvh",
+      "slot": 15
+    },
+    {
+      "name": "RevenueTokenRegistered",
+      "signature": "3PG2UFQbFX8SNkWtkmPX5rS2oQi4meD3vEBCYMbCyhvgYXmYq8HbWD6GXEYv4hF4xxjj38qj8SLq38p9iua7HxZF",
+      "slot": 46
+    },
+    {
+      "name": "RevenueTokenConfigured",
+      "signature": "2pvte9fJwZvHVcVPMP4hJdmxuirmqL17d1Hwc5fFnN7sbRDwGXGfRFSxD7oRXMnZ9NgYiz5XUryoEc8YpTC2i5mh",
+      "slot": 95
+    },
+    {
+      "name": "RevenueTokenPoolSynced",
+      "signature": "3Dfdo7Sn89ebnd9ntYkuiCmYzzUpJYjzvD1y5FNCAqgLB3Q6yYArHUE6GvTd4sNkeqhvU8qtob1NoLPxJDWi29xV",
+      "slot": 459
+    },
+    {
+      "name": "RevenueShareSwept",
+      "signature": "uTP6YUYgvwuohzUaWwHQ6YuTfmAAtRKuZd5jzRmVtbkJNb86MmVzwWUUMDtyT1VQCwsmxxm5Xm8vPYhdLEHD9hW",
+      "slot": 514
+    },
+    {
+      "name": "Swept",
+      "signature": "uTP6YUYgvwuohzUaWwHQ6YuTfmAAtRKuZd5jzRmVtbkJNb86MmVzwWUUMDtyT1VQCwsmxxm5Xm8vPYhdLEHD9hW",
+      "slot": 514
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "4dJmQfFFnomgU9Rug1uqkVFyd1btk2iNNprKDyFttKQGq5Ht9VMmv9Kpob5Q1m5QGsPuPFG2tZ8Es1gWNnB5Kefa",
+      "slot": 515
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "2t1kLupbXLkTzApGcQndK1tGHTmjLCUPXsku4HBNHgVA6MbAu1hYyQ8ijcVYrPisZzFgcowPdNYSE4eRYdts6jyf",
+      "slot": 533
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "2QWaeWx5g54GZJttZeNSzcAzjRTeLLGBba7RWFRMUE1EHXg8jBQPBwAjTRnEzPDingWhaet2iQiGSoeKvBRRHLdw",
+      "slot": 542
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "2BdabRK38zDarKV4Wvw5dFQKbMftDwUwbFqSwu1QRuTaPTEXNfgonrseraW9SwCTtFKDLrY3f9Zeno4mDddXWp7p",
+      "slot": 552
+    },
+    {
+      "name": "TreasuryClaimed",
+      "signature": "22AjkDonzocqBobAzKzZLsL72Lff8comZtEbF9jXfdNuhF1FLpRS1JENse6CJtzs2wM5mJrE9cvzTAk6g9T5RoDX",
+      "slot": 607
+    },
+    {
+      "name": "TreasuryClaimed",
+      "signature": "5nPQ3GxagAP79cnbWo7GkMF4TWtvYSCw79rtL4ZsLvT7QTfz3UkjjaPLrPExY8y5WXPzt4w8NEFx7kdEKFxwLZL6",
+      "slot": 608
+    },
+    {
+      "name": "TreasuryClaimed",
+      "signature": "4CtG69qArF9peL8GUjTRqEHbAMxH6ix8uWQXkdPJbVC9PTANXRb3LpVjWEM2XL7PtyksPNdyb3R39AmHBbAviYSo",
+      "slot": 609
+    }
+  ],
+  "amounts": {
+    "lamportsToPool": "7534788",
+    "leftoverBurned": "913465000155",
+    "claimBurned": "913465000155",
+    "buybackLamportsIn": "30633501",
+    "buybackBurned": "3069471459",
+    "supplyBeforeClaims": "996930528541",
+    "supplyNow": "83465528386",
+    "vaultBefore": "890880",
+    "vaultNow": "8425668",
+    "escrowNow": "70257379"
+  },
+  "api": {
+    "ingest": {
+      "running": true,
+      "lastPollAt": "2026-10-05T22:51:20+05:30",
+      "stale": false,
+      "pools": [
+        {
+          "address": "9KiWryqrEszzWLDNnr3hn4x7ezQAYiYFd4yXkoyu5hAF",
+          "venue": "dbc"
+        },
+        {
+          "address": "67RY3gT3ipjqhpyRAbR5ZeCxBZDgYgWuJ5MvKMbtYXZ1",
+          "venue": "damm-v2"
+        }
+      ],
+      "mode": "websocket",
+      "lagSeconds": null,
+      "pollSeconds": 30
+    },
+    "feesToLenders": {
+      "claimedSol": 0.007534788,
+      "pendingSol": 0,
+      "holder": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+      "note": "Epoch's partner fees (trading fees, surplus, migration fee, LP fees) are claimed into the Epoch lending pool as income; tokens burned, as is the supply the curve never sold."
+    },
+    "leftover": {
+      "receiver": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "tokens": 0,
+      "withdrawn": true,
+      "burned": true,
+      "burnedTokens": 913465.000155
+    },
+    "buybacks": {
+      "totals": {
+        "escrowedSol": 0.1,
+        "spentSol": 0.030633501,
+        "burned": 3069.471459,
+        "redeemed": 0,
+        "redeemedSol": 0,
+        "buybacks": 4
+      },
+      "escrow": {
+        "address": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo",
+        "balanceSol": 0.069366499,
+        "mode": "buyback"
+      },
+      "treasuryTotals": {
+        "toLendersSol": 0.007534788,
+        "tokensBurned": 913465.000155,
+        "claims": 3
+      },
+      "nextSlice": {
+        "epoch": 23,
+        "slice": 0,
+        "inSlots": 14,
+        "etaSeconds": 6,
+        "waitsForSweep": true
+      }
+    },
+    "holders": {
+      "all": 6,
+      "buyers": 4
+    },
+    "tokenBurned": 916534.471614,
+    "wsFrames": {
+      "trade": 12,
+      "market": 12,
+      "snapshot": 2,
+      "fee:curveComplete": 1,
+      "fee:dammPoolCreated": 1,
+      "fee:partnerTradingFee": 1,
+      "fee:leftover": 1,
+      "fee:lpFee": 1
+    },
+    "ingestAfterFirstBackfill": {
+      "running": true,
+      "lastPollAt": "2026-10-05T22:46:32+05:30",
+      "stale": false,
+      "pools": [
+        {
+          "address": "9KiWryqrEszzWLDNnr3hn4x7ezQAYiYFd4yXkoyu5hAF",
+          "venue": "dbc"
+        }
+      ],
+      "mode": "websocket",
+      "lagSeconds": null,
+      "pollSeconds": 30
+    },
+    "ingestAfterTheRun": {
+      "mode": "websocket",
+      "lagSeconds": 1.1,
+      "pollSeconds": 30
+    }
+  },
+  "checks": [
+    {
+      "name": "treasury claims sent through the program (TreasuryClaimed)",
+      "expected": 3,
+      "actual": 3,
+      "pass": true
+    },
+    {
+      "name": "treasury claim kinds",
+      "expected": ["tradingFee", "leftover", "lpFee"],
+      "actual": ["tradingFee", "leftover", "lpFee"],
+      "pass": true
+    },
+    {
+      "name": "vault grew by the SOL claimed (lamports)",
+      "expected": "8425668",
+      "actual": "8425668",
+      "pass": true
+    },
+    {
+      "name": "/buybacks treasury.totals.toLendersSol = sum(lamportsToPool)",
+      "expected": 0.007534788,
+      "actual": 0.007534788,
+      "pass": true
+    },
+    {
+      "name": "/fees toLenders.claimedSol = /buybacks treasury.totals.toLendersSol",
+      "expected": 0.007534788,
+      "actual": 0.007534788,
+      "pass": true
+    },
+    {
+      "name": "/fees toLenders.holder = the pool vault",
+      "expected": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+      "actual": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+      "pass": true
+    },
+    {
+      "name": "/buybacks treasury.totals.tokensBurned (UI) = sum(tokensBurned)",
+      "expected": 913465.000155,
+      "actual": 913465.000155,
+      "pass": true
+    },
+    {
+      "name": "/buybacks treasury.address = the treasury PDA",
+      "expected": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "actual": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "pass": true
+    },
+    {
+      "name": "/fees partner = the treasury PDA",
+      "expected": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "actual": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "pass": true
+    },
+    {
+      "name": "/fees leftover.burned",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "/fees leftover.burnedTokens = the leftover claim tokensBurned",
+      "expected": 913465.000155,
+      "actual": 913465.000155,
+      "pass": true
+    },
+    {
+      "name": "/fees leftover.withdrawn",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "the mint supply dropped by the treasury burns (raw units)",
+      "expected": "83465528386",
+      "actual": "83465528386",
+      "pass": true
+    },
+    {
+      "name": "/v1/launches/:mint token.burned = launch supply - supply now (every burn: buybacks + treasury)",
+      "expected": 916534.471614,
+      "actual": 916534.471614,
+      "pass": true
+    },
+    {
+      "name": "pool income_unallocated includes the claims (lamports)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "sweeps that paid a share (RevenueShareSwept)",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "name": "share = 5% of the 2 SOL swept (lamports)",
+      "expected": "100000000",
+      "actual": "100000000",
+      "pass": true
+    },
+    {
+      "name": "buyback slices (BuybackExecuted)",
+      "expected": 4,
+      "actual": 4,
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.escrowedSol",
+      "expected": 0.1,
+      "actual": 0.1,
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.spentSol = sum(lamportsIn)",
+      "expected": 0.030633501,
+      "actual": 0.030633501,
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.burned = sum(tokensBurned)",
+      "expected": 3069.471459,
+      "actual": 3069.471459,
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.buybacks",
+      "expected": 4,
+      "actual": 4,
+      "pass": true
+    },
+    {
+      "name": "/buybacks rows = the slices (epoch, slice, solIn)",
+      "expected": [
+        [8, 3, 0.008220949],
+        [8, 2, 0.007833952],
+        [8, 1, 0.007465172],
+        [8, 0, 0.007113428]
+      ],
+      "actual": [
+        [8, 3, 0.008220949],
+        [8, 2, 0.007833952],
+        [8, 1, 0.007465172],
+        [8, 0, 0.007113428]
+      ],
+      "pass": true
+    },
+    {
+      "name": "/buybacks venue after the sync",
+      "expected": "damm-v2",
+      "actual": "damm-v2",
+      "pass": true
+    },
+    {
+      "name": "/buybacks escrow.balanceSol (above rent)",
+      "expected": 0.069366499,
+      "actual": 0.069366499,
+      "pass": true
+    },
+    {
+      "name": "/page revenueToken.escrow.balanceSol (above rent)",
+      "expected": 0.069366499,
+      "actual": 0.069366499,
+      "pass": true
+    },
+    {
+      "name": "/v1/launches/:mint escrow.balanceSol (above rent)",
+      "expected": 0.069366,
+      "actual": 0.069366,
+      "pass": true
+    },
+    {
+      "name": "/page revenueToken from the program",
+      "expected": ["program", true, 4],
+      "actual": ["program", true, 4],
+      "pass": true
+    },
+    {
+      "name": "/buybacks schedule.nextSlice (in term, after the sweep)",
+      "expected": {
+        "waitsForSweep": true,
+        "atLeastEpoch": true
+      },
+      "actual": {
+        "waitsForSweep": true,
+        "atLeastEpoch": true
+      },
+      "pass": true
+    },
+    {
+      "name": "trades in the feed (6 on the curve, 2 on DAMM v2, 4 buyback slices)",
+      "expected": 12,
+      "actual": 12,
+      "pass": true
+    },
+    {
+      "name": "buyback trades in the feed = the slices (SOL in, lamports)",
+      "expected": ["7113428", "7465172", "7833952", "8220949"],
+      "actual": ["7113428", "7465172", "7833952", "8220949"],
+      "pass": true
+    },
+    {
+      "name": "/market venue and state",
+      "expected": ["damm-v2", "migrated"],
+      "actual": ["damm-v2", "migrated"],
+      "pass": true
+    },
+    {
+      "name": "/candles volume = the trades' SOL",
+      "expected": 0.922937,
+      "actual": 0.922937,
+      "pass": true
+    },
+    {
+      "name": "/holders: the treasury holds nothing after the burn",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "/page unavailable",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "name": "/page ingest.mode",
+      "expected": "websocket",
+      "actual": "websocket",
+      "pass": true
+    },
+    {
+      "name": "/page ingest.lagSeconds under 5 s, or null (no new row since the API started)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "WS trade frames = every trade in /trades, once each (ids)",
+      "expected": [
+        "2BdabRK38zDarKV4Wvw5dFQKbMftDwUwbFqSwu1QRuTaPTEXNfgonrseraW9SwCTtFKDLrY3f9Zeno4mDddXWp7p:0",
+        "2LAHEasDZD3k1rb9pc8baGTFnrjQL8GK8T8vpLM4ASkdt1AaX79AUkudZX23qYcKgAkRos7JFpbYFn5CJcnsJjqK:1",
+        "2QWaeWx5g54GZJttZeNSzcAzjRTeLLGBba7RWFRMUE1EHXg8jBQPBwAjTRnEzPDingWhaet2iQiGSoeKvBRRHLdw:0",
+        "2t1kLupbXLkTzApGcQndK1tGHTmjLCUPXsku4HBNHgVA6MbAu1hYyQ8ijcVYrPisZzFgcowPdNYSE4eRYdts6jyf:0",
+        "33khehdnANYh9meLGTAZvVYsSJUqfrkhkJREeHSDo9VhhinbRJV3zkT5WJ5Zr4T6cjeQpAW3z3FPvtSN3igpvHyz:0",
+        "3uZA7KorKhDgt5fqbtQ17cesFqbDtyqdGPEWerNxJioMXuH2QTiGqtjPA45u5bSkJaEP3RgBpMPVaEnV51QKX8kV:1",
+        "4dJmQfFFnomgU9Rug1uqkVFyd1btk2iNNprKDyFttKQGq5Ht9VMmv9Kpob5Q1m5QGsPuPFG2tZ8Es1gWNnB5Kefa:0",
+        "5XDRkGDWv5xtH4JmMNFFGvAFiPGNMFG6R6rWHfHwQYiy72eGgGA9j3QGj1nojxmvsxvK65PNXvzuqDxjcAWP5zr3:2",
+        "5aeUkNWy8WDXQHzXzAQZZT5ttLWFGdurN8VjtATuhNoBXG4D9BP3YSPb6vG1QN8KfaS8U4hC2xGBXLR1jXtJHQJ9:1",
+        "MygKiDsPPoC1FJSarecyKFeKz1h8RKV3ZuWu2H3T219xiXtmthva9kVmJvDzWVLxTL9CLXkyxxJhCTVbRP35NCV:1",
+        "oyh6KYtnaVTnQ2mR18hMBMxJxW3c2SM5oRUq9wUxWSFrVLP9QGhrp1gTa9bF4mAqHiQ1YxBVSstxjWeu3uWm12W:0",
+        "qCwKbkYcLi9VQeTHJGoRmkxUazu3rztXLgocPKEapQWMAXnS3rXTpPCa4rq4unjR1QRmM76scMtppqbBbBJmBc6:1"
+      ],
+      "actual": [
+        "2BdabRK38zDarKV4Wvw5dFQKbMftDwUwbFqSwu1QRuTaPTEXNfgonrseraW9SwCTtFKDLrY3f9Zeno4mDddXWp7p:0",
+        "2LAHEasDZD3k1rb9pc8baGTFnrjQL8GK8T8vpLM4ASkdt1AaX79AUkudZX23qYcKgAkRos7JFpbYFn5CJcnsJjqK:1",
+        "2QWaeWx5g54GZJttZeNSzcAzjRTeLLGBba7RWFRMUE1EHXg8jBQPBwAjTRnEzPDingWhaet2iQiGSoeKvBRRHLdw:0",
+        "2t1kLupbXLkTzApGcQndK1tGHTmjLCUPXsku4HBNHgVA6MbAu1hYyQ8ijcVYrPisZzFgcowPdNYSE4eRYdts6jyf:0",
+        "33khehdnANYh9meLGTAZvVYsSJUqfrkhkJREeHSDo9VhhinbRJV3zkT5WJ5Zr4T6cjeQpAW3z3FPvtSN3igpvHyz:0",
+        "3uZA7KorKhDgt5fqbtQ17cesFqbDtyqdGPEWerNxJioMXuH2QTiGqtjPA45u5bSkJaEP3RgBpMPVaEnV51QKX8kV:1",
+        "4dJmQfFFnomgU9Rug1uqkVFyd1btk2iNNprKDyFttKQGq5Ht9VMmv9Kpob5Q1m5QGsPuPFG2tZ8Es1gWNnB5Kefa:0",
+        "5XDRkGDWv5xtH4JmMNFFGvAFiPGNMFG6R6rWHfHwQYiy72eGgGA9j3QGj1nojxmvsxvK65PNXvzuqDxjcAWP5zr3:2",
+        "5aeUkNWy8WDXQHzXzAQZZT5ttLWFGdurN8VjtATuhNoBXG4D9BP3YSPb6vG1QN8KfaS8U4hC2xGBXLR1jXtJHQJ9:1",
+        "MygKiDsPPoC1FJSarecyKFeKz1h8RKV3ZuWu2H3T219xiXtmthva9kVmJvDzWVLxTL9CLXkyxxJhCTVbRP35NCV:1",
+        "oyh6KYtnaVTnQ2mR18hMBMxJxW3c2SM5oRUq9wUxWSFrVLP9QGhrp1gTa9bF4mAqHiQ1YxBVSstxjWeu3uWm12W:0",
+        "qCwKbkYcLi9VQeTHJGoRmkxUazu3rztXLgocPKEapQWMAXnS3rXTpPCa4rq4unjR1QRmM76scMtppqbBbBJmBc6:1"
+      ],
+      "pass": true
+    },
+    {
+      "name": "WS fee frames include the treasury claims and the lifecycle",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "/holders count.all = token accounts with a balance",
+      "expected": 6,
+      "actual": 6,
+      "pass": true
+    },
+    {
+      "name": "/holders top = the chain balances (token account, raw units)",
+      "expected": [
+        ["2Ch1mWZMydezAzCFQ3nmJ5QQ1GkTrw89BTtKnsrFF7Lh", "34498251350"],
+        ["9VFxe8qkLkGmBVvfUZshfscuoVdfC9G6MftWrTLVQJ8W", "3781498065"],
+        ["9mhsYmJiPTVj8cg3maZWGFaz7dnwfkJkeEe71kNzHiLu", "33318787"],
+        ["ADHb9ypWibS6AbazYe1P4UpHhpv96ut5KrQACyCjS9eF", "27280734459"],
+        ["BLDb4vrdp9wMgrvQbJqw1aWJa6xgxXhak8sxBjjrfj5s", "3446558893"],
+        ["DkmGaE7yjFENAiubSsDuaP8qVKHHs4PDEyAGm8ep29vX", "14425166832"]
+      ],
+      "actual": [
+        ["2Ch1mWZMydezAzCFQ3nmJ5QQ1GkTrw89BTtKnsrFF7Lh", "34498251350"],
+        ["9VFxe8qkLkGmBVvfUZshfscuoVdfC9G6MftWrTLVQJ8W", "3781498065"],
+        ["9mhsYmJiPTVj8cg3maZWGFaz7dnwfkJkeEe71kNzHiLu", "33318787"],
+        ["ADHb9ypWibS6AbazYe1P4UpHhpv96ut5KrQACyCjS9eF", "27280734459"],
+        ["BLDb4vrdp9wMgrvQbJqw1aWJa6xgxXhak8sxBjjrfj5s", "3446558893"],
+        ["DkmGaE7yjFENAiubSsDuaP8qVKHHs4PDEyAGm8ep29vX", "14425166832"]
+      ],
+      "pass": true
+    },
+    {
+      "name": "/holders top sums to the supply (raw units)",
+      "expected": "83465528386",
+      "actual": "83465528386",
+      "pass": true
+    },
+    {
+      "name": "activity rows of kind buyback (registered, graduated, share, 4 slices, 3 claims)",
+      "expected": 10,
+      "actual": 10,
+      "pass": true
+    },
+    {
+      "name": "activity slice rows = the slices (lamports)",
+      "expected": ["7113428", "7465172", "7833952", "8220949"],
+      "actual": ["7113428", "7465172", "7833952", "8220949"],
+      "pass": true
+    },
+    {
+      "name": "activity treasury rows: SOL to lenders = sum(lamportsToPool), and the burn",
+      "expected": ["7534788", 3, true],
+      "actual": ["7534788", 3, true],
+      "pass": true
+    },
+    {
+      "name": "activity share row = the share swept (SOL)",
+      "expected": 0.1,
+      "actual": 0.1,
+      "pass": true
+    }
+  ]
+}

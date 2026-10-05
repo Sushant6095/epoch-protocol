@@ -9,6 +9,10 @@ after a restart on 4 Oct 2026, 09:36–09:47 IST. Times below are IST.
 Epoch program: the treasury PDA as fee claimer and leftover receiver, and `register_revenue_token` signed by the
 validator's operator.
 
+[Round 2](#10-round-2-the-whole-loop-through-the-program-5-oct-2026) (5 Oct 2026, 22:45–22:52 IST) ran the whole loop
+through the program on a fresh stand-in: launch, trades, graduation, a sweep, buyback slices and the treasury's claims.
+Every Launch endpoint, the activity feed and the WS frames were checked against the chain: 46 of 46 checks passed.
+
 **Where:** the public devnet faucet refused every airdrop, so the rehearsal ran on a local `solana-test-validator`
 loaded with **Meteora's mainnet program binaries** (DBC, DAMM v2, Metaplex token metadata) and the DAMM v2 migration
 configs, dumped from mainnet. That is closer to the mainnet launch than devnet would have been: devnet runs different
@@ -310,6 +314,105 @@ A re-check at 12:14 IST, on the resumed ledger:
   - `rOPR` answered with `source: "program"`, its escrow at 0 SOL;
   - `/buybacks` for `rREH` answered "No validator has registered this mint as a revenue token.";
   - `/buybacks` by symbol answered `400 BAD_REQUEST`.
+
+## 10. Round 2: the whole loop through the program (5 Oct 2026)
+
+5 Oct 2026, 22:45–22:52 IST, on a fresh stand-in. A first run (22:24–22:35 IST) gave the same amounts to the lamport
+and found the API fixes below; this is the second run, on the fixed code.
+
+- **The chain.** `solana-test-validator` with 64-slot epochs, Meteora's mainnet DBC, DAMM v2 and Metaplex binaries,
+  and `programs/epoch` from the round-2 branch. The program was built with `cargo build-sbf` in a copy with a throwaway
+  `declare_id!` (`8iavauBSyvtsM9iaNbtqmaU62jWP8U1wAr1SQGftHhfQ`, 950,296 bytes) and loaded at genesis.
+- **The code.** Only code in this repo: the SDK's builders, the launch CLI, the API's `/quote` and `/build` (signed
+  by three test wallets), `rehearse migrate`, and the crank jobs from `cranks_app/dist` (`BuybackJob`, `SweepJob`,
+  `LaunchFeeClaimJob`).
+- **The API's feed.** The realtime feed ran on the RPC websocket (`LAUNCH_REALTIME=auto` with a devnet launch
+  cluster), with `LAUNCH_TRADES_POLL_SECONDS=5` and `LAUNCH_TRADES_BACKSTOP_SECONDS=30`.
+- **The check.** A checker read the chain: the program's events from the transaction logs, the mint supply, the vault,
+  the escrow, the `RevenueToken` and the token accounts. It compared them with every Launch endpoint, the activity
+  feed and the recorded WS frames, to the lamport and the token unit. **46 of 46 checks passed.**
+- **The record.** Every check, signature and amount is in
+  [meteora-e2e-2026-10-05.json](meteora-e2e-2026-10-05.json).
+
+### The program and the launch
+
+| Step | Signature | Result |
+| --- | --- | --- |
+| `initialize_pool` | `4hNRaZBhh87E6RB82Xh1HSYTzunQa5GTdYTCWWxST5w5HR4D15XVcyDYV2HuxTLtmTSWsrbyPDYyfXobcJkvNqh7` | Pool `CrSBeKMoSBEsjFHf98Aq6ioascraPai3DqsVvnhq3rvd`, treasury PDA `CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA`, vault `Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2` |
+| Vote account `9EBKeKgZma5jJhkPBuXULmx2yjjepMruhyBfhoU53V84` (withdrawer: its operator), vote floor funded | `3JsYGANvPUYCG6zACK1WoX81iRxUkNE94cfZzHRnMBftoXBboRGmgF6AKWE25376wfurS3HCrDG4gmrGMxxc9RYF` | |
+| `onboard_with_bond` | `5YyHXJ5H3wPaNpNKjgwpgQLEvk14383Fackz2ccReLUm22xvMNpnEvh7DSc6XhfKkPBkJWZ53pTFh5DD2c6AqBvh` | position `3fDmeEEHLmA7WZ7bY5yeHJeNBKiHEZiAo28bmuZyqpcp` Active, operator `2DPfWMML11Ya1rmUyTnUQucm111sBxVMfwrau5uQWuCC` |
+| `createConfig` | `4sysN4PT9fknigvTCdN5yz9Q87BJhaYNBTJ2mqZhqjK7wuSjDLLGqauXrnVynZk83fipjd41iCENS5nwKZuevyA4` | Fee claimer and leftover receiver: the treasury PDA |
+| `createPool` with the first buy (0.02 SOL) | `5XDRkGDWv5xtH4JmMNFFGvAFiPGNMFG6R6rWHfHwQYiy72eGgGA9j3QGj1nojxmvsxvK65PNXvzuqDxjcAWP5zr3` | `rR2E`, mint `9rgrjLnvaztGut7iGaGnx3peJ2vyHccpkaCStmA54GLL`, DBC pool `9KiWryqrEszzWLDNnr3hn4x7ezQAYiYFd4yXkoyu5hAF` |
+| `transferPoolCreator` | `36ejBtpdZL4AznT1MZ4oizgU38SBgckVPbzyHZdUAdTdgk7Ku75FoWgtmsRDydKcTev6ZFkPtnxQov1F4gkVdZEU` | The pool creator is the validator's operator |
+| `register_revenue_token(500, 100)`, signed by the operator | `3PG2UFQbFX8SNkWtkmPX5rS2oQi4meD3vEBCYMbCyhvgYXmYq8HbWD6GXEYv4hF4xxjj38qj8SLq38p9iua7HxZF` | `RevenueToken` `BKnweefs2va1DBqSRzEEYLefHePUkzFvnmaySZHPeDaj`, escrow `8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo`, term epochs 1–100 |
+| `configure_revenue_token` (pool admin) | `2pvte9fJwZvHVcVPMP4hJdmxuirmqL17d1Hwc5fFnN7sbRDwGXGfRFSxD7oRXMnZ9NgYiz5XUryoEc8YpTC2i5mh` | 4 slices in a 48-slot window, to fit 64-slot epochs; impact cap 1,000 bps |
+
+### Trades through the API, and graduation
+
+Each trade was quoted (`POST /quote`), built (`POST /build`), then signed and sent by a test wallet. **Every fill
+equalled its quote** to the base unit, in and out.
+
+| IST | Venue | Side | In | Out | Signature |
+| --- | --- | --- | --- | --- | --- |
+| 22:46:01 | dbc | buy (first buy, in `createPool`) | 0.02 SOL | 3,446.558893 | `5XDRkG…5zr3` |
+| 22:46:50 | dbc | buy | 0.15 SOL | 23,781.498065 | `MygKiDsPPoC1FJSarecyKFeKz1h8RKV3ZuWu2H3T219xiXtmthva9kVmJvDzWVLxTL9CLXkyxxJhCTVbRP35NCV` |
+| 22:46:55 | dbc | buy | 0.12 SOL | 16,737.343094 | `5aeUkNWy8WDXQHzXzAQZZT5ttLWFGdurN8VjtATuhNoBXG4D9BP3YSPb6vG1QN8KfaS8U4hC2xGBXLR1jXtJHQJ9` |
+| 22:47:00 | dbc | sell | 20,000 | 0.139089343 SOL | `2LAHEasDZD3k1rb9pc8baGTFnrjQL8GK8T8vpLM4ASkdt1AaX79AUkudZX23qYcKgAkRos7JFpbYFn5CJcnsJjqK` |
+| 22:47:04 | dbc | buy | 0.3 SOL | 39,498.25135 | `3uZA7KorKhDgt5fqbtQ17cesFqbDtyqdGPEWerNxJioMXuH2QTiGqtjPA45u5bSkJaEP3RgBpMPVaEnV51QKX8kV` |
+| 22:47:09 | dbc | buy | 0.056965304 SOL (0.1 asked: the quote caps a buy at what completes the raise) | 6,411.909041; `EvtCurveComplete` | `qCwKbkYcLi9VQeTHJGoRmkxUazu3rztXLgocPKEapQWMAXnS3rXTpPCa4rq4unjR1QRmM76scMtppqbBbBJmBc6` |
+| 22:47:24 | — | `migrateToDammV2` | | DAMM v2 pool `67RY3gT3ipjqhpyRAbR5ZeCxBZDgYgWuJ5MvKMbtYXZ1` | `4ov8xQvpAhxjWLF3sCvREX5tF3wXBGky1ZVdxbQgoYMAGTdXSA1RJPQiChPLcXXnN2Mj9uwEiy512UFX4SHjMo5a` |
+| 22:47:35 | damm-v2 | buy | 0.05 SOL | 4,131.482324 | `33khehdnANYh9meLGTAZvVYsSJUqfrkhkJREeHSDo9VhhinbRJV3zkT5WJ5Zr4T6cjeQpAW3z3FPvtSN3igpvHyz` |
+| 22:47:40 | damm-v2 | sell | 5,000 | 0.056248724 SOL | `oyh6KYtnaVTnQ2mR18hMBMxJxW3c2SM5oRUq9wUxWSFrVLP9QGhrp1gTa9bF4mAqHiQ1YxBVSstxjWeu3uWm12W` |
+
+### Sweep, buybacks and the treasury's claims
+
+| Step | Signature | Result |
+| --- | --- | --- |
+| `BuybackJob` (graduated): `sync_revenue_token_pool` | `3Dfdo7Sn89ebnd9ntYkuiCmYzzUpJYjzvD1y5FNCAqgLB3Q6yYArHUE6GvTd4sNkeqhvU8qtob1NoLPxJDWi29xV` | Venue DAMM v2 |
+| 2 SOL sent to the vote account (standing in for commission), then `SweepJob` | `uTP6YUYgvwuohzUaWwHQ6YuTfmAAtRKuZd5jzRmVtbkJNb86MmVzwWUUMDtyT1VQCwsmxxm5Xm8vPYhdLEHD9hW` | `RevenueShareSwept`: 0.1 SOL (5% of 2 SOL) into the escrow, epoch 8 |
+| `BuybackJob`, slice 0 | `4dJmQfFFnomgU9Rug1uqkVFyd1btk2iNNprKDyFttKQGq5Ht9VMmv9Kpob5Q1m5QGsPuPFG2tZ8Es1gWNnB5Kefa` | 0.007113428 SOL → 824.312518 burned |
+| slice 1 | `2t1kLupbXLkTzApGcQndK1tGHTmjLCUPXsku4HBNHgVA6MbAu1hYyQ8ijcVYrPisZzFgcowPdNYSE4eRYdts6jyf` | 0.007465172 SOL → 784.748357 burned |
+| slice 2 | `2QWaeWx5g54GZJttZeNSzcAzjRTeLLGBba7RWFRMUE1EHXg8jBQPBwAjTRnEzPDingWhaet2iQiGSoeKvBRRHLdw` | 0.007833952 SOL → 747.806675 burned |
+| slice 3 | `2BdabRK38zDarKV4Wvw5dFQKbMftDwUwbFqSwu1QRuTaPTEXNfgonrseraW9SwCTtFKDLrY3f9Zeno4mDddXWp7p` | 0.008220949 SOL → 712.603909 burned |
+| `LaunchFeeClaimJob` through the program: `TreasuryClaimed` tradingFee | `22AjkDonzocqBobAzKzZLsL72Lff8comZtEbF9jXfdNuhF1FLpRS1JENse6CJtzs2wM5mJrE9cvzTAk6g9T5RoDX` | 0.006299679 SOL into the pool's vault |
+| `TreasuryClaimed` leftover | `5nPQ3GxagAP79cnbWo7GkMF4TWtvYSCw79rtL4ZsLvT7QTfz3UkjjaPLrPExY8y5WXPzt4w8NEFx7kdEKFxwLZL6` | 913,465.000155 tokens (the supply the curve never sold) burned |
+| `TreasuryClaimed` lpFee | `4CtG69qArF9peL8GUjTRqEHbAMxH6ix8uWQXkdPJbVC9PTANXRb3LpVjWEM2XL7PtyksPNdyb3R39AmHBbAviYSo` | 0.001235109 SOL into the pool's vault |
+| creatorMigrationFee | not sent (dry run) | 0.350000954 SOL: the validator's own claim; its key was not loaded |
+
+### What the API showed (each checked against the chain)
+
+- **`/fees`.** `toLenders.claimedSol` 0.007534788 equals `/buybacks` `treasury.totals.toLendersSol`, which equals the
+  sum of the claims' `lamportsToPool` (7,534,788 lamports). Its `holder` is the vault, which grew by exactly that:
+  890,880 → 8,425,668 lamports. `leftover.burned` is `true`, with `burnedTokens` 913,465.000155. The supply fell by
+  exactly 913,465,000,155 raw units: 996,930,528,541 → 83,465,528,386.
+- **`/buybacks`.** Four rows, one per `BuybackExecuted`. Totals: spent 0.030633501 SOL, burned 3,069.471459,
+  escrowed 0.1. The escrow is 0.069366499 SOL above rent, the same in `/page` and `/v1/launches/:mint`. Venue
+  `damm-v2`. `schedule.nextSlice.waitsForSweep` is `true`: the next epoch's share is not swept yet.
+- **`/v1/launches/:mint`.** `token.burned` is 916,534.471614: every burn, buybacks and the leftover.
+- **`/trades`.** 12 rows: 6 on the curve (the first buy included), 2 on DAMM v2, and the 4 slices, whose `trader` is
+  the escrow and whose SOL equals each slice's `lamportsIn`.
+- **`/candles`.** Volume equals the trades' SOL (0.922937).
+- **`/market`.** `damm-v2`, `migrated`.
+- **`/holders`.** All 6 token accounts with a balance, to the raw unit, summing to the supply. The treasury holds
+  nothing.
+- **Activity.** 10 `buyback` rows with the same amounts: registered, graduated, the share, the 4 slices and the 3
+  treasury claims. Also one `sweep` row and one `advance` (onboarded).
+- **WS `launch:<mint>`.** Each of the 12 trades once, a `market` frame after each, and `fee` frames for
+  `curveComplete`, `dammPoolCreated`, `partnerTradingFee`, `leftover` and `lpFee`.
+- **`ingest`.** `mode: "websocket"`, `pollSeconds` 30. `lagSeconds` was null after the first start's backfill, 0.9 s
+  after the curve trades and 1.1 s after the claims.
+
+### Found and fixed in the API
+
+1. **A trimmed ledger stopped the trade feed for good.** With `--limit-ledger-size 200000` the stand-in drops
+   transactions after about 14 minutes. From then on, `getSignaturesForAddress(until: <cursor>)` answered
+   "Transaction … not found" on every poll. A node with limited history does the same. The ingester now reads back
+   to the cursor's slot.
+2. **`/holders` kept its list for 2 minutes, whatever happened.** After the trades it still showed the 2 holders from
+   before them (flagged `stale`). It is now read again after a trade or claim, at most every 5 s.
+3. **`ingest.lagSeconds` counted the first start's backfill** (77 s in the first run). It no longer does.
+
+The program behaved as specified throughout: no program bug was found.
 
 ## Costs (payer, SOL)
 

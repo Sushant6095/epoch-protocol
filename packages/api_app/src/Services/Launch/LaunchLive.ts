@@ -1,6 +1,14 @@
-import { type LaunchPageConfig, LaunchPageConfigSchema, loadConfig } from '@epoch/config-sdk';
+import {
+  IndexerConfigSchema,
+  type LaunchConfig,
+  type LaunchPageConfig,
+  LaunchPageConfigSchema,
+  loadConfig,
+} from '@epoch/config-sdk';
+import { Logger } from '@epoch/logger';
 import { PostgresConnectionManager } from '@epoch/pg_models';
-import { ConnectionManager } from '@epoch/solana';
+import { ConnectionManager, type GrpcEndpoint } from '@epoch/solana';
+import { Connection } from '@solana/web3.js';
 
 import { getLaunchServices } from '.';
 import { getServices } from '..';
@@ -11,6 +19,7 @@ import { type StreamHub } from '../Stream/StreamHub';
 import { RpcLaunchChainReader } from './LaunchChain';
 import { RpcLaunchLiveChain } from './LaunchLiveChain';
 import { LaunchPageService } from './LaunchPageService';
+import { GrpcRealtimeSource, type LaunchRealtimeSource, WebsocketRealtimeSource } from './LaunchRealtime';
 import { LaunchTradeIngester } from './LaunchTradeIngester';
 import { type LaunchTradeStore, MemoryLaunchTradeStore, PgLaunchTradeStore } from './LaunchTradeStore';
 import { ProgramRevenueTokenSource, RpcRevenueTokenChain } from './RevenueTokenSource';
@@ -29,6 +38,46 @@ export interface LaunchPageServices {
 let pageServices: LaunchPageServices | undefined;
 
 const isLocal = (url: string): boolean => /\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url);
+const logger = Logger.create('LaunchLive');
+
+/**
+ * The trade feed's realtime source (LAUNCH_REALTIME): Yellowstone gRPC through Solami (mainnet launches with a key;
+ * RPC Fast as failover), else the launch RPC's websocket; null for `off`.
+ */
+export function launchRealtimeSource(
+  config: Pick<LaunchPageConfig, 'LAUNCH_REALTIME' | 'LAUNCH_RPC_WS_URL'>,
+  launch: Pick<LaunchConfig, 'LAUNCH_CLUSTER' | 'LAUNCH_RPC_URL'>,
+  env: Record<string, string | undefined> = process.env,
+): LaunchRealtimeSource | null {
+  if (config.LAUNCH_REALTIME === 'off') return null;
+  const grpc = loadConfig(
+    IndexerConfigSchema.pick({
+      SOLAMI_GRPC_URL: true,
+      SOLAMI_TOKEN: true,
+      RPC_FAST_GRPC_URL: true,
+      RPC_FAST_TOKEN: true,
+      SOLAMI_GRPC_COMPRESSION: true,
+    }),
+    env,
+  );
+  // Solami streams mainnet: a devnet launch (or a local stand-in) uses the websocket.
+  const grpcUsable = !!grpc.SOLAMI_TOKEN && launch.LAUNCH_CLUSTER === 'mainnet';
+  if (config.LAUNCH_REALTIME === 'grpc' && !grpcUsable) {
+    logger.warn('LAUNCH_REALTIME=grpc needs SOLAMI_TOKEN and a mainnet launch cluster: using the websocket');
+  }
+  if (grpcUsable && config.LAUNCH_REALTIME !== 'websocket') {
+    const endpoints: GrpcEndpoint[] = [{ name: 'solami', url: grpc.SOLAMI_GRPC_URL, token: grpc.SOLAMI_TOKEN }];
+    if (grpc.RPC_FAST_GRPC_URL) {
+      endpoints.push({ name: 'rpcfast', url: grpc.RPC_FAST_GRPC_URL, token: grpc.RPC_FAST_TOKEN });
+    }
+    return new GrpcRealtimeSource(endpoints, {
+      compression: grpc.SOLAMI_GRPC_COMPRESSION === 'none' ? undefined : grpc.SOLAMI_GRPC_COMPRESSION,
+    });
+  }
+  return new WebsocketRealtimeSource(
+    new Connection(launch.LAUNCH_RPC_URL, { commitment: 'confirmed', wsEndpoint: config.LAUNCH_RPC_WS_URL }),
+  );
+}
 
 /** The Launch page's services (plan F13), built from LaunchPageConfig and the launch services on first use. */
 export function getLaunchPageServices(): LaunchPageServices {
@@ -55,6 +104,9 @@ export function getLaunchPageServices(): LaunchPageServices {
     pollMs: config.LAUNCH_TRADES_POLL_SECONDS * 1_000,
     backfillLimit: config.LAUNCH_TRADES_BACKFILL_LIMIT,
     enabled: config.LAUNCH_TRADES_INGEST && !!launchConfig.LAUNCHES_PATH,
+    realtime:
+      config.LAUNCH_TRADES_INGEST && launchConfig.LAUNCHES_PATH ? launchRealtimeSource(config, launchConfig) : null,
+    backstopMs: config.LAUNCH_TRADES_BACKSTOP_SECONDS * 1_000,
     onTrades: (mint, rows) => wiring.page?.onTrades(mint, rows),
     onFeeEvents: (mint, rows) => wiring.page?.onFeeEvents(mint, rows),
   });

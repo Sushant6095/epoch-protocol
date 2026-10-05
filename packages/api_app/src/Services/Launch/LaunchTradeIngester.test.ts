@@ -8,17 +8,20 @@ import {
   VALIDATOR,
 } from '../../__fixtures__/LaunchFixtures';
 import { type LaunchLiveChain, type PoolSignature } from './LaunchLiveChain';
+import { type LaunchRealtimeSource, type RealtimeTransaction } from './LaunchRealtime';
 import { cursorName, type IngestLaunch, LaunchTradeIngester } from './LaunchTradeIngester';
 import { MemoryLaunchTradeStore, type StoredLaunchFeeEvent, type StoredLaunchTrade } from './LaunchTradeStore';
 
 /**
  * getSignaturesForAddress and getTransaction over the rehearsal's recorded transactions: `visible` is what the chain
- * has so far, `missing` what the node lists but cannot return yet, `failed` what failed on chain.
+ * has so far, `missing` what the node lists but cannot return yet, `failed` what failed on chain, `purged` what the
+ * node trimmed from its history (neither listed nor usable as `until`).
  */
 class FakeChain implements Pick<LaunchLiveChain, 'signatures' | 'transaction'> {
   visible = new Set(REHEARSAL_TXS.map((tx) => tx.name));
   missing = new Set<string>();
   failed = new Set<string>();
+  purged = new Set<string>();
   error: Error | null = null;
   readonly fetched: string[] = [];
   signatureCalls = 0;
@@ -29,9 +32,12 @@ class FakeChain implements Pick<LaunchLiveChain, 'signatures' | 'transaction'> {
   ): Promise<PoolSignature[]> {
     this.signatureCalls++;
     if (this.error) throw this.error;
-    const list = REHEARSAL_TXS.filter((tx) => this.visible.has(tx.name) && tx.accounts.includes(address)).sort(
-      (a, b) => b.slot - a.slot,
-    );
+    if (REHEARSAL_TXS.some((tx) => tx.signature === options.until && this.purged.has(tx.name))) {
+      throw new Error(`failed to get signatures for address: Transaction ${options.until} not found`);
+    }
+    const list = REHEARSAL_TXS.filter(
+      (tx) => this.visible.has(tx.name) && !this.purged.has(tx.name) && tx.accounts.includes(address),
+    ).sort((a, b) => b.slot - a.slot);
     const start = options.before ? list.findIndex((tx) => tx.signature === options.before) + 1 : 0;
     const until = options.until ? list.findIndex((tx) => tx.signature === options.until) : -1;
     return list
@@ -135,9 +141,9 @@ describe('LaunchTradeIngester (the rehearsal transactions)', () => {
       signature: rehearsalTx('withdraw-leftover').signature,
     });
 
-    // Next poll: the DAMM v2 pool's history. The migration is read again through it and stored once.
+    // Next poll: the DAMM v2 pool's history. The migration, already read through the curve, is not fetched again.
     expect(await ingest.pollOnce()).toEqual({ trades: 2, feeEvents: 1 });
-    expect(chain.fetched.slice(8)).toEqual(['migrate-damm-v2', 'damm-buy', 'damm-sell', 'claim-lp-fee']);
+    expect(chain.fetched.slice(8)).toEqual(['damm-buy', 'damm-sell', 'claim-lp-fee']);
     expect((await store.trades(REHEARSAL.mint, { limit: 2 })).map((row) => [row.venue, row.side])).toEqual([
       ['damm-v2', 'sell'],
       ['damm-v2', 'buy'],
@@ -150,7 +156,7 @@ describe('LaunchTradeIngester (the rehearsal transactions)', () => {
 
     // Nothing new: no transaction is fetched again.
     expect(await ingest.pollOnce()).toEqual({ trades: 0, feeEvents: 0 });
-    expect(chain.fetched).toHaveLength(12);
+    expect(chain.fetched).toHaveLength(11);
     expect(pushed.trades.flat()).toHaveLength(6);
     expect(pushed.fees.flat()).toHaveLength(6);
   });
@@ -159,11 +165,45 @@ describe('LaunchTradeIngester (the rehearsal transactions)', () => {
     chain.visible = new Set(['launch-create-pool-first-buy', 'dbc-buy']);
     const ingest = ingester();
     expect(await ingest.pollOnce()).toEqual({ trades: 2, feeEvents: 0 });
+    // The first start's backfill is history, not feed lag.
+    expect(ingest.feedStatus(REHEARSAL.mint)).toEqual({ mode: 'polling', lagSeconds: null, pollSeconds: 10 });
     chain.visible.add('dbc-sell');
     chain.visible.add('dbc-buy-completes-curve');
+    clock = rehearsalTx('dbc-buy-completes-curve').blockTime * 1000 + 4_200;
     expect(await ingest.pollOnce()).toEqual({ trades: 2, feeEvents: 1 });
     expect(chain.fetched).toEqual(['launch-create-pool-first-buy', 'dbc-buy', 'dbc-sell', 'dbc-buy-completes-curve']);
     expect(pushed.trades[1].map((row) => row.side)).toEqual(['sell', 'buy']);
+    // Read after the cursor: the newest row's lag.
+    expect(ingest.feedStatus(REHEARSAL.mint).lagSeconds).toBe(4.2);
+  });
+
+  it("reads back to the cursor's slot when the node no longer has the cursor's transaction", async () => {
+    chain.visible = new Set(['launch-create-pool-first-buy', 'dbc-buy']);
+    const ingest = ingester();
+    expect(await ingest.pollOnce()).toEqual({ trades: 2, feeEvents: 0 });
+    // The node trims its history past the cursor (limited ledger retention): `until` answers "not found".
+    chain.purged.add('dbc-buy');
+    let calls = chain.signatureCalls;
+    expect(await ingest.pollOnce()).toEqual({ trades: 0, feeEvents: 0 });
+    expect(chain.signatureCalls - calls).toBe(2); // the refused `until`, then the read back to the cursor's slot
+    expect(ingest.lastPoll(REHEARSAL.mint)).toBe(clock);
+    // While the pool is quiet, the trimmed cursor is read back to its slot at once.
+    calls = chain.signatureCalls;
+    expect(await ingest.pollOnce()).toEqual({ trades: 0, feeEvents: 0 });
+    expect(chain.signatureCalls - calls).toBe(1);
+    // A new transaction is read, and moves the cursor; the older first buy is not fetched again.
+    chain.visible.add('dbc-sell');
+    expect(await ingest.pollOnce()).toEqual({ trades: 1, feeEvents: 0 });
+    expect(chain.fetched).toEqual(['launch-create-pool-first-buy', 'dbc-buy', 'dbc-sell']);
+    expect(await store.cursor(cursorName(DBC_POOL))).toMatchObject({ signature: rehearsalTx('dbc-sell').signature });
+    // From the new cursor, as usual.
+    chain.visible.add('dbc-buy-completes-curve');
+    expect(await ingest.pollOnce()).toEqual({ trades: 1, feeEvents: 1 });
+    // Any other error still fails the read.
+    chain.error = new Error('failed to get signatures for address: Transaction 1111 not found');
+    clock += 10_000;
+    expect(await ingest.pollOnce()).toEqual({ trades: 0, feeEvents: 0 });
+    expect(ingest.lastPoll(REHEARSAL.mint)).toBe(clock - 10_000);
   });
 
   it('starts from the newest signature when backfill is off', async () => {
@@ -250,5 +290,153 @@ describe('LaunchTradeIngester (the rehearsal transactions)', () => {
     });
     expect(await ingest.pollOnce()).toEqual({ trades: 6, feeEvents: 6 });
     expect(await ingest.pollOnce()).toEqual({ trades: 0, feeEvents: 0 });
+  });
+});
+
+/** A realtime source driven by hand: what it was told to watch, and its health. */
+class FakeRealtime implements LaunchRealtimeSource {
+  readonly mode = 'websocket' as const;
+  readonly watched: string[][] = [];
+  up = true;
+  started = false;
+
+  start(): void {
+    this.started = true;
+  }
+
+  watch(pools: readonly string[]): void {
+    this.watched.push([...pools]);
+  }
+
+  healthy(): boolean {
+    return this.up;
+  }
+
+  stop(): void {
+    this.started = false;
+  }
+}
+
+describe('LaunchTradeIngester with a realtime source', () => {
+  let chain: FakeChain;
+  let store: MemoryLaunchTradeStore;
+  let realtime: FakeRealtime;
+  let clock: number;
+  let published: StoredLaunchTrade[][];
+  let waits: number;
+
+  const ingester = () =>
+    new LaunchTradeIngester({
+      chain,
+      store,
+      launches: async () => [CURVE_ONLY],
+      pollMs: 10_000,
+      backstopMs: 60_000,
+      backfillLimit: 1_000,
+      enabled: true,
+      realtime,
+      onTrades: (_mint, rows) => published.push(rows),
+      now: () => clock,
+      sleep: async () => {
+        waits++;
+        chain.missing.clear();
+      },
+    });
+  /** A transaction as the source pushes it: carried (gRPC) or a signature to fetch (websocket). */
+  const pushed = (name: string, carried: boolean): RealtimeTransaction => {
+    const tx = rehearsalTx(name);
+    return {
+      signature: tx.signature,
+      slot: tx.slot,
+      pools: [DBC_POOL],
+      failed: false,
+      raw: carried ? tx.raw : null,
+      receivedAt: clock,
+    };
+  };
+
+  beforeEach(() => {
+    chain = new FakeChain();
+    chain.visible = new Set(['launch-create-pool-first-buy', 'dbc-buy']);
+    store = new MemoryLaunchTradeStore();
+    realtime = new FakeRealtime();
+    clock = Date.parse('2026-10-03T13:30:00Z');
+    published = [];
+    waits = 0;
+  });
+
+  it('stores a pushed transaction once; polling then neither fetches nor republishes it', async () => {
+    const ingest = ingester();
+    expect(await ingest.pollOnce()).toEqual({ trades: 2, feeEvents: 0 });
+    expect(ingest.feedStatus(REHEARSAL.mint).lagSeconds).toBeNull();
+    // The pass told the source what to watch.
+    expect(realtime.watched).toEqual([[DBC_POOL]]);
+    chain.visible.add('dbc-sell');
+    clock = rehearsalTx('dbc-sell').blockTime * 1000 + 1_500;
+    await ingest.push(pushed('dbc-sell', true));
+    expect(published.map((rows) => rows.map((row) => row.side))).toEqual([['buy', 'buy'], ['sell']]);
+    expect((await store.trades(REHEARSAL.mint, { limit: 1 }))[0]).toMatchObject({
+      signature: rehearsalTx('dbc-sell').signature,
+      side: 'sell',
+      solLamports: 75_281_111n,
+    });
+    // Pushed again (both pools, or a reconnect): nothing new.
+    await ingest.push(pushed('dbc-sell', true));
+    expect(published).toHaveLength(2);
+    // The backstop poll sees the signature, skips the fetch and moves its cursor past it.
+    expect(await ingest.pollOnce()).toEqual({ trades: 0, feeEvents: 0 });
+    expect(chain.fetched).toEqual(['launch-create-pool-first-buy', 'dbc-buy']);
+    expect(await store.cursor(cursorName(DBC_POOL))).toMatchObject({ signature: rehearsalTx('dbc-sell').signature });
+    expect(published).toHaveLength(2);
+    expect(ingest.feedStatus(REHEARSAL.mint)).toEqual({ mode: 'websocket', lagSeconds: 1.5, pollSeconds: 60 });
+  });
+
+  it('fetches a pushed signature the source did not carry, waiting for the node to return it', async () => {
+    const ingest = ingester();
+    await ingest.pollOnce();
+    chain.visible.add('dbc-sell');
+    chain.missing.add('dbc-sell');
+    await ingest.push(pushed('dbc-sell', false));
+    expect(waits).toBe(1);
+    expect(chain.fetched).toEqual(['launch-create-pool-first-buy', 'dbc-buy', 'dbc-sell']);
+    expect(published.flat().map((row) => row.side)).toEqual(['buy', 'buy', 'sell']);
+    // A failed one is neither fetched nor stored.
+    await ingest.push({ ...pushed('dbc-buy-completes-curve', false), failed: true });
+    expect(chain.fetched).toHaveLength(3);
+  });
+
+  it('learns a graduation from a pushed migration and watches the DAMM v2 pool at once', async () => {
+    const ingest = ingester();
+    await ingest.pollOnce();
+    await ingest.push(pushed('migrate-damm-v2', true));
+    expect(ingest.graduatedPool(REHEARSAL.mint)).toBe(DAMM_POOL);
+    expect(realtime.watched.at(-1)).toEqual([DBC_POOL, DAMM_POOL]);
+    // A DAMM v2 trade pushed next is decoded with the new pool.
+    await ingest.push({ ...pushed('damm-buy', true), pools: [DAMM_POOL] });
+    expect((await store.trades(REHEARSAL.mint, { limit: 1 }))[0]).toMatchObject({ venue: 'damm-v2', side: 'buy' });
+  });
+
+  it('polls at the backstop pace while the source is healthy, and at the normal pace when it is down', async () => {
+    const ingest = ingester();
+    expect(ingest.pollDelayMs()).toBe(60_000);
+    expect(ingest.feedStatus(REHEARSAL.mint)).toEqual({ mode: 'websocket', lagSeconds: null, pollSeconds: 60 });
+    realtime.up = false;
+    expect(ingest.pollDelayMs()).toBe(10_000);
+    expect(ingest.mode).toBe('polling');
+    // Without a source: polling, at the normal pace.
+    const plain = new LaunchTradeIngester({
+      chain,
+      store,
+      launches: async () => [CURVE_ONLY],
+      pollMs: 10_000,
+      backfillLimit: 0,
+      enabled: true,
+    });
+    expect(plain.feedStatus(REHEARSAL.mint)).toEqual({ mode: 'polling', lagSeconds: null, pollSeconds: 10 });
+    // start() hands the source its callbacks; stop() stops it.
+    ingest.start();
+    expect(realtime.started).toBe(true);
+    await ingest.stop();
+    expect(realtime.started).toBe(false);
   });
 });

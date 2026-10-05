@@ -63,6 +63,8 @@ const DBC_POOL_AUTHORITY = 'FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM';
 const DAMM_V2_POOL_AUTHORITY = 'HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC';
 const DAY_MS = 86_400_000;
 const PAGE_TRADES = 50;
+/** Top holders are kept 2 minutes, or read again on request after a trade or claim (at most this often). */
+const HOLDERS_REREAD_MS = 5_000;
 
 /** Why a quote or a transaction cannot be built, as an HTTP error the ticket can show. */
 export class LaunchTradeException extends EpochException {
@@ -143,6 +145,8 @@ const nullableRound = (value: number | null, digits: number): number | null =>
 export class LaunchPageService {
   private readonly markets = new Map<string, SnapshotCache<MarketRead>>();
   private readonly holderCaches = new Map<string, SnapshotCache<LaunchHolders['top']>>();
+  /** When a trade or claim last changed a mint's balances (epoch ms): the holders are read again on the next request. */
+  private readonly holdersChangedAt = new Map<string, number>();
   private readonly claimCaches = new Map<string, SnapshotCache<LaunchClaimsState | null>>();
   private readonly now: () => number;
   /** Publishes on WS `launch:<mint>` (set by the stream wiring). */
@@ -178,6 +182,7 @@ export class LaunchPageService {
   /** New trades from the ingester: drop the market read and push the trades and the new market on the stream. */
   onTrades(mint: string, rows: StoredLaunchTrade[]): void {
     this.markets.get(mint)?.invalidate();
+    if (rows.length > 0) this.holdersChangedAt.set(mint, this.now());
     if (!this.publish) return;
     void (async () => {
       const entry = this.options.launches.entries().find((candidate) => candidate.mint === mint);
@@ -193,6 +198,7 @@ export class LaunchPageService {
   onFeeEvents(mint: string, rows: StoredLaunchFeeEvent[]): void {
     this.claimCaches.get(mint)?.invalidate();
     this.markets.get(mint)?.invalidate();
+    if (rows.length > 0) this.holdersChangedAt.set(mint, this.now());
     const entry = this.options.launches.entries().find((candidate) => candidate.mint === mint);
     if (!entry) return;
     for (const row of rows) this.publish?.(mint, { type: 'fee', event: this.toFeeEvent(row, entry) });
@@ -329,7 +335,13 @@ export class LaunchPageService {
         }),
       ),
     );
-    const top = await cache.get();
+    // A trade or claim since the last read moved balances: read again, at most every HOLDERS_REREAD_MS (a failed
+    // re-read serves the last list, marked by its age).
+    const changed = (this.holdersChangedAt.get(entry.mint) ?? 0) > cache.loadedAtMs;
+    const top =
+      changed && cache.loadedAtMs > 0 && this.now() - cache.loadedAtMs >= HOLDERS_REREAD_MS
+        ? await cache.refresh().catch(() => cache.get())
+        : await cache.get();
     // Fewer than 20 accounts back from getTokenLargestAccounts is every holder: count them from the fresh list.
     // Otherwise the counts come from the board's holder scan (one getProgramAccounts, LAUNCH_HOLDERS_CACHE_MINUTES).
     const complete = top.length < 20;
@@ -842,14 +854,20 @@ export class LaunchPageService {
     const last = ingester?.lastPoll(entry.mint) ?? null;
     // The graduation event may predate this process: the curve names its DAMM v2 pool too.
     const damm = entry.dammPool ?? (entry.dbcPool ? await this.dammPoolOf(entry).catch(() => null) : null);
+    const feed = ingester?.enabled ? ingester.feedStatus(entry.mint) : null;
+    // A slow backstop poll (realtime healthy) is not staleness: allow two of its intervals.
+    const staleMs = Math.max(this.options.staleMs, 2 * (feed?.pollSeconds ?? 0) * 1_000);
     return {
       running: !!ingester?.enabled,
       lastPollAt: last === null ? null : isoIst(new Date(last)),
-      stale: !ingester?.enabled || last === null || this.now() - last > this.options.staleMs,
+      stale: !ingester?.enabled || last === null || this.now() - last > staleMs,
       pools: [
         ...(entry.dbcPool ? [{ address: entry.dbcPool, venue: 'dbc' as const }] : []),
         ...(damm ? [{ address: damm, venue: 'damm-v2' as const }] : []),
       ],
+      mode: feed?.mode ?? 'polling',
+      lagSeconds: feed?.lagSeconds ?? null,
+      pollSeconds: feed?.pollSeconds ?? null,
     };
   }
 
