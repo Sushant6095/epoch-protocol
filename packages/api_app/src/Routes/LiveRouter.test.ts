@@ -10,6 +10,7 @@ import {
   PostgresConnectionManager,
   runMigrations,
   slotFees,
+  solamiUsageReports,
 } from '@epoch/pg_models';
 import { TransactionRollbackError } from 'drizzle-orm';
 
@@ -112,6 +113,30 @@ describe('/v1/live without Postgres', () => {
       { ...block, slot: S + 5, blockTime: new Date(now - 2_400), medianCuPrice: 5_000 },
       { ...block, slot: S + 6, blockTime: new Date(now - 2_000), medianCuPrice: 7_001 },
     ]);
+    // What indexer_app writes every 10 s (a unique name: other test files may write their own rows in parallel).
+    await db.insert(solamiUsageReports).values({
+      component: 'route-test-indexer',
+      report: {
+        component: 'route-test-indexer',
+        startedAt: now - 60_000,
+        at: now - 1_000,
+        grpc: {
+          subscription: 'meta',
+          endpoint: 'solami',
+          status: 'streaming',
+          compression: null,
+          bytes: 123_456,
+          updates: 789,
+          reconnects: 0,
+          lastUpdateAt: now - 1_000,
+          lagSlots: 1,
+        },
+        rpc: [],
+        beam: null,
+        lastError: null,
+      },
+      updatedAt: new Date(now - 1_000),
+    });
     await db.insert(feeIndexLive).values({
       epoch: EPOCH,
       estimate: 200,
@@ -200,6 +225,26 @@ describe('/v1/live without Postgres', () => {
         expect.objectContaining({ rank: 2, identity: B, slots: 4, medianCuPrice: 4_000, name: 'Helius' }),
       ]);
       expect(body.data).toMatchObject({ value: 200, setter: A, final: false });
+    }));
+
+  it('GET /solami: each component’s Solami usage from solami_usage, plus the API’s own', () =>
+    withSeed(async (get) => {
+      const { status, body } = await get<{
+        components: { name: string; stale: boolean }[];
+        grpc: Record<string, unknown>[];
+        inUse: string[];
+      }>('/v1/live/solami');
+      expect(status).toBe(200);
+      expect(body.data.components).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'route-test-indexer', stale: false }),
+          expect.objectContaining({ name: 'api', stale: false }),
+        ]),
+      );
+      expect(body.data.grpc).toContainEqual(
+        expect.objectContaining({ component: 'route-test-indexer', status: 'streaming', bytes: 123_456, lagSlots: 1 }),
+      );
+      expect(body.data.inUse).toContain('grpc');
     }));
 
   it('GET /epochs/:epoch/distribution', () =>

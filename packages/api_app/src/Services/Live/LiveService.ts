@@ -1,4 +1,5 @@
 import { type LiveSlotPayload } from '@epoch/pg_models';
+import { type SolamiUsageReport, solamiUsage } from '@epoch/solana';
 
 import { KeyedSnapshotCache } from '../../Lib/KeyedSnapshotCache';
 import { isoIst, LAMPORTS_PER_SOL, round } from '../../Lib/Stats';
@@ -13,6 +14,10 @@ import {
   type LiveSource,
   type LiveStreamStatus,
   type LiveSummary,
+  type SolamiBeamUsage,
+  type SolamiGrpcUsage,
+  type SolamiRpcUsage,
+  type SolamiUsageResponse,
 } from '../../types/Live.types';
 import { EMPTY_NAMES, type NameIndex } from '../Activity/ValidatorNames';
 import { type FeeIndexLiveRow, type LeaderStat, type LiveRepository, type LiveSlotRow } from './LiveRepository';
@@ -34,6 +39,10 @@ export interface LiveServiceDeps {
   names: () => Promise<NameIndex>;
   /** LIVE_STALE_AFTER_SECONDS × 1000. */
   staleAfterMs: number;
+  /** This process's own Solami counters (the slot and program stream, its RPC calls). Default: `solamiUsage`. */
+  apiUsage?: () => SolamiUsageReport;
+  /** SOLAMI_USAGE_STALE_SECONDS × 1000: a component's counters older than this are shown as stale. Default 120 s. */
+  usageStaleMs?: number;
   now?: () => number;
 }
 
@@ -229,6 +238,132 @@ export class LiveService {
       percentiles: rows.percentiles,
       indexValue: final?.value ?? live?.estimate ?? null,
       unit: 'µL/CU',
+    };
+  }
+
+  /**
+   * GET /v1/live/solami: what Epoch uses of Solami, per component: gRPC streams (status, bytes, lag), RPC calls by
+   * method (p50/p95, errors), Beam sends (landed, tips spent) and the last error. Built from the counters each process
+   * writes to solami_usage, plus this API's own.
+   */
+  async solami(): Promise<SolamiUsageResponse> {
+    const now = this.now();
+    const staleMs = this.deps.usageStaleMs ?? 120_000;
+    const rows = await this.deps.repo.usageReports();
+    const own = { ...(this.deps.apiUsage ?? (() => solamiUsage.report()))(), component: 'api' };
+    const entries = [
+      ...rows
+        .filter((row) => row.component !== 'api')
+        .map((row) => ({ report: row.report as unknown as SolamiUsageReport, updatedAt: row.updatedAt.getTime() })),
+      { report: own, updatedAt: now },
+    ].map((entry) => ({ ...entry, name: entry.report.component, stale: now - entry.updatedAt > staleMs }));
+
+    const grpc: SolamiGrpcUsage[] = entries
+      .filter((e) => e.report.grpc)
+      .map(({ name, stale, report }) => {
+        const g = report.grpc as NonNullable<SolamiUsageReport['grpc']>;
+        return {
+          component: name,
+          subscription: g.subscription ?? null,
+          endpoint: g.endpoint ?? null,
+          status: stale ? 'offline' : g.status,
+          compression: g.compression ?? null,
+          bytes: g.bytes ?? 0,
+          updates: g.updates ?? 0,
+          reconnects: g.reconnects ?? 0,
+          lastUpdateAt: g.lastUpdateAt ? isoIst(new Date(g.lastUpdateAt)) : null,
+          lagSlots: g.lagSlots ?? null,
+        };
+      });
+    // Fields in a fixed order (jsonb reorders keys when the components store their reports).
+    const rpc: SolamiRpcUsage[] = entries.flatMap(({ name, report }) =>
+      (report.rpc ?? []).map((r) => ({
+        component: name,
+        host: r.host,
+        solami: r.solami,
+        calls: r.calls,
+        errors: r.errors,
+        rateLimited: r.rateLimited,
+        p50Ms: r.p50Ms,
+        p95Ms: r.p95Ms,
+        methods: (r.methods ?? []).map((m) => ({
+          method: m.method,
+          calls: m.calls,
+          errors: m.errors,
+          rateLimited: m.rateLimited,
+          p50Ms: m.p50Ms,
+          p95Ms: m.p95Ms,
+        })),
+      })),
+    );
+    const beam: SolamiBeamUsage[] = entries
+      .filter((e) => e.report.beam)
+      .map(({ name, report }) => {
+        const b = report.beam as NonNullable<SolamiUsageReport['beam']>;
+        return {
+          component: name,
+          sends: b.sends,
+          landed: b.landed,
+          failed: b.failed,
+          fallbacks: b.fallbacks,
+          tipLamports: b.tipLamports,
+          tipsSpentLamports: b.tipsSpentLamports,
+          tipsSpentSol: round(b.tipsSpentLamports / LAMPORTS_PER_SOL, 6),
+          tipSource: b.tipSource,
+          lastSignature: b.lastSignature,
+          lastLandedAt: b.lastLandedAt ? isoIst(new Date(b.lastLandedAt)) : null,
+        };
+      });
+    const sum = (pick: (b: SolamiBeamUsage) => number) => beam.reduce((total, b) => total + pick(b), 0);
+    const tipsSpentLamports = sum((b) => b.tipsSpentLamports);
+    const lastError = entries
+      .filter((e) => e.report.lastError)
+      .map(({ name, report }) => ({
+        component: name,
+        ...(report.lastError as NonNullable<SolamiUsageReport['lastError']>),
+      }))
+      .sort((a, b) => b.at - a.at)[0];
+
+    const fresh = entries.filter((e) => !e.stale);
+    const inUse = [
+      fresh.some((e) => e.report.grpc && e.report.grpc.status !== 'off') ? 'grpc' : null,
+      fresh.some((e) => (e.report.rpc ?? []).some((r) => r.solami && r.calls > 0)) ? 'rpc' : null,
+      fresh.some((e) => (e.report.beam?.sends ?? 0) > 0) ? 'beam' : null,
+    ].filter((product): product is string => product !== null);
+
+    return {
+      schemaVersion: 1,
+      kind: 'real',
+      asOf: isoIst(new Date(now)),
+      source: 'solami_usage (indexer_app, publisher_app, cranks_app) + api_app’s own counters',
+      inUse,
+      components: entries.map(({ name, updatedAt, stale, report }) => ({
+        name,
+        updatedAt: isoIst(new Date(updatedAt)),
+        stale,
+        startedAt: isoIst(new Date(report.startedAt)),
+      })),
+      grpc,
+      rpc,
+      beam,
+      beamTotals: {
+        sends: sum((b) => b.sends),
+        landed: sum((b) => b.landed),
+        failed: sum((b) => b.failed),
+        tipsSpentLamports,
+        tipsSpentSol: round(tipsSpentLamports / LAMPORTS_PER_SOL, 6),
+      },
+      lastError: lastError
+        ? {
+            component: lastError.component,
+            product: lastError.product,
+            message: lastError.message,
+            at: isoIst(new Date(lastError.at)),
+          }
+        : null,
+      ...(rows.length === 0
+        ? { note: 'No component has written solami_usage yet: start indexer_app (and publisher_app / cranks_app).' }
+        : {}),
     };
   }
 

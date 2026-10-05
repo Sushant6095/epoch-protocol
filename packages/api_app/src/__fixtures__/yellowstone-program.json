@@ -1,0 +1,24 @@
+{
+  "source": "SubscribeUpdate messages as Solami’s Yellowstone gRPC sends them for api_app’s subscription (confirmed slots + transactions with account_include = the Epoch program, failed = false), encoded with @triton-one/yellowstone-grpc 7.0.1’s SubscribeUpdate codec. The `Program data:` payloads are real Epoch events from packages/epoch-sdk/src/__fixtures__/rust-vectors.json (written by the program crate); the program id is the tests’ PROGRAM (32 bytes of 9) and the signatures are synthetic.",
+  "program": "cGfHiC6Kgg3FpFZvgwGcswsCRtp4aBP2fzuXRQPizuN",
+  "updates": [
+    {
+      "label": "slot 453,600,001 confirmed",
+      "base64": "CgVzbG90cxoOCIHGpdgBEIDGpdgBGAFaBgjQvo7WBg=="
+    },
+    {
+      "label": "slot 453,600,002 processed (ignored: the slot channel follows confirmed)",
+      "base64": "CgVzbG90cxoMCILGpdgBEIHGpdgBWgYI0L6O1gY="
+    },
+    {
+      "label": "Epoch program transaction: Swept + AdvanceRepaid",
+      "signature": "d814XjoBuviF7Knd8Cjz5sGU3pW4oJNPa5DLwJdaqZMTm5MMnq6MytPwH7yv1U89wXQZUUTHTuRpDvmTYLiY9Cs",
+      "base64": "Cgdwcm9ncmFtIv0ECvQECkAfJi00O0JJUFdeZWxzeoGIj5adpKuyucDHztXc4+rx+P8GDRQbIikwNz5FTFNaYWhvdn2Ei5KZoKeutbzDytHYIq0EEIgnGgAiADI+UHJvZ3JhbSBjR2ZIaUM2S2dnM0ZwRlp2Z3dHY3N3c0NSdHA0YUJQMmZ6dVhSUVBpenVOIGludm9rZSBbMV0yH1Byb2dyYW0gbG9nOiBJbnN0cnVjdGlvbjogU3dlZXAypgFQcm9ncmFtIGRhdGE6IC9vb0p4c0E5cFlmci9DQXZWNkFuZ296K2NuYjhaa2JZWS9ITWVyS2ZqQk5sa3lEbTZraW9CNDhiWFQ0ZHdGeUJnQTFONFdDQisycHI4WWpubDg4ZzhyaTM5RENTQjhMNURURGhNYS9ONHJ2c3ZOMHZteVZKVWhuejlueWhtRGs2WTNRTTBvdFRlUmtnM3ZpSjFVaGlpZz09MnpQcm9ncmFtIGRhdGE6IHViK0lXdUJmQWNWdnVsRTdjU0pmRElMSE4xL0RKM1VqY0FQUHZKOFpKMHNBMk1mYks4ZUljTDZQYktJTEt5RW9Mb0N3M284UmQxTGR1MlhnMGR0alJtY3hqMTlMbHh1dUxOSjVlNEdoc3lrPTJaUHJvZ3JhbSBjR2ZIaUM2S2dnM0ZwRlp2Z3dHY3N3c0NSdHA0YUJQMmZ6dVhSUVBpenVOIGNvbnN1bWVkIDIxMDAwIG9mIDIwMDAwMCBjb21wdXRlIHVuaXRzMjtQcm9ncmFtIGNHZkhpQzZLZ2czRnBGWnZnd0djc3dzQ1J0cDRhQlAyZnp1WFJRUGl6dU4gc3VjY2Vzc3gBgAGIpAEoBxCBxqXYAVoGCNC+jtYG"
+    },
+    {
+      "label": "Epoch program transaction: Deposited, after another program’s Program data line",
+      "signature": "2FD9cqYHAsFiVe1Y91Rj58T47Ba16gS74BYtTqSMBf3Nc9hnfmSaNiAnB6wpqofyd6jcckwGjeQTjYZzADzEFfVg",
+      "base64": "Cgdwcm9ncmFtIpMGCooGCkA+RUxTWmFob3Z9hIuSmaCnrrW8w8rR2N/m7fT7AgkQFx4lLDM6QUhPVl1ka3J5gIeOlZyjqrG4v8bN1Nvi6fD3IsMFEIgnGgAiADI+UHJvZ3JhbSBMYlVpV0wzeFZWOGhURllCVmRiVE5ycERvNDFOS1M2bzNMSEh1RHpqZmNZIGludm9rZSBbMV0ypgFQcm9ncmFtIGRhdGE6IC9vb0p4c0E5cFlkMnE4OFU0dlZwbVY2ZkhGMzlFeXZzYXRIejVFZkx4WjVnMG1QWUIyZ3dIWm5iUkV4SmwwR2VkWkNoMEsrcW8rSmNuVlYvb3B5cEpzYko5cy9Ma3RjVTVUeGlxOEFCUlNFU0VTMWxwTk9TbUZSYy9PM0J1aGNFVDZweVRtMTZjQkEyR1hCdFFNYnFwUT09MjtQcm9ncmFtIExiVWlXTDN4VlY4aFRGWUJWZGJUTnJwRG80MU5LUzZvM0xISHVEempmY1kgc3VjY2VzczI+UHJvZ3JhbSBjR2ZIaUM2S2dnM0ZwRlp2Z3dHY3N3c0NSdHA0YUJQMmZ6dVhSUVBpenVOIGludm9rZSBbMV0yH1Byb2dyYW0gbG9nOiBJbnN0cnVjdGlvbjogU3dlZXAykgFQcm9ncmFtIGRhdGE6IGI0MGFMYUVqWkRtY21nWWdGc0RPRHdNUWFNcXZyd05qemtFZU1kdnl3QjB3bzEyTmhkTTFEQk1BQWxoZDMzRHM5alg3dGRhY25haFBZbU1RY05SZUxnK0hBQ2Q3eVYxVkFUVk9BY0pXamk1V0JMZ25QelVGRHdGcXczNHluZVVLN2c9PTJaUHJvZ3JhbSBjR2ZIaUM2S2dnM0ZwRlp2Z3dHY3N3c0NSdHA0YUJQMmZ6dVhSUVBpenVOIGNvbnN1bWVkIDIxMDAwIG9mIDIwMDAwMCBjb21wdXRlIHVuaXRzMjtQcm9ncmFtIGNHZkhpQzZLZ2czRnBGWnZnd0djc3dzQ1J0cDRhQlAyZnp1WFJRUGl6dU4gc3VjY2Vzc3gBgAGIpAEoBxCCxqXYAVoGCNC+jtYG"
+    }
+  ]
+}

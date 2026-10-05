@@ -1,9 +1,16 @@
 import '@epoch/common/first-module';
 
 import { GracefulShutdown } from '@epoch/common';
-import { BuybackConfigSchema, CranksConfigSchema, LaunchClaimsConfigSchema, loadConfig } from '@epoch/config-sdk';
+import {
+  BeamConfigSchema,
+  BuybackConfigSchema,
+  CranksConfigSchema,
+  LaunchClaimsConfigSchema,
+  loadConfig,
+} from '@epoch/config-sdk';
 import { Logger } from '@epoch/logger';
-import { ConnectionManager, loadKeypair, TransactionSender } from '@epoch/solana';
+import { startUsageWriter } from '@epoch/pg_models';
+import { beamRoute, ConnectionManager, loadKeypair, solamiUsage, TransactionSender } from '@epoch/solana';
 import { PublicKey } from '@solana/web3.js';
 
 import { MeteoraBuybackMarket } from './Chain/BuybackMarket';
@@ -22,11 +29,20 @@ async function main(): Promise<void> {
   const crank = loadKeypair(config.CRANK_KEYPAIR_PATH);
   const scorer = config.SCORER_KEYPAIR_PATH ? loadKeypair(config.SCORER_KEYPAIR_PATH) : undefined;
   const hedgeMakers = config.EPOCH_MARKET_MAKER ? [new PublicKey(config.EPOCH_MARKET_MAKER)] : [];
+  // Solami Beam for every crank transaction on mainnet (SOLAMI_BEAM_URL): sweeps, accruals, buyback slices,
+  // settlements, finalization and treasury claims go out tipped through Beam's stake-weighted lane; off elsewhere.
+  const beamConfig = loadConfig(BeamConfigSchema);
+  const beam = beamRoute({
+    url: beamConfig.SOLAMI_BEAM_URL,
+    tipLamports: beamConfig.SOLAMI_BEAM_TIP_LAMPORTS,
+    tipAddressesUrl: beamConfig.SOLAMI_TIP_ADDRESSES_URL,
+    cluster: config.EPOCH_CLUSTER,
+  });
 
   const chain = new ProgramClient({
     programId,
     connections,
-    sender: new TransactionSender(connections, crank),
+    sender: new TransactionSender(connections, crank, { beam }),
     scorer,
     computeUnitPriceMicroLamports: config.CRANK_CU_PRICE_MICROLAMPORTS,
     dryRun: config.DRY_RUN,
@@ -62,9 +78,16 @@ async function main(): Promise<void> {
     hedgeMakers: hedgeMakers.map((m) => m.toBase58()),
     dryRun: config.DRY_RUN,
     buybacks: buyback.BUYBACK_ENABLED ? { slippageBps: buyback.BUYBACK_SLIPPAGE_BPS } : false,
+    beam: beam !== undefined,
     epoch: clock.epoch.toString(),
   });
   GracefulShutdown.register('job-runner', runner.start());
+  // GET /v1/live/solami shows this process's Beam sends as the `cranks` component (needs DATABASE_URL).
+  solamiUsage.setComponent('cranks');
+  GracefulShutdown.register(
+    'solami-usage',
+    startUsageWriter(() => solamiUsage.report()),
+  );
 
   // Revenue-token fee claims (plan F13): their own loop, cluster and keys; off unless LAUNCH_CLAIMS_ENABLED=true. The
   // partner treasury's claims go through the program, sent by this crank. A bad claims configuration is logged; it

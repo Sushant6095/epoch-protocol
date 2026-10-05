@@ -5,8 +5,8 @@ import { BeamConfigSchema, loadConfig, PublisherConfigSchema } from '@epoch/conf
 import { solToLamports } from '@epoch/epoch-sdk';
 import { ConfigException } from '@epoch/exceptions';
 import { Logger } from '@epoch/logger';
-import { PostgresConnectionManager } from '@epoch/pg_models';
-import { beamRoute, ConnectionManager, loadKeypair, TransactionSender } from '@epoch/solana';
+import { PostgresConnectionManager, startUsageWriter } from '@epoch/pg_models';
+import { beamRoute, ConnectionManager, loadKeypair, solamiUsage, TransactionSender } from '@epoch/solana';
 import { PublicKey } from '@solana/web3.js';
 
 import { PublisherClient } from './Chain/PublisherClient';
@@ -40,7 +40,8 @@ async function main(): Promise<void> {
 
   const programId = new PublicKey(config.EPOCH_PROGRAM_ID);
   const connections = new ConnectionManager(config.EPOCH_RPC_URL, config.EPOCH_RPC_FALLBACK_URL);
-  // Solami Beam for post_index on mainnet (SOLAMI_BEAM_URL): tipped, stake-weighted landing; off elsewhere.
+  // Solami Beam for every transaction signed here on mainnet (SOLAMI_BEAM_URL): post_index and the maker's quotes go
+  // out tipped through Beam's stake-weighted lane; off elsewhere. Sends, landings and tips go to solami_usage.
   const beamConfig = loadConfig(BeamConfigSchema);
   const beam = beamRoute({
     url: beamConfig.SOLAMI_BEAM_URL,
@@ -53,7 +54,7 @@ async function main(): Promise<void> {
     connections,
     senders: {
       publisher: publisher ? new TransactionSender(connections, publisher, { beam }) : undefined,
-      maker: maker ? new TransactionSender(connections, maker) : undefined,
+      maker: maker ? new TransactionSender(connections, maker, { beam }) : undefined,
     },
     computeUnitPriceMicroLamports: config.PUBLISHER_CU_PRICE_MICROLAMPORTS,
     dryRun: config.DRY_RUN,
@@ -88,6 +89,12 @@ async function main(): Promise<void> {
   });
   const loop = new PublisherLoop(steps, config.PUBLISHER_INTERVAL_SECONDS * 1_000);
   GracefulShutdown.register('publisher-loop', loop.start());
+  // GET /v1/live/solami shows this process's Beam sends and RPC use as the `publisher` component.
+  solamiUsage.setComponent('publisher');
+  GracefulShutdown.register(
+    'solami-usage',
+    startUsageWriter(() => solamiUsage.report()),
+  );
 }
 
 main().catch((error: unknown) => {

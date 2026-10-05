@@ -1,7 +1,8 @@
 import { type LiveIndexPayload, type LiveSlotPayload } from '@epoch/pg_models';
+import { type GrpcStreamOptions, SolamiUsage } from '@epoch/solana';
 
 import { FakeChain, FakeGrpcStream, LEADERS, waitFor } from '../__fixtures__/FakeChain';
-import { MemoryIndexerStore } from '../__fixtures__/MemoryIndexerStore';
+import { MemoryIndexerStore } from '../Repositories/MemoryIndexerStore';
 import { rollupRows } from '../Processors/EpochTracker';
 import { type SlotFeeRow } from '../Repositories/SlotFeeRepository';
 import { SlotStream, type SlotStreamOptions } from './SlotStream';
@@ -61,12 +62,16 @@ describe('SlotStream over the Yellowstone firehose', () => {
     const chain = new FakeChain(32, (slot) => slot % 10 === 7, 70);
     const store = new MemoryIndexerStore();
     const streams: FakeGrpcStream[] = [];
+    const usage = new SolamiUsage('indexer');
+    let grpcOptions: GrpcStreamOptions | undefined;
     const stream = new SlotStream(
       { ...OPTIONS, backfillEpoch: true },
       {
         rpc: chain.rpc,
         store,
-        createGrpcStream: () => {
+        usage,
+        createGrpcStream: (_endpoints, options) => {
+          grpcOptions = options;
           const fake = new FakeGrpcStream(async (_request, push) => {
             for (let slot = 66; slot <= 100; slot++) {
               chain.tip = slot;
@@ -122,6 +127,10 @@ describe('SlotStream over the Yellowstone firehose', () => {
     expect(live).toMatchObject({ epoch: 3, source: 'grpc', stride: 1, stakeEpoch: 3, status: 'stopped' });
     expect(live.estimate).toBe(rollupRows(expectedRows(chain, 96, 100), stakeMap(chain)).value);
     expect(stream.stats.lostSlots).toBe(0);
+
+    // The stream counts into the usage report, which is written for GET /v1/live/solami.
+    expect(grpcOptions).toMatchObject({ usage, subscription: 'firehose' });
+    expect(store.usage).toMatchObject({ component: 'indexer', grpc: { lagSlots: 0 } });
   });
 
   it('resumes from the saved cursor with fromSlot when the endpoint can replay it', async () => {

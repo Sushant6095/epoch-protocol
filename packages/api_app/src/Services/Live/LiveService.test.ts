@@ -1,3 +1,5 @@
+import { SolamiUsage } from '@epoch/solana';
+
 import { nameIndex } from '../Activity/ValidatorNames';
 import { type FeeIndexLiveRow, type LiveRepository, type LiveSlotRow } from './LiveRepository';
 import { LiveService, weightedMedian } from './LiveService';
@@ -82,6 +84,7 @@ function fakeRepo(overrides: Partial<LiveRepository> = {}): LiveRepository {
       ],
       percentiles: { p10: 1_000, p25: 1_000, p50: 3_162, p75: 3_200, p90: 3_300 },
     }),
+    usageReports: async () => [],
     ...overrides,
   };
 }
@@ -261,5 +264,122 @@ describe('weightedMedian', () => {
       ])?.leader,
     ).toBe('b');
     expect(weightedMedian([])).toBeNull();
+  });
+});
+
+describe('LiveService.solami', () => {
+  /** A component's counters as it would write them to solami_usage. */
+  function report(component: string, fill: (usage: SolamiUsage) => void, at = NOW - 5_000) {
+    const usage = new SolamiUsage(component, () => at);
+    fill(usage);
+    return { component, report: { ...usage.report() }, updatedAt: new Date(at) };
+  }
+
+  it('shows each component’s gRPC, RPC and Beam use, Beam totals and the newest error', async () => {
+    const indexer = report('indexer', (u) => {
+      u.grpc({ subscription: 'meta', endpoint: 'solami', status: 'streaming', compression: 'zstd', lagSlots: 2 });
+      u.grpcUpdate(4_096);
+      u.recordRpc('https://rpc.solami.dev/sol?api_key=not-a-real-key', 'getBlock', 180, 'ok');
+      u.recordRpc(
+        'https://rpc.solami.dev/sol?api_key=not-a-real-key',
+        'getBlock',
+        220,
+        'rate-limited',
+        '-32005: Rate limited',
+      );
+    });
+    const publisher = report('publisher', (u) => {
+      u.beamSent('sigA', 100_000, 'api');
+      u.beamLanded('sigA', 100_000);
+    });
+    const cranks = report(
+      'cranks',
+      (u) => {
+        u.beamSent('sigB', 150_000, 'api');
+        u.beamLanded('sigB', 150_000);
+      },
+      NOW - 600_000,
+    );
+    const api = new SolamiUsage('process', () => NOW);
+    api.grpc({ subscription: 'slots+program', endpoint: 'solami', status: 'streaming' });
+    api.recordRpc('https://api.mainnet-beta.solana.com', 'getEpochInfo', 90, 'ok');
+    const live = new LiveService({
+      repo: fakeRepo({ usageReports: async () => [cranks, indexer, publisher] }),
+      epochInfo: async () => null,
+      names: async () => nameIndex([]),
+      staleAfterMs: 20_000,
+      apiUsage: () => api.report(),
+      usageStaleMs: 120_000,
+      now: () => NOW,
+    });
+
+    const out = await live.solami();
+    expect(out).toMatchObject({ schemaVersion: 1, kind: 'real', asOf: expect.stringMatching(IST) });
+    expect(out.components.map((c) => [c.name, c.stale])).toEqual([
+      ['cranks', true],
+      ['indexer', false],
+      ['publisher', false],
+      ['api', false],
+    ]);
+    expect(out.grpc).toEqual([
+      expect.objectContaining({
+        component: 'indexer',
+        subscription: 'meta',
+        status: 'streaming',
+        bytes: 4_096,
+        lagSlots: 2,
+      }),
+      expect.objectContaining({ component: 'api', subscription: 'slots+program', status: 'streaming' }),
+    ]);
+    expect(out.rpc.map((r) => [r.component, r.host, r.solami, r.calls, r.rateLimited])).toEqual([
+      ['indexer', 'rpc.solami.dev', true, 2, 1],
+      ['api', 'api.mainnet-beta.solana.com', false, 1, 0],
+    ]);
+    expect(out.rpc[0].methods[0]).toEqual({
+      method: 'getBlock',
+      calls: 2,
+      errors: 1,
+      rateLimited: 1,
+      p50Ms: 180,
+      p95Ms: 220,
+    });
+    expect(out.beam.map((b) => [b.component, b.sends, b.landed, b.tipsSpentSol])).toEqual([
+      ['cranks', 1, 1, 0.00015],
+      ['publisher', 1, 1, 0.0001],
+    ]);
+    expect(out.beamTotals).toEqual({
+      sends: 2,
+      landed: 2,
+      failed: 0,
+      tipsSpentLamports: 250_000,
+      tipsSpentSol: 0.00025,
+    });
+    // cranks has not reported for 10 minutes: its Beam use still counts, but it is not "in use".
+    expect(out.inUse).toEqual(['grpc', 'rpc', 'beam']);
+    expect(out.lastError).toMatchObject({
+      component: 'indexer',
+      product: 'rpc',
+      message: expect.stringContaining('-32005'),
+    });
+    expect(JSON.stringify(out)).not.toContain('not-a-real-key');
+  });
+
+  it('marks a component that stopped reporting as offline and answers before any component ran', async () => {
+    const old = report('indexer', (u) => u.grpc({ subscription: 'firehose', status: 'streaming' }), NOW - 300_000);
+    const live = (rows: Awaited<ReturnType<LiveRepository['usageReports']>>) =>
+      new LiveService({
+        repo: fakeRepo({ usageReports: async () => rows }),
+        epochInfo: async () => null,
+        names: async () => nameIndex([]),
+        staleAfterMs: 20_000,
+        apiUsage: () => new SolamiUsage('process', () => NOW).report(),
+        now: () => NOW,
+      });
+    const stale = await live([old]).solami();
+    expect(stale.grpc).toEqual([expect.objectContaining({ component: 'indexer', status: 'offline' })]);
+    expect(stale.inUse).toEqual([]);
+    const empty = await live([]).solami();
+    expect(empty.components.map((c) => c.name)).toEqual(['api']);
+    expect(empty.note).toContain('start indexer_app');
   });
 });

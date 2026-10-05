@@ -6,5 +6,7 @@ export * from './GrpcStream';
 export * from './keypair';
 export * from './PrebuiltTransaction';
 export * from './pubkeys';
+export * from './SolamiErrors';
+export * from './SolamiUsage';
 export * from './TransactionSender';
 export * from './VoteState';

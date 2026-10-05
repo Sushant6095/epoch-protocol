@@ -1,8 +1,8 @@
 import { GracefulShutdown } from '@epoch/common';
-import { type LaunchClaimsConfig } from '@epoch/config-sdk';
+import { BeamConfigSchema, type LaunchClaimsConfig, loadConfig } from '@epoch/config-sdk';
 import { Logger } from '@epoch/logger';
 import { type ClaimKind, toBaseUnits } from '@epoch/meteora';
-import { ConnectionManager, loadKeypair } from '@epoch/solana';
+import { beamRoute, ConnectionManager, loadKeypair } from '@epoch/solana';
 import { type Keypair, type PublicKey } from '@solana/web3.js';
 
 import { JobRunner } from './JobRunner';
@@ -52,11 +52,20 @@ export function createLaunchFeeClaimJob(config: LaunchClaimsConfig, program?: La
     signers.set(creator.publicKey.toBase58(), creator);
   }
   const registry = new LaunchRegistryFile(config.LAUNCHES_PATH, config.LAUNCH_CLUSTER);
+  // Claims on mainnet go through Solami Beam when SOLAMI_BEAM_URL is set (the launch cluster decides, not the program's).
+  const beamConfig = loadConfig(BeamConfigSchema);
+  const beam = beamRoute({
+    url: beamConfig.SOLAMI_BEAM_URL,
+    tipLamports: beamConfig.SOLAMI_BEAM_TIP_LAMPORTS,
+    tipAddressesUrl: beamConfig.SOLAMI_TIP_ADDRESSES_URL,
+    cluster: config.LAUNCH_CLUSTER,
+  });
   return new LaunchFeeClaimJob({
     launches: () => registry.load(),
     chain: new RpcLaunchClaimChain(
       new ConnectionManager(config.LAUNCH_RPC_URL, config.LAUNCH_RPC_FALLBACK_URL),
       config.LAUNCH_CLAIM_CU_PRICE_MICROLAMPORTS,
+      beam,
     ),
     signers,
     payer: treasury,

@@ -1,4 +1,4 @@
-import { loadConfig, LiveConfigSchema } from '@epoch/config-sdk';
+import { LiveConfigSchema, loadConfig, SolamiApiConfigSchema } from '@epoch/config-sdk';
 import { Logger } from '@epoch/logger';
 import { PostgresConnectionManager } from '@epoch/pg_models';
 
@@ -31,6 +31,7 @@ export function getLiveService(): LiveService {
     }),
     names: () => names.get(),
     staleAfterMs: loadConfig(LiveConfigSchema).LIVE_STALE_AFTER_SECONDS * 1_000,
+    usageStaleMs: loadConfig(SolamiApiConfigSchema).SOLAMI_USAGE_STALE_SECONDS * 1_000,
   });
   return service;
 }

@@ -1,4 +1,5 @@
 import { type LiveIndexPayload, type LivePayload, type LiveSlotPayload } from '@epoch/pg_models';
+import { type SolamiUsageReport } from '@epoch/solana';
 
 import {
   type EpochIndexWrite,
@@ -6,10 +7,16 @@ import {
   type IndexerStore,
   type SlotRecord,
   type StakeRow,
-} from '../Repositories/IndexerStore';
-import { type SlotFeeRow } from '../Repositories/SlotFeeRepository';
+} from './IndexerStore';
+import { type SlotFeeRow } from './SlotFeeRepository';
 
-/** IndexerStore in memory, with the same rules as PgIndexerStore (a posted epoch_index row is never rewritten). */
+/** Notifications kept (the newest), so a long `pnpm demo:solami` run stays small. */
+const MAX_NOTIFICATIONS = 5_000;
+
+/**
+ * IndexerStore in memory, with the same rules as PgIndexerStore (a posted epoch_index row is never rewritten): the
+ * tests' store, and `pnpm demo:solami`'s, which must never touch a real indexer's cursor.
+ */
 export class MemoryIndexerStore implements IndexerStore {
   readonly slotFees = new Map<number, SlotFeeRow>();
   readonly liveSlots = new Map<number, SlotRecord>();
@@ -18,6 +25,7 @@ export class MemoryIndexerStore implements IndexerStore {
   readonly stakes = new Map<number, Map<string, bigint>>();
   readonly epochIndex = new Map<number, { value: number; postedSignature: string | null }>();
   cursor: IndexerCursor | null = null;
+  usage: SolamiUsageReport | null = null;
   batches = 0;
   failNextBatch = false;
 
@@ -40,7 +48,7 @@ export class MemoryIndexerStore implements IndexerStore {
       if (!this.liveSlots.has(record.fees.slot)) this.liveSlots.set(record.fees.slot, record);
     }
     if (batch.cursor) this.cursor = { ...batch.cursor };
-    this.notifications.push(...batch.notify);
+    this.notify(...batch.notify);
   }
 
   async readCursor() {
@@ -49,7 +57,11 @@ export class MemoryIndexerStore implements IndexerStore {
 
   async writeLive(live: LiveIndexPayload) {
     this.live.set(live.epoch, live);
-    this.notifications.push(live);
+    this.notify(live);
+  }
+
+  async writeUsage(report: SolamiUsageReport) {
+    this.usage = report;
   }
 
   async epochRows(epoch: number) {
@@ -69,7 +81,7 @@ export class MemoryIndexerStore implements IndexerStore {
     const existing = this.epochIndex.get(epoch);
     if (existing?.postedSignature) return 'posted';
     this.epochIndex.set(epoch, { value, postedSignature: null });
-    this.notifications.push({ t: 'epoch', epoch, value });
+    this.notify({ t: 'epoch', epoch, value });
     return 'written';
   }
 
@@ -77,5 +89,12 @@ export class MemoryIndexerStore implements IndexerStore {
     const slots = [...this.liveSlots.keys()].sort((a, b) => b - a).slice(keep);
     for (const slot of slots) this.liveSlots.delete(slot);
     return slots.length;
+  }
+
+  private notify(...payloads: LivePayload[]): void {
+    this.notifications.push(...payloads);
+    if (this.notifications.length > MAX_NOTIFICATIONS) {
+      this.notifications.splice(0, this.notifications.length - MAX_NOTIFICATIONS);
+    }
   }
 }

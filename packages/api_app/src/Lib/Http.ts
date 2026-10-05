@@ -1,11 +1,14 @@
 import { retry, sleep } from '@epoch/common';
 import { ChainException, EpochException } from '@epoch/exceptions';
 import { Logger } from '@epoch/logger';
+import { explainSolamiError, isSolamiHost, type SolamiUsage, solamiUsage } from '@epoch/solana';
 
 const logger = Logger.create('Http');
 
-/** How many times one request waits out an HTTP 429 before it counts as a failure. */
+/** How many times one request waits out an HTTP 429 (or Solami's -32005) before it counts as a failure. */
 const RATE_LIMIT_WAITS = 4;
+/** Solami's rate limit, sent with HTTP 200 (its docs: "Errors"). */
+const SOLAMI_RATE_LIMITED = -32005;
 
 /** Hides API keys and paths so RPC URLs can be logged safely. */
 export const redactUrl = (url: string): string => {
@@ -44,6 +47,8 @@ export class JsonRpcClient {
   constructor(
     private readonly urls: string[],
     private readonly timeoutMs = 30_000,
+    /** Calls by method with latency and errors, for GET /v1/live/solami. Default: this process's `solamiUsage`. */
+    private readonly usage: SolamiUsage = solamiUsage,
   ) {
     if (urls.length === 0) throw new Error('JsonRpcClient needs at least one URL');
   }
@@ -55,7 +60,15 @@ export class JsonRpcClient {
         return await retry(() => this.post<T>(url, method, params, timeoutMs), { retries: 2, baseDelayMs: 400 });
       } catch (error) {
         lastError = error;
-        logger.warn('RPC call failed on this endpoint', { method, host: redactUrl(url), error: String(error) });
+        const host = redactUrl(url);
+        // A Solami key or plan problem says what to change; anything else is logged as it came.
+        const explained = isSolamiHost(host) ? explainSolamiError('rpc', error) : null;
+        logger.warn('RPC call failed on this endpoint', {
+          method,
+          host,
+          error: String(error),
+          ...(explained && explained.kind !== 'other' ? { hint: explained.hint } : {}),
+        });
       }
     }
     throw new ChainException(`RPC ${method} failed`, { cause: String(lastError) });
@@ -63,21 +76,49 @@ export class JsonRpcClient {
 
   private async post<T>(url: string, method: string, params: unknown[], timeoutMs: number): Promise<T> {
     for (let attempt = 0; ; attempt++) {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: this.nextId++, method, params }),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      // Rate limited: wait as long as the server asks (or 2–10 s) before the normal retries kick in.
-      if (res.status === 429 && attempt < RATE_LIMIT_WAITS) {
-        const retryAfter = Number(res.headers.get('retry-after'));
-        await sleep(retryAfter > 0 ? retryAfter * 1_000 : Math.min(10_000, 2_000 * 2 ** attempt));
-        continue;
+      const started = Date.now();
+      const record = (outcome: 'ok' | 'error' | 'rate-limited', message?: string) =>
+        this.usage.recordRpc(url, method, Date.now() - started, outcome, message);
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: this.nextId++, method, params }),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+      } catch (error) {
+        record('error', String(error));
+        throw error;
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Rate limited: wait as long as the server asks (or 2–10 s) before the normal retries kick in.
+      if (res.status === 429) {
+        record('rate-limited', 'HTTP 429');
+        if (attempt < RATE_LIMIT_WAITS) {
+          const retryAfter = Number(res.headers.get('retry-after'));
+          await sleep(retryAfter > 0 ? retryAfter * 1_000 : Math.min(10_000, 2_000 * 2 ** attempt));
+          continue;
+        }
+      }
+      if (!res.ok) {
+        if (res.status !== 429) record('error', `HTTP ${res.status}`);
+        throw new Error(`HTTP ${res.status}`);
+      }
       const body = (await res.json()) as RpcEnvelope<T>;
-      if (body.error) throw new Error(`${body.error.code}: ${body.error.message}`);
+      if (body.error) {
+        // Solami rate-limits with HTTP 200 and -32005 in the body: back off as for a 429.
+        if (body.error.code === SOLAMI_RATE_LIMITED) {
+          record('rate-limited', `${body.error.code}: ${body.error.message}`);
+          if (attempt < RATE_LIMIT_WAITS) {
+            await sleep(Math.min(10_000, 500 * 2 ** attempt + Math.floor(Math.random() * 250)));
+            continue;
+          }
+        } else {
+          record('error', `${body.error.code}: ${body.error.message}`);
+        }
+        throw new Error(`${body.error.code}: ${body.error.message}`);
+      }
+      record('ok');
       return body.result as T;
     }
   }

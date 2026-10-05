@@ -214,6 +214,9 @@ importers:
       '@epoch/meteora':
         specifier: workspace:*
         version: link:../meteora
+      '@epoch/pg_models':
+        specifier: workspace:*
+        version: link:../pg_models
       '@epoch/solana':
         specifier: workspace:*
         version: link:../solana

@@ -519,3 +519,16 @@ export const launchFeeEvents = pgTable(
     index('launch_fee_events_mint_time_idx').on(t.mint, t.blockTime),
   ],
 );
+
+// ── Solami usage: what each component uses of Solami (GET /v1/live/solami) ─────────────────────────────────────
+
+/**
+ * One row per component (indexer, publisher, cranks): its Solami counters as `@epoch/solana` SolamiUsage reports them
+ * (gRPC stream status and bytes, RPC calls by method with p50/p95 latency and errors, Beam sends, landings and tips,
+ * the last error), rewritten every few seconds. Keys never appear: endpoints are kept by host.
+ */
+export const solamiUsageReports = pgTable('solami_usage', {
+  component: text('component').primaryKey(),
+  report: jsonb('report').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

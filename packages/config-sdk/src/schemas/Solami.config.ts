@@ -19,14 +19,23 @@ export const normalizeGrpcUrl = (value: string): string =>
 
 const grpcEndpoint = (fallback: string) => z.string().trim().default(fallback).transform(normalizeGrpcUrl);
 
+/** Solami's Yellowstone gRPC: shared by indexer_app and api_app. */
+const solamiGrpc = {
+  /** Yellowstone gRPC. The key goes on the `x-token` metadata (SOLAMI_TOKEN), never in the URL. */
+  SOLAMI_GRPC_URL: grpcEndpoint('https://grpc.solami.dev'),
+  SOLAMI_TOKEN: z.string().trim().optional(),
+  /** zstd or gzip asks the gRPC server to compress the stream (and compresses our requests). Both were accepted by
+   * grpc.solami.dev on 5 Oct 2026; `pnpm solami:check --compression zstd` checks it with your key. */
+  SOLAMI_GRPC_COMPRESSION: z.enum(['none', 'zstd', 'gzip']).default('none'),
+};
+
 /**
  * indexer_app: the Solana Fee Index computed live from mainnet blocks (Solami Track). Every key is read from the
  * environment and never logged; URLs are logged by host only.
  */
 export const IndexerConfigSchema = z.object({
-  /** Yellowstone gRPC. The key goes on the `x-token` metadata (SOLAMI_TOKEN), never in the URL. */
-  SOLAMI_GRPC_URL: grpcEndpoint('https://grpc.solami.dev'),
-  SOLAMI_TOKEN: z.string().trim().optional(),
+  SOLAMI_GRPC_URL: solamiGrpc.SOLAMI_GRPC_URL,
+  SOLAMI_TOKEN: solamiGrpc.SOLAMI_TOKEN,
   /** Optional failover stream (RPC Fast), used only after Solami fails. */
   RPC_FAST_GRPC_URL: z.string().trim().optional(),
   RPC_FAST_TOKEN: z.string().trim().optional(),
@@ -42,9 +51,7 @@ export const IndexerConfigSchema = z.object({
    * - `auto`: `grpc`, then `hybrid` if Solami refuses the firehose; `rpc` when there is no SOLAMI_TOKEN.
    */
   SLOT_SOURCE: z.enum(['auto', 'grpc', 'hybrid', 'rpc']).default('auto'),
-  /** zstd or gzip asks the gRPC server to compress the stream (and compresses our requests). Check it with
-   * `pnpm solami:check` before turning it on. */
-  SOLAMI_GRPC_COMPRESSION: z.enum(['none', 'zstd', 'gzip']).default('none'),
+  SOLAMI_GRPC_COMPRESSION: solamiGrpc.SOLAMI_GRPC_COMPRESSION,
   /** RPC requests per second and in flight for gap fill (and for block fetches in `hybrid` / `rpc` mode). */
   GAP_FILL_RPS: z.coerce.number().positive().max(500).default(8),
   GAP_FILL_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
@@ -65,13 +72,18 @@ export const IndexerConfigSchema = z.object({
 
 export type IndexerConfig = z.infer<typeof IndexerConfigSchema>;
 
-/** Beam over HTTP: a normal sendTransaction to Solami RPC that carries a tip transfer is routed through Beam. */
+/**
+ * Beam over HTTP for every mainnet transaction we sign (publisher_app, cranks_app): a JSON-RPC `sendTransaction`
+ * carrying a tip transfer goes out through Beam's stake-weighted lane.
+ */
 export const BeamConfigSchema = z.object({
-  /** Solami RPC with the key (https://rpc.solami.dev/sol?api_key=<key>). Unset: Beam is off. */
+  /** The HTTP endpoint for the tipped sendTransaction: your Solami RPC URL (https://rpc.solami.dev/sol?api_key=<key>).
+   * Solami's llms.txt also names https://beam-http.solami.dev, which did not resolve on 5 Oct 2026. Unset: Beam is
+   * off. */
   SOLAMI_BEAM_URL: optionalUrl,
   /** Tip per transaction, lamports. Solami's floor is 100,000 (0.0001 SOL). */
   SOLAMI_BEAM_TIP_LAMPORTS: z.coerce.number().int().min(100_000).max(100_000_000).default(100_000),
-  /** Current tip addresses (no auth); never hardcoded. */
+  /** Current tip addresses (no auth), cached 10 minutes; the list pinned from Solami's SDK covers an outage. */
   SOLAMI_TIP_ADDRESSES_URL: z.string().url().default('https://api.solami.dev/onchain/tip-addresses'),
 });
 
@@ -86,3 +98,17 @@ export const LiveConfigSchema = z.object({
 });
 
 export type LiveConfig = z.infer<typeof LiveConfigSchema>;
+
+/**
+ * api_app's own Solami gRPC stream (one connection): slot updates for the WS `slot` channel and, when the program runs
+ * on mainnet, the Epoch program's transactions for program_events. Polling and logsSubscribe stay as the fallbacks.
+ */
+export const SolamiApiConfigSchema = z.object({
+  ...solamiGrpc,
+  /** Off: the API polls slots and uses logsSubscribe even with SOLAMI_TOKEN set. */
+  SOLAMI_API_STREAM: flag('true'),
+  /** A component's usage row older than this is shown as stale in GET /v1/live/solami. */
+  SOLAMI_USAGE_STALE_SECONDS: z.coerce.number().int().min(10).max(86_400).default(120),
+});
+
+export type SolamiApiConfig = z.infer<typeof SolamiApiConfigSchema>;

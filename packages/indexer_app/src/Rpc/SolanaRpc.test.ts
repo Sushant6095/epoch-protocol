@@ -1,3 +1,5 @@
+import { SolamiUsage } from '@epoch/solana';
+
 import { BlockFetcher, RateLimiter } from '../Streams/BlockFetcher';
 import { recordedBlocks } from '../__fixtures__/mainnetBlocks';
 import { redact, RpcError, rpcHost, SolanaRpc } from './SolanaRpc';
@@ -59,6 +61,54 @@ describe('SolanaRpc', () => {
     );
     const rpc = new SolanaRpc(URL_WITH_KEY, { fetchFn: fetchFn as unknown as typeof fetch });
     await expect(rpc.getBlock(452_937_313)).rejects.toMatchObject({ code: -32007 });
+  });
+
+  it('says what to change when Solami refuses the key or keeps rate-limiting, and counts every call', async () => {
+    const usage = new SolamiUsage('test');
+    const refused = new SolanaRpc(URL_WITH_KEY, {
+      fetchFn: (async () => reply(401, { message: 'unauthorized' })) as unknown as typeof fetch,
+      usage,
+    });
+    const auth = (await refused.getSlot().catch((e: unknown) => e)) as Error;
+    expect(auth.message).toContain('Solami RPC refused the key (HTTP 401)');
+    expect(auth.message).not.toContain(KEY);
+
+    const limited = new SolanaRpc(URL_WITH_KEY, {
+      fetchFn: (async () =>
+        reply(200, { error: { code: -32005, message: 'Rate limited' } })) as unknown as typeof fetch,
+      retries: 0,
+      usage,
+    });
+    const rate = (await limited.getBlock(1).catch((e: unknown) => e)) as RpcError;
+    expect(rate).toBeInstanceOf(RpcError);
+    expect(rate.code).toBe(-32005);
+    expect(rate.message).toContain('lower GAP_FILL_RPS');
+
+    const skipped = new SolanaRpc(URL_WITH_KEY, {
+      fetchFn: (async () =>
+        reply(200, { error: { code: -32007, message: 'Slot 1 was skipped' } })) as unknown as typeof fetch,
+      usage,
+    });
+    await expect(skipped.getBlock(1)).rejects.toMatchObject({ code: -32007 });
+
+    const [host] = usage.report().rpc;
+    expect(host).toMatchObject({ host: 'rpc.solami.dev', solami: true, calls: 3, errors: 2, rateLimited: 1 });
+    expect(host.methods.map((m) => [m.method, m.calls, m.errors])).toEqual([
+      ['getBlock', 2, 1],
+      ['getSlot', 1, 1],
+    ]);
+    expect(JSON.stringify(usage.report())).not.toContain(KEY);
+  });
+
+  it('keeps public RPC errors plain (the hints are about Solami keys and plans)', async () => {
+    const rpc = new SolanaRpc('https://api.mainnet-beta.solana.com', {
+      fetchFn: (async () => reply(403, { message: 'forbidden' })) as unknown as typeof fetch,
+      usage: new SolamiUsage('test'),
+    });
+    const error = (await rpc.getSlot().catch((e: unknown) => e)) as Error;
+    expect(error.message).toBe(
+      'RPC getSlot failed on api.mainnet-beta.solana.com: HTTP 403 from api.mainnet-beta.solana.com: {"message":"forbidden"}',
+    );
   });
 
   it('redacts keys from URLs and messages', () => {

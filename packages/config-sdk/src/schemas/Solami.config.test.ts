@@ -1,5 +1,5 @@
 import { loadConfig } from '../loadConfig';
-import { BeamConfigSchema, IndexerConfigSchema, LiveConfigSchema } from './Solami.config';
+import { BeamConfigSchema, IndexerConfigSchema, LiveConfigSchema, SolamiApiConfigSchema } from './Solami.config';
 
 describe('IndexerConfigSchema', () => {
   it('defaults to Solami gRPC in auto mode with public RPC as the fallback RPC', () => {
@@ -52,5 +52,29 @@ describe('BeamConfigSchema', () => {
 describe('LiveConfigSchema', () => {
   it('defaults the staleness window and the feed', () => {
     expect(loadConfig(LiveConfigSchema, {})).toEqual({ LIVE_STALE_AFTER_SECONDS: 20, LIVE_FEED_ENABLED: true });
+  });
+});
+
+describe('SolamiApiConfigSchema', () => {
+  it('streams through Solami when a key is set, with the same endpoint rules as the indexer', () => {
+    expect(loadConfig(SolamiApiConfigSchema, {})).toEqual({
+      SOLAMI_GRPC_URL: 'https://grpc.solami.dev',
+      SOLAMI_TOKEN: undefined,
+      SOLAMI_GRPC_COMPRESSION: 'none',
+      SOLAMI_API_STREAM: true,
+      SOLAMI_USAGE_STALE_SECONDS: 120,
+    });
+    const config = loadConfig(SolamiApiConfigSchema, {
+      SOLAMI_GRPC_URL: 'grpc.solami.dev:443',
+      SOLAMI_TOKEN: ' k ',
+      SOLAMI_GRPC_COMPRESSION: 'zstd',
+      SOLAMI_API_STREAM: 'false',
+    });
+    expect(config).toMatchObject({
+      SOLAMI_GRPC_URL: 'https://grpc.solami.dev',
+      SOLAMI_TOKEN: 'k',
+      SOLAMI_GRPC_COMPRESSION: 'zstd',
+      SOLAMI_API_STREAM: false,
+    });
   });
 });

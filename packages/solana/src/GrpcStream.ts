@@ -1,5 +1,8 @@
 import { Logger } from '@epoch/logger';
-import Client, { type ChannelOptions, type SubscribeRequest, type SubscribeUpdate } from '@triton-one/yellowstone-grpc';
+import Client, { type ChannelOptions, SubscribeUpdate, type SubscribeRequest } from '@triton-one/yellowstone-grpc';
+
+import { errorText, explainSolamiError } from './SolamiErrors';
+import { type SolamiUsage } from './SolamiUsage';
 
 // The Yellowstone protobuf codecs and enums, so apps build requests and decode fixtures without their own dependency.
 export {
@@ -66,26 +69,35 @@ export interface GrpcStreamOptions {
   /** Errors that reconnecting cannot fix (a refused key or filter): `run()` rejects with them instead of retrying. */
   isFatal?: (error: unknown) => boolean;
   onState?: (state: GrpcStreamState) => void;
+  /** Counts bytes, updates and state for the Solami usage report (`solamiUsage` in apps). */
+  usage?: SolamiUsage;
+  /** What the stream subscribes to, for the usage report (e.g. `firehose`, `meta`, `slots+program`). */
+  subscription?: string;
   /** Tests. */
   createClient?: (endpoint: GrpcEndpoint, channelOptions: ChannelOptions) => GeyserClient;
 }
 
 const logger = Logger.create('GrpcStream');
 
+/** The whole message of a native client error, `cause` chain included (see SolamiErrors.errorText). */
+export const grpcErrorText = errorText;
+
 /**
- * The whole message of a native client error: the top level is generic ("failed to open subscribe stream"); the gRPC
- * status and the server's message (e.g. "invalid api key", "unfiltered/firehose subscriptions are not allowed…")
- * are in the `cause` chain.
+ * Counts each update's protobuf bytes as the native client hands them over (before decoding), so the usage report gets
+ * real sizes without re-encoding. Relies on @triton-one/yellowstone-grpc 7's duplex wrapper (`_napiDuplexStream`);
+ * false when that shape is not there, and the caller measures by re-encoding instead.
  */
-export function grpcErrorText(error: unknown): string {
-  const parts: string[] = [];
-  let current: unknown = error;
-  for (let depth = 0; current !== undefined && current !== null && depth < 5; depth++) {
-    const message = current instanceof Error ? current.message : typeof current === 'string' ? current : '';
-    if (message && !parts.some((part) => part.includes(message))) parts.push(message);
-    current = (current as { cause?: unknown }).cause;
-  }
-  return parts.join(': ') || String(error);
+export function countNativeBytes(stream: unknown, onBytes: (bytes: number) => void): boolean {
+  const native = (stream as { _napiDuplexStream?: { read?: () => Promise<unknown> } } | null)?._napiDuplexStream;
+  if (!native || typeof native.read !== 'function') return false;
+  const read = native.read.bind(native);
+  native.read = async () => {
+    const update = await read();
+    const length = (update as { length?: unknown } | null)?.length;
+    if (typeof length === 'number') onBytes(length);
+    return update;
+  };
+  return true;
 }
 
 /** The stream's keep-alive and size settings; compression only when asked for. */
@@ -124,6 +136,12 @@ export class GrpcStream {
   ) {
     if (endpoints.length === 0) throw new Error('GrpcStream needs at least one endpoint');
     this.state = { status: 'connecting', endpoint: endpoints[0].name, reconnects: 0 };
+    options.usage?.grpc({
+      subscription: options.subscription ?? null,
+      compression: options.compression ?? null,
+      endpoint: endpoints[0].name,
+      status: 'connecting',
+    });
   }
 
   get status(): GrpcStreamState {
@@ -156,10 +174,16 @@ export class GrpcStream {
         const stream = await client.subscribe(request);
         this.active = stream;
         if (this.stopped) break;
+        const usage = this.options.usage;
+        const nativeBytes = usage ? countNativeBytes(stream, (bytes) => usage.grpcBytes(bytes)) : false;
         const watchdog = this.watchdog(stream);
         try {
           for await (const update of stream) {
             watchdog.touch();
+            if (usage) {
+              if (nativeBytes) usage.grpcUpdateOnly();
+              else usage.grpcUpdate(SubscribeUpdate.encode(update).finish().length);
+            }
             if (!delivered) {
               delivered = true;
               failures = 0;
@@ -175,14 +199,16 @@ export class GrpcStream {
         if (!this.stopped) this.setState({ lastError: 'stream ended' });
       } catch (error) {
         if (this.stopped) break;
-        const text = grpcErrorText(error);
+        const text = errorText(error);
+        const { hint } = explainSolamiError('grpc', error);
         this.setState({ lastError: text });
+        this.options.usage?.error('grpc', `${hint} (${text.slice(0, 200)})`);
         if (this.options.isFatal?.(error)) {
-          logger.error('stream refused; not retrying', text, { endpoint: endpoint.name });
+          logger.error('stream refused; not retrying', text, { endpoint: endpoint.name, hint });
           this.setState({ status: 'stopped' });
           throw error;
         }
-        logger.warn('stream failed', { endpoint: endpoint.name, attempt, error: text });
+        logger.warn('stream failed', { endpoint: endpoint.name, attempt, error: text, hint });
       } finally {
         this.active?.destroy();
         this.active = undefined;
@@ -251,6 +277,11 @@ export class GrpcStream {
 
   private setState(patch: Partial<GrpcStreamState>): void {
     this.state = { ...this.state, ...patch };
+    this.options.usage?.grpc({
+      status: this.state.status,
+      endpoint: this.state.endpoint,
+      reconnects: this.state.reconnects,
+    });
     this.options.onState?.({ ...this.state });
   }
 }

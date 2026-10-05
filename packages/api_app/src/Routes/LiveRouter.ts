@@ -8,4 +8,5 @@ export const liveRouter: HttpRouter = createRouter()
   .get('/summary', handle(LiveController.summary))
   .get('/slots', validate(LiveSlotsQueryDto, 'query'), handle(LiveController.slots))
   .get('/leaders', validate(LiveLeadersQueryDto, 'query'), handle(LiveController.leaders))
-  .get('/epochs/:epoch/distribution', validate(LiveEpochParamsDto, 'params'), handle(LiveController.distribution));
+  .get('/epochs/:epoch/distribution', validate(LiveEpochParamsDto, 'params'), handle(LiveController.distribution))
+  .get('/solami', handle(LiveController.solami));

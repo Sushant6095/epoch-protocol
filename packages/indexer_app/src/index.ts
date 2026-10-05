@@ -4,7 +4,7 @@ import { GracefulShutdown } from '@epoch/common';
 import { DatabaseConfigSchema, IndexerConfigSchema, loadConfig, normalizeGrpcUrl } from '@epoch/config-sdk';
 import { Logger } from '@epoch/logger';
 import { PostgresConnectionManager } from '@epoch/pg_models';
-import { type GrpcEndpoint } from '@epoch/solana';
+import { type GrpcEndpoint, solamiUsage } from '@epoch/solana';
 
 import { PgIndexerStore } from './Repositories/IndexerStore';
 import { rpcHost, SolanaRpc } from './Rpc/SolanaRpc';
@@ -15,6 +15,8 @@ const logger = Logger.create('indexer_app');
 async function main(): Promise<void> {
   const config = loadConfig(IndexerConfigSchema);
   loadConfig(DatabaseConfigSchema);
+  // GET /v1/live/solami shows this process's gRPC, RPC and errors as the `indexer` component.
+  solamiUsage.setComponent('indexer');
   // Solami RPC (with the key) for gap fill, leaders, stakes and the hybrid/rpc sources; public RPC without one.
   const rpc = new SolanaRpc(config.SOLAMI_RPC_URL ?? config.DATA_RPC_URL);
   const endpoints: GrpcEndpoint[] = [];

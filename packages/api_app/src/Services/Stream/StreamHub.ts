@@ -64,6 +64,12 @@ export interface SlotSource {
   getSlotLeaders(startSlot: number, limit: number): Promise<string[]>;
 }
 
+/** Slots pushed by a stream (api_app's Solami gRPC): while it delivers, the `slot` channel follows it, not polling. */
+export interface SlotFeed {
+  /** Confirmed slots as they arrive; returns the unsubscribe. */
+  onSlot(listener: (slot: number) => void): () => void;
+}
+
 /** Turns bus events into activity rows (ActivityService). */
 export interface ActivityMapper {
   fromProgramEvent(event: StoredProgramEvent): Promise<ActivityEvent | null>;
@@ -102,6 +108,13 @@ export interface StreamHubOptions {
   slotIntervalMs: number;
   /** Omitted → no `slot` channel. */
   slots?: SlotSource;
+  /**
+   * Pushed slots (Solami Yellowstone gRPC, confirmed): the `slot` channel sends each one as it arrives and polls
+   * `slots` only while the feed is quiet (not configured, down, or refused).
+   */
+  slotFeed?: SlotFeed;
+  /** Without a pushed slot for this long (at least two slot intervals) the `slot` channel polls again. Default 3 s. */
+  slotFeedQuietMs?: number;
   /** Names the slot leader by identity. */
   names?: () => Promise<NameIndex>;
   activity: ActivityMapper;
@@ -144,6 +157,10 @@ const MESSAGES_PER_WINDOW = 50;
 /** A provider value served to new subscribers without a re-read, unless an event made it stale. */
 const PROVIDER_VALUE_MAX_AGE_MS = 15_000;
 const ERROR_LOG_INTERVAL_MS = 60_000;
+/** Without a pushed slot for this long (or two slot intervals) the `slot` channel polls again. */
+const FEED_QUIET_MS = 3_000;
+/** How often the epoch info behind pushed slots is re-read. */
+const EPOCH_INFO_MAX_AGE_MS = 60_000;
 
 /** Trailing debounce with a ceiling, so a steady stream of events still pushes every `maxWaitMs`. */
 class Debouncer {
@@ -241,6 +258,13 @@ export class StreamHub {
   private lastSlot?: { update: SlotUpdate; at: number };
   private leaders?: { start: number; identities: string[] };
   private lastSlotErrorLog = 0;
+  /** Unsubscribes from the slot feed. */
+  private feedOff?: () => void;
+  /** When the feed last pushed a slot (epoch ms). */
+  private lastFeedAt = 0;
+  /** The last epoch info read: places pushed slots in their epoch. */
+  private epochInfo?: { info: Awaited<ReturnType<SlotSource['getEpochInfo']>>; at: number };
+  private epochInfoBusy = false;
 
   private readonly pushers: Record<ProviderChannel, Debouncer>;
   private readonly cached = new Map<ProviderChannel, { data: unknown; at: number; generation: number }>();
@@ -359,6 +383,8 @@ export class StreamHub {
     this.busListeners = [];
     clearInterval(this.heartbeat);
     this.stopSlotPolling();
+    this.feedOff?.();
+    this.feedOff = undefined;
     for (const channel of PROVIDER_CHANNELS) this.pushers[channel].cancel();
     for (const client of this.clients) client.socket.terminate();
     this.clients.clear();
@@ -689,6 +715,10 @@ export class StreamHub {
 
   private updateSlotPolling(): void {
     const wanted = this.options.slots !== undefined && this.subscribers('slot') > 0;
+    // The feed stays subscribed once used: its stream is shared (program events) and reconnecting it costs more.
+    if (wanted && this.options.slotFeed && !this.feedOff) {
+      this.feedOff = this.options.slotFeed.onSlot((slot) => void this.onFeedSlot(slot));
+    }
     if (wanted && !this.slotTimer) {
       this.slotTimer = setInterval(() => void this.slotTick(), this.options.slotIntervalMs);
       this.slotTimer.unref();
@@ -706,9 +736,15 @@ export class StreamHub {
   private async slotTick(): Promise<void> {
     const slots = this.options.slots;
     if (!slots || this.slotBusy) return;
+    if (this.feedFresh()) {
+      // Solami gRPC is pushing slots: only keep the epoch info (epoch, slot index) fresh.
+      if (!this.epochInfo || this.now() - this.epochInfo.at > EPOCH_INFO_MAX_AGE_MS) await this.refreshEpochInfo(slots);
+      return;
+    }
     this.slotBusy = true;
     try {
       const info = await slots.getEpochInfo();
+      this.epochInfo = { info, at: this.now() };
       if (this.lastSlot?.update.slot === info.absoluteSlot) {
         this.lastSlot.at = this.now();
         return;
@@ -722,7 +758,10 @@ export class StreamHub {
         slotsInEpoch: info.slotsInEpoch,
         leader,
         leaderName: leader ? (names.byIdentity.get(leader) ?? null) : null,
+        source: 'rpc',
       };
+      // A slower poll can finish after a pushed slot: never send the channel backwards.
+      if (this.lastSlot && update.slot <= this.lastSlot.update.slot) return;
       this.lastSlot = { update, at: this.now() };
       this.broadcast('slot', update);
     } catch (error) {
@@ -732,6 +771,68 @@ export class StreamHub {
       }
     } finally {
       this.slotBusy = false;
+    }
+  }
+
+  /** True while the feed has pushed a slot recently (then the poll stands by). */
+  private feedFresh(): boolean {
+    return (
+      this.options.slotFeed !== undefined &&
+      this.now() - this.lastFeedAt <
+        Math.max(this.options.slotFeedQuietMs ?? FEED_QUIET_MS, 2 * this.options.slotIntervalMs)
+    );
+  }
+
+  /** A slot pushed by the feed: placed in its epoch from the last epoch info, named, and sent at once. */
+  private async onFeedSlot(slot: number): Promise<void> {
+    this.lastFeedAt = this.now();
+    const slots = this.options.slots;
+    if (!slots || this.subscribers('slot') === 0) return;
+    const stale = () => this.lastSlot !== undefined && slot <= this.lastSlot.update.slot;
+    if (stale()) return;
+    const position = this.slotPosition(slot);
+    if (!position) {
+      void this.refreshEpochInfo(slots);
+      return;
+    }
+    const leader = await this.leaderOf(slots, slot);
+    const names = leader && this.options.names ? await this.options.names().catch(() => EMPTY_NAMES) : EMPTY_NAMES;
+    if (stale()) return;
+    const update: SlotUpdate = {
+      slot,
+      ...position,
+      leader,
+      leaderName: leader ? (names.byIdentity.get(leader) ?? null) : null,
+      source: 'grpc',
+    };
+    this.lastSlot = { update, at: this.now() };
+    this.broadcast('slot', update);
+  }
+
+  /** Epoch and slot index of `slot` from the last epoch info (null before one is read, or for an older slot). */
+  private slotPosition(slot: number): { epoch: number; slotIndex: number; slotsInEpoch: number } | null {
+    const info = this.epochInfo?.info;
+    if (!info) return null;
+    const offset = slot - (info.absoluteSlot - info.slotIndex);
+    if (offset < 0) return null;
+    // Mainnet epochs have a fixed length: a slot past the end belongs to the next epoch (re-read soon after).
+    const epochs = Math.floor(offset / info.slotsInEpoch);
+    if (epochs > 0 && this.epochInfo) this.epochInfo.at = 0;
+    return { epoch: info.epoch + epochs, slotIndex: offset % info.slotsInEpoch, slotsInEpoch: info.slotsInEpoch };
+  }
+
+  private async refreshEpochInfo(slots: SlotSource): Promise<void> {
+    if (this.epochInfoBusy) return;
+    this.epochInfoBusy = true;
+    try {
+      this.epochInfo = { info: await slots.getEpochInfo(), at: this.now() };
+    } catch (error) {
+      if (this.now() - this.lastSlotErrorLog > ERROR_LOG_INTERVAL_MS) {
+        this.lastSlotErrorLog = this.now();
+        logger.warn('epoch info read failed', { error: errorMessage(error) });
+      }
+    } finally {
+      this.epochInfoBusy = false;
     }
   }
 

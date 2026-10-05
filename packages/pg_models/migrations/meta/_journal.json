@@ -22,6 +22,13 @@
       "when": 1791088597245,
       "tag": "0002_side_tracks",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791206906688,
+      "tag": "0003_solami_usage",
+      "breakpoints": true
     }
   ]
 }

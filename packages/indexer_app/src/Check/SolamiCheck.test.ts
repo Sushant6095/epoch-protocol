@@ -47,6 +47,21 @@ function fakeSolami(chain: FakeChain, options: { firehose: 'ok' | 'refused'; aut
   return { client, subscriptions };
 }
 
+/** Solami's HTTP surfaces as the check sees them (5 Oct 2026: beam-http.solami.dev did not resolve). */
+async function http(url: string, body?: unknown): Promise<{ status: number; body: string }> {
+  if (url.startsWith('https://beam-http.solami.dev')) {
+    throw Object.assign(new TypeError('fetch failed'), {
+      cause: new Error('getaddrinfo ENOTFOUND beam-http.solami.dev'),
+    });
+  }
+  if (url.startsWith('https://api.solami.dev/swqos/tx/')) return { status: 404, body: '{"message":"not found!"}' };
+  if (url === RPC_URL && (body as { method?: string }).method === 'getHealth') {
+    return { status: 200, body: '{"jsonrpc":"2.0","result":"ok","id":1}' };
+  }
+  if (url.startsWith('https://rpc.solami.dev/sol')) return { status: 401, body: '{"message":"unauthorized"}' };
+  throw new Error(`unexpected ${url}`);
+}
+
 function check(chain: FakeChain, solami: ReturnType<typeof fakeSolami>, patch: Partial<SolamiCheckOptions> = {}) {
   let now = 1_000_000;
   const lines: string[] = [];
@@ -69,7 +84,8 @@ function check(chain: FakeChain, solami: ReturnType<typeof fakeSolami>, patch: P
       fetchJson: async (url) =>
         url.endsWith('/pricing')
           ? { payg: { grpc: { usd_per_gb: 0.08 } } }
-          : ['15qWd4huAkoxvhDsHMfpUn27TW1YBYMMJJ2jkAkbeam'],
+          : ['15qWd4huAkoxvhDsHMfpUn27TW1YBYMMJJ2jkAkbeam', '6993ZufwyEDNdB94kciDTGB17ANXguiNH22VmMQU1ami'],
+      http,
       now: () => (now += 50),
       sleep: async () => undefined,
       log: (line) => lines.push(line),
@@ -82,16 +98,23 @@ describe('SolamiCheck', () => {
   it('passes with a working key, reports the replay window, block timing and the firehose cost', async () => {
     const chain = new FakeChain(432_000, () => false, 452_937_000);
     const solami = fakeSolami(chain, { firehose: 'ok' });
-    const { check: c, lines } = check(chain, solami);
+    const { check: c, lines } = check(chain, solami, { beamUrl: RPC_URL, compression: 'zstd' });
     const results = await c.run();
     expect(results.map((r) => [r.name, r.status])).toEqual([
       ['rpc', 'PASS'],
       ['grpc endpoint', 'PASS'],
       ['grpc key', 'PASS'],
       ['grpc firehose', 'PASS'],
-      ['beam', 'PASS'],
+      ['beam tips', 'PASS'],
+      ['beam http', 'PASS'],
+      ['beam landing', 'PASS'],
     ]);
     expect(results[1].detail).toContain('yellowstone-grpc-geyser 15.2.1 (solana 4.2.2)');
+    expect(results[1].detail).toContain('zstd compression accepted');
+    expect(results[4].detail).toContain('2 tip addresses');
+    expect(results[4].detail).toContain('1 of the 10 fallback addresses pinned');
+    expect(results[5].detail).toContain('SOLAMI_BEAM_URL (rpc.solami.dev): HTTP 200, getHealth ok');
+    expect(results[6].detail).toContain('HTTP 404');
     expect(results[1].detail).toContain('from_slot replay window 3000 slots');
     expect(results[2].detail).toMatch(/5 confirmed block metas/);
     expect(results[3].detail).toMatch(/GiB\/day ≈ \$\d+\.\d\d\/day at \$0\.08\/GB/);
@@ -124,9 +147,11 @@ describe('SolamiCheck', () => {
       ['rpc', 'PASS'],
       ['grpc endpoint', 'PASS'],
       ['grpc key', 'FAIL'],
-      ['beam', 'PASS'],
+      ['beam tips', 'PASS'],
+      ['beam http', 'WARN'],
+      ['beam landing', 'PASS'],
     ]);
-    expect(results.find((r) => r.name === 'grpc key')?.detail).toContain('check SOLAMI_TOKEN');
+    expect(results.find((r) => r.name === 'grpc key')?.detail).toContain('Solami gRPC refused SOLAMI_TOKEN');
     expect(refused.check.passed).toBe(false);
 
     const missing = check(chain, fakeSolami(chain, { firehose: 'ok' }), { grpc: undefined, rpc: undefined });
@@ -134,7 +159,25 @@ describe('SolamiCheck', () => {
     expect(out.map((r) => [r.name, r.status])).toEqual([
       ['rpc', 'WARN'],
       ['grpc', 'FAIL'],
-      ['beam', 'PASS'],
+      ['beam tips', 'PASS'],
+      ['beam http', 'WARN'],
+      ['beam landing', 'PASS'],
     ]);
+    // Without SOLAMI_BEAM_URL the check tries the host llms.txt names, and says plainly that it does not resolve.
+    expect(out.find((r) => r.name === 'beam http')?.detail).toContain('does not resolve');
+  });
+
+  it('fails a configured Beam URL that refuses the key, with what to change', async () => {
+    const chain = new FakeChain(432_000, () => false, 452_937_000);
+    const { check: c, lines } = check(chain, fakeSolami(chain, { firehose: 'ok' }), {
+      beamUrl: 'https://rpc.solami.dev/sol?api_key=wrong-beam-key',
+      secrets: [TOKEN, RPC_KEY, 'wrong-beam-key'],
+    });
+    const results = await c.run();
+    const beam = results.find((r) => r.name === 'beam http');
+    expect(beam?.status).toBe('FAIL');
+    expect(beam?.detail).toContain('Solami RPC refused the key (HTTP 401)');
+    expect(lines.join('\n')).not.toContain('wrong-beam-key');
+    expect(c.passed).toBe(false);
   });
 });

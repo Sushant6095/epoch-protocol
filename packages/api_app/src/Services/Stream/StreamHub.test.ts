@@ -283,6 +283,7 @@ describe('StreamHub', () => {
         slotsInEpoch: 432_000,
         leader: 'leader-93960000',
         leaderName: 'Leader Validator',
+        source: 'rpc',
       },
       at: expect.stringMatching(IST),
     });
@@ -302,6 +303,63 @@ describe('StreamHub', () => {
     const reads = slots.reads();
     await sleep(100);
     expect(slots.reads()).toBe(reads);
+  });
+
+  it('follows Solami’s pushed slots while they flow, and polls again when they stop', async () => {
+    const slots = fakeSlots();
+    let push: ((slot: number) => void) | undefined;
+    let feedSubscriptions = 0;
+    await setup({
+      slots,
+      slotFeed: {
+        onSlot: (listener) => {
+          feedSubscriptions++;
+          push = listener;
+          return () => (push = undefined);
+        },
+      },
+      slotFeedQuietMs: 150,
+      names: async () => nameIndex([{ name: 'Leader Validator', vote: 'v', identity: 'leader-93960002' }]),
+    });
+    const client = await connect('?channels=slot');
+    // The first frame comes from a poll (it also reads the epoch info that places pushed slots).
+    const polled = await client.next((m) => m.channel === 'slot');
+    expect(polled.data).toMatchObject({ slot: 375_840_001, source: 'rpc' });
+    expect(feedSubscriptions).toBe(1);
+
+    // Pushed slots go out as they arrive, placed in the epoch and named; the poll stands by.
+    push?.(375_840_010);
+    const pushed = await client.next((m) => m.channel === 'slot' && m.data.source === 'grpc');
+    expect(pushed.data).toEqual({
+      slot: 375_840_010,
+      epoch: 870,
+      slotIndex: 10,
+      slotsInEpoch: 432_000,
+      leader: 'leader-93960002',
+      leaderName: 'Leader Validator',
+      source: 'grpc',
+    });
+    const reads = slots.reads();
+    for (let slot = 375_840_011; slot <= 375_840_015; slot++) {
+      push?.(slot);
+      await sleep(15);
+    }
+    // An older slot (a late push) never sends the channel backwards.
+    push?.(375_840_012);
+    await client.next((m) => m.channel === 'slot' && m.data.slot === 375_840_015);
+    expect(slots.reads()).toBe(reads);
+    expect(client.frames('slot').map((f) => f.data.slot)).toEqual([
+      375_840_001, 375_840_010, 375_840_011, 375_840_012, 375_840_013, 375_840_014, 375_840_015,
+    ]);
+
+    // A slot past the epoch's end belongs to the next epoch.
+    push?.(375_840_000 + 432_000 + 3);
+    const next = await client.next((m) => m.channel === 'slot' && m.data.epoch === 871);
+    expect(next.data).toMatchObject({ slotIndex: 3, source: 'grpc' });
+
+    // The feed goes quiet: polling resumes.
+    await sleep(250);
+    expect(slots.reads()).toBeGreaterThan(reads);
   });
 
   it('pushes vault and feeIndex on subscribe and after the events that change them', async () => {

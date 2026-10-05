@@ -18,6 +18,7 @@ on 3 Oct 2026 (mainnet epoch 1048) from a smoke run of `indexer_app` in RPC samp
 | Slot strip: the newest blocks, one bar per slot (median, p25–p75 band, counts) | `GET /v1/live/slots?limit=60`, then WS `slots` | load, then one frame per block (≈ 2.5 per second with `grpc`) |
 | Leaders table: per-leader median, slots, stake, rank, which leader sets the index | `GET /v1/live/leaders?limit=50` | load, then every 30 s |
 | Distribution: histogram of this epoch's slot medians, index marker | `GET /v1/live/epochs/{epoch}/distribution` | load, then every 60 s |
+| "Powered by Solami" panel: which Solami products run, their health, bytes, latency, Beam landings and tips | `GET /v1/live/solami` | load, then every 10 s |
 
 ## `GET /v1/live/summary`
 
@@ -232,6 +233,152 @@ Buckets are log-spaced, four per decade, `[fromCuPrice, toCuPrice)`, contiguous 
 one (empty ones inside the range are kept, so bars line up). `indexValue` is where to draw the index marker. An epoch
 with no data answers `slots: 0`, `buckets: []`, `percentiles: null`.
 
+## `GET /v1/live/solami`
+
+What Epoch uses of Solami right now, per component, for the "Powered by Solami" panel (and for judges): every gRPC
+stream (status, subscription, bytes, lag), every RPC host with calls by method, p50/p95 latency, errors and rate limits,
+Beam sends with landings and tips spent, and the newest error. Components write their counters to `solami_usage` every
+10–30 s (indexer_app, publisher_app, cranks_app); the API adds its own (its Solami stream for the `slot` channel and
+program events, and its RPC calls). Counters run since each process started. No sign-in; `no-store`.
+
+| Field | Meaning |
+| --- | --- |
+| `inUse` | the Solami products in use by components that reported recently: `grpc`, `rpc` (a `*.solami.dev` host), `beam` |
+| `components[]` | `{ name, updatedAt, stale, startedAt }`: `stale` when the counters are older than `SOLAMI_USAGE_STALE_SECONDS` (120 s): that process is not running |
+| `grpc[]` | `{ component, subscription, endpoint, status, compression, bytes, updates, reconnects, lastUpdateAt, lagSlots }`. `subscription`: `firehose` or `meta` (indexer), `slots` or `slots+program` (api). `status`: `streaming`, `connecting`, `reconnecting`, `stopped`, `off` (no key: RPC polling), `offline` (stale component). `bytes` are protobuf bytes received, after any compression. |
+| `rpc[]` | `{ component, host, solami, calls, errors, rateLimited, p50Ms, p95Ms, methods[] }`, one entry per component and host; `solami: false` marks a non-Solami host (a public fallback), listed so the panel can show what is not Solami yet |
+| `beam[]` | `{ component, sends, landed, failed, fallbacks, tipLamports, tipsSpentLamports, tipsSpentSol, tipSource, lastSignature, lastLandedAt }` for publisher_app and cranks_app on mainnet; `tipSource` is `api` (the live tip list) or `pinned` (the list from Solami's SDK, during an API outage) |
+| `beamTotals` | sums over the senders |
+| `lastError` | `{ component, product, message, at }`: the newest error any component saw (a rate limit, a refused key, a failed send), with Solami's explanation where there is one |
+
+A real response from a smoke run on 5 Oct 2026 without a Solami key (the indexer polls public RPC, so `inUse` is
+empty, gRPC is `off` and both RPC hosts are marked `solami: false`; the API's 429s are public RPC rate-limiting its
+reward reads; method lists trimmed):
+
+```json
+{
+  "ok": true,
+  "data": {
+    "schemaVersion": 1,
+    "kind": "real",
+    "asOf": "2026-10-05T19:24:12+05:30",
+    "source": "solami_usage (indexer_app, publisher_app, cranks_app) + api_app’s own counters",
+    "inUse": [],
+    "components": [
+      {
+        "name": "indexer",
+        "updatedAt": "2026-10-05T19:24:03+05:30",
+        "stale": false,
+        "startedAt": "2026-10-05T19:20:26+05:30"
+      },
+      {
+        "name": "api",
+        "updatedAt": "2026-10-05T19:24:12+05:30",
+        "stale": false,
+        "startedAt": "2026-10-05T19:22:51+05:30"
+      }
+    ],
+    "grpc": [
+      {
+        "component": "indexer",
+        "subscription": null,
+        "endpoint": null,
+        "status": "off",
+        "compression": null,
+        "bytes": 0,
+        "updates": 0,
+        "reconnects": 0,
+        "lastUpdateAt": null,
+        "lagSlots": null
+      }
+    ],
+    "rpc": [
+      {
+        "component": "indexer",
+        "host": "api.mainnet-beta.solana.com",
+        "solami": false,
+        "calls": 189,
+        "errors": 0,
+        "rateLimited": 0,
+        "p50Ms": 81,
+        "p95Ms": 371,
+        "methods": [
+          {
+            "method": "getSlot",
+            "calls": 105,
+            "errors": 0,
+            "rateLimited": 0,
+            "p50Ms": 57,
+            "p95Ms": 89
+          },
+          {
+            "method": "getBlock",
+            "calls": 80,
+            "errors": 0,
+            "rateLimited": 0,
+            "p50Ms": 289,
+            "p95Ms": 390
+          },
+          {
+            "…": "…"
+          }
+        ]
+      },
+      {
+        "component": "api",
+        "host": "api.mainnet-beta.solana.com",
+        "solami": false,
+        "calls": 74,
+        "errors": 6,
+        "rateLimited": 6,
+        "p50Ms": 413,
+        "p95Ms": 1459,
+        "methods": [
+          {
+            "method": "getInflationReward",
+            "calls": 42,
+            "errors": 6,
+            "rateLimited": 6,
+            "p50Ms": 397,
+            "p95Ms": 813
+          },
+          {
+            "method": "getBlock",
+            "calls": 12,
+            "errors": 0,
+            "rateLimited": 0,
+            "p50Ms": 526,
+            "p95Ms": 648
+          },
+          {
+            "…": "…"
+          }
+        ]
+      }
+    ],
+    "beam": [],
+    "beamTotals": {
+      "sends": 0,
+      "landed": 0,
+      "failed": 0,
+      "tipsSpentLamports": 0,
+      "tipsSpentSol": 0
+    },
+    "lastError": {
+      "component": "api",
+      "product": "rpc",
+      "message": "getInflationReward on api.mainnet-beta.solana.com: HTTP 429",
+      "at": "2026-10-05T19:23:59+05:30"
+    }
+  }
+}
+```
+
+With a key, `inUse` becomes `["grpc", "rpc"]` (`"beam"` once a sender has used it), `grpc[]` shows the indexer's
+`firehose` or `meta` stream and the API's `slots` / `slots+program` stream with growing `bytes`, and `rpc[]` lists
+`rpc.solami.dev` with `solami: true`. Show each product as a row: a green dot when `inUse` lists it, the numbers next to
+it, `lastError.message` under the panel when it is less than a few minutes old.
+
 ## WebSocket `/v1/stream`
 
 One socket per page, on the API port: `ws://localhost:4000/v1/stream?channels=slots,index:live` (or send
@@ -251,12 +398,17 @@ one in [`packages/api_app/README.md`](../../packages/api_app/README.md#ws-v1stre
 
 Both channels are listed in `hello` only when the API has a database. They need no sign-in.
 
+The Terminal-wide `slot` channel (the slot ticker) also comes from Solami when the API has a key: each confirmed slot
+as Solami's Yellowstone stream pushes it, with `"source": "grpc"`; while that stream is not configured or goes quiet
+the API polls RPC every 2 s and the frames say `"source": "rpc"`.
+
 ## Refresh behaviour
 
 1. On load, in parallel: `summary`, `slots?limit=60`, `leaders?limit=50`, `epochs/{summary.epoch.number}/distribution`.
 2. Open the socket with `slots,index:live`. Append each `slots` frame to the strip (drop the oldest beyond 60; ignore a
    slot you already have); replace the header and big number with each `index:live` frame.
-3. Poll `leaders` every 30 s and `distribution` every 60 s (both are cached 10 s on the server).
+3. Poll `leaders` every 30 s and `distribution` every 60 s (both are cached 10 s on the server), and `solami` every
+   10 s for the "Powered by Solami" panel.
 4. On socket close: back off (1 s, 2 s, … 30 s), reconnect, and reload `slots` so the strip has no hole.
 5. When `summary.epoch.number` changes, reload `leaders` and `distribution` for the new epoch; `lastFinal` updates when
    the previous epoch's value is written (it may take a few minutes after the boundary while gap fill finishes).

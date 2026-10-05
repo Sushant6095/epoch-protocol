@@ -146,7 +146,7 @@ Full plan with checkpoints: [`docs/PLAN.md`](docs/PLAN.md) · Implementation pla
 | --- | --- | --- |
 | Meteora | Validators sell a fixed share of their revenue as a token launched on a DBC curve (Epoch is the partner); every epoch the program buys it back on the curve or its DAMM v2 pool and burns it; Epoch's partner and LP fees are claimed on-chain into the lending pool | Launch |
 | Panta | Real-money (USDC, mainnet) markets each epoch on the Solana Fee Index, created by our bot and traded from the Predict page; every trade attributed to Epoch | Predict |
-| Solami | The Fee Index computed live from mainnet through Solami's Yellowstone gRPC and RPC; Beam for the index's on-chain post | Live |
+| Solami | The Fee Index computed live from mainnet through Solami's Yellowstone gRPC and RPC; the API's slot ticker and program events over Solami gRPC; every mainnet transaction we sign through Beam; a live usage report (`GET /v1/live/solami`) | Live |
 | Superteam India | SOL in ₹, validators hosted in India, and a wallet's staking rewards in ₹ per Indian financial year with a CSV | India |
 | RPC Fast | Crank transactions land through RPC Fast; failover data stream | — |
 
@@ -159,18 +159,21 @@ The Solana Fee Index is computed live from mainnet blocks streamed through [Sola
 gRPC: every non-vote transaction's priority fee (legacy and v0 `SetComputeUnitPrice`, and the inline fee of SIMD-0385
 v1 transactions), each slot's median with leader-paid transactions left out, and the stake-weighted median across
 leaders, updated every 2 seconds and settled into `epoch_index` when the epoch ends. Solami RPC fills gaps and snapshots
-the leader schedule and stakes; Solami Beam can land the `post_index` transaction on mainnet. The Terminal's Live page
-shows it slot by slot (`GET /v1/live/*`, WS `slots` and `index:live`).
+the leader schedule and stakes; the API's own Solami stream drives the slot ticker and, on mainnet, the program's
+events; Solami Beam lands every transaction we sign on mainnet (`post_index`, quotes, every crank send). The Terminal's
+Live page shows it slot by slot (`GET /v1/live/*`, WS `slots` and `index:live`), and `GET /v1/live/solami` shows what
+each component uses of Solami: gRPC bytes and lag, RPC calls with p50/p95, Beam landings and tips.
 
 ```bash
 # .env: SOLAMI_TOKEN=<key>  SOLAMI_RPC_URL=https://rpc.solami.dev/sol?api_key=<key>  DATABASE_URL=…
 pnpm install && pnpm build && pnpm db:migrate
 pnpm solami:check                                  # read-only check of your key: RPC, gRPC, firehose cost, Beam
 node packages/indexer_app/dist/index.js            # SLOT_SOURCE=auto: gRPC firehose, or hybrid on a plan stream
-node packages/api_app/dist/index.js                # GET /v1/live/summary
+node packages/api_app/dist/index.js                # GET /v1/live/summary, GET /v1/live/solami
+pnpm demo:solami                                   # the stream in a terminal, for a 2–3 minute demo (works without a key)
 ```
 
-Get a key at <https://solami.dev/signup?ref=st-earn-sep-26> (Pro trial: 7 days). Setup, every variable, the methodology,
+Get a key at <https://solami.dev/signup?ref=st-earn-sep-26> (gRPC: the Pro plan, gRPC PAYG or a $10/day stream). Setup, every variable, the methodology,
 bandwidth costs and the fallback modes: [`packages/indexer_app/README.md`](packages/indexer_app/README.md). Page
 contract for the frontend: [`docs/pages/live.md`](docs/pages/live.md).
 

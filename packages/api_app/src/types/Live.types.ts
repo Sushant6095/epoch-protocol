@@ -146,3 +146,92 @@ export interface FeeDistribution extends Meta {
   indexValue: number | null;
   unit: 'µL/CU';
 }
+
+// ── GET /v1/live/solami: what Epoch uses of Solami, per component, for judges ─────────────────────────
+
+/** A component's gRPC stream (indexer_app: the firehose or block meta; api_app: slots and program transactions). */
+export interface SolamiGrpcUsage {
+  component: string;
+  /** firehose | meta | slots | slots+program */
+  subscription: string | null;
+  /** solami | rpc-fast */
+  endpoint: string | null;
+  /** connecting | streaming | reconnecting | stopped | off (no key: RPC polling) | offline (the component is not reporting) */
+  status: string;
+  compression: string | null;
+  /** Protobuf bytes received (after any decompression). */
+  bytes: number;
+  updates: number;
+  reconnects: number;
+  /** ISO 8601 IST. */
+  lastUpdateAt: string | null;
+  /** Slots behind the tip (indexer_app). */
+  lagSlots: number | null;
+}
+
+export interface SolamiRpcMethod {
+  method: string;
+  calls: number;
+  errors: number;
+  rateLimited: number;
+  p50Ms: number | null;
+  p95Ms: number | null;
+}
+
+/** A component's RPC calls to one host (a key in the URL is never kept). */
+export interface SolamiRpcUsage {
+  component: string;
+  host: string;
+  /** A *.solami.dev host. Others (public RPC fallbacks) are listed for honesty. */
+  solami: boolean;
+  calls: number;
+  errors: number;
+  rateLimited: number;
+  p50Ms: number | null;
+  p95Ms: number | null;
+  methods: SolamiRpcMethod[];
+}
+
+/** A sender's Beam use (publisher_app post_index, cranks_app sends). */
+export interface SolamiBeamUsage {
+  component: string;
+  sends: number;
+  /** Confirmed without an error. */
+  landed: number;
+  failed: number;
+  /** Sent the normal way because no tip address could be read. */
+  fallbacks: number;
+  tipLamports: number | null;
+  /** Tips of landed transactions. */
+  tipsSpentLamports: number;
+  tipsSpentSol: number;
+  /** api (live list) | pinned (Solami SDK's list, during an API outage) */
+  tipSource: string | null;
+  lastSignature: string | null;
+  /** ISO 8601 IST. */
+  lastLandedAt: string | null;
+}
+
+export interface SolamiComponent {
+  /** indexer | api | publisher | cranks */
+  name: string;
+  /** When its counters were last written (api: now). ISO 8601 IST. */
+  updatedAt: string;
+  /** Counters older than SOLAMI_USAGE_STALE_SECONDS: the component is not running (or not reporting). */
+  stale: boolean;
+  /** When the process started. ISO 8601 IST. */
+  startedAt: string;
+}
+
+/** GET /v1/live/solami. Counters are since each process started. */
+export interface SolamiUsageResponse extends Meta {
+  /** Solami products in use right now (fresh components only): grpc, rpc, beam. */
+  inUse: string[];
+  components: SolamiComponent[];
+  grpc: SolamiGrpcUsage[];
+  rpc: SolamiRpcUsage[];
+  beam: SolamiBeamUsage[];
+  /** Sums over every component's Beam use. */
+  beamTotals: { sends: number; landed: number; failed: number; tipsSpentLamports: number; tipsSpentSol: number };
+  lastError: { component: string; product: string; message: string; at: string } | null;
+}

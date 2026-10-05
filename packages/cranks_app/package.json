@@ -27,6 +27,7 @@
     "@epoch/exceptions": "workspace:*",
     "@epoch/logger": "workspace:*",
     "@epoch/meteora": "workspace:*",
+    "@epoch/pg_models": "workspace:*",
     "@epoch/solana": "workspace:*",
     "@solana/web3.js": "^1.98.0"
   },

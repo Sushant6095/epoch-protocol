@@ -1,5 +1,10 @@
 import {
+  BEAM_HTTP_URL,
+  BEAM_LANDING_URL,
+  BEAM_PINNED_TIP_ACCOUNTS,
+  BEAM_TIP_ADDRESSES_URL,
   CommitmentLevel,
+  explainSolamiError,
   type GeyserUnaryClient,
   grpcErrorText,
   type GrpcEndpoint,
@@ -36,6 +41,8 @@ export interface SolamiCheckOptions {
 export interface SolamiCheckDeps {
   createClient: (endpoint: GrpcEndpoint, compression?: 'zstd' | 'gzip') => GeyserUnaryClient;
   fetchJson: (url: string) => Promise<unknown>;
+  /** A plain HTTP request (GET, or a JSON POST with `body`): status and body text, whatever the status. */
+  http: (url: string, body?: unknown) => Promise<{ status: number; body: string }>;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   /** Progress lines (already redacted). */
@@ -48,6 +55,8 @@ const GIB = 1024 ** 3;
 type Stream = AsyncIterable<SubscribeUpdate> & { destroy(error?: Error): unknown };
 
 const text = grpcErrorText;
+/** 64 zero bytes in base58: a signature Beam has never seen (its landing lookup answers 404). */
+const UNKNOWN_SIGNATURE = '1'.repeat(64);
 
 export const median = (values: number[]): number | null => {
   if (values.length === 0) return null;
@@ -117,12 +126,9 @@ export class SolamiCheck {
       );
     } catch (error) {
       const message = text(error);
-      const hint = /HTTP 401|HTTP 403/.test(message)
-        ? ' (the api_key in SOLAMI_RPC_URL was refused)'
-        : /-32005/.test(message)
-          ? ' (rate limited)'
-          : '';
-      this.add('rpc', 'FAIL', `${host}: ${message}${hint}`);
+      // SolanaRpc already explains Solami's errors in its message; anything else gets the hint here.
+      const { hint, kind } = explainSolamiError('rpc', error);
+      this.add('rpc', 'FAIL', `${host}: ${message}${kind !== 'other' && !message.includes(hint) ? ` (${hint})` : ''}`);
     }
   }
 
@@ -148,10 +154,11 @@ export class SolamiCheck {
         `${rpcHost(endpoint.url)}: ${parsed}, confirmed slot ${slot}` +
           (window !== null
             ? `, from_slot replay window ${window} slots (≈ ${Math.round((window * 0.4) / 60)} min)`
-            : ''),
+            : '') +
+          (this.options.compression ? `; ${this.options.compression} compression accepted` : ''),
       );
     } catch (error) {
-      this.add('grpc endpoint', 'FAIL', text(error));
+      this.add('grpc endpoint', 'FAIL', `${text(error)} (${explainSolamiError('grpc', error).hint})`);
       return;
     }
     if ((await this.timeBlocks(client)) && this.options.firehoseSeconds > 0) await this.measureFirehose(client);
@@ -195,8 +202,8 @@ export class SolamiCheck {
     } catch (error) {
       polling = false;
       await poller;
-      const auth = isAuthRefused(error);
-      this.add('grpc key', 'FAIL', `${text(error)}${auth ? ' (the x-token key was refused: check SOLAMI_TOKEN)' : ''}`);
+      const { hint } = explainSolamiError('grpc', error);
+      this.add('grpc key', 'FAIL', `${text(error)} (${isAuthRefused(error) ? hint : `${hint}; the key may be fine`})`);
       return false;
     } finally {
       stream?.destroy();
@@ -258,7 +265,7 @@ export class SolamiCheck {
             'SLOT_SOURCE=hybrid. Enable gRPC pay-as-you-go (or ask Solami for the firehose allowance) for SLOT_SOURCE=grpc.',
         );
       } else {
-        this.add('grpc firehose', 'FAIL', text(error));
+        this.add('grpc firehose', 'FAIL', `${text(error)} (${explainSolamiError('grpc', error).hint})`);
       }
     } finally {
       stream?.destroy();
@@ -276,20 +283,54 @@ export class SolamiCheck {
     }
   }
 
+  /** Beam without sending anything: tip addresses, the HTTP endpoint (a JSON-RPC getHealth) and the landing lookup. */
   private async checkBeam(): Promise<void> {
+    const pinned = BEAM_PINNED_TIP_ACCOUNTS.length;
     try {
-      const tips = await this.deps.fetchJson('https://api.solami.dev/onchain/tip-addresses');
-      const count = Array.isArray(tips) ? tips.length : 0;
-      const configured = this.options.beamUrl
-        ? `SOLAMI_BEAM_URL → ${rpcHost(this.options.beamUrl)}`
-        : 'SOLAMI_BEAM_URL unset (Beam off)';
+      const tips = await this.deps.fetchJson(BEAM_TIP_ADDRESSES_URL);
+      const live = Array.isArray(tips) ? tips.map(String) : [];
+      const stillListed = BEAM_PINNED_TIP_ACCOUNTS.filter((address) => live.includes(address)).length;
       this.add(
-        'beam',
-        count > 0 ? 'PASS' : 'WARN',
-        `${count} tip addresses from api.solami.dev; ${configured}; nothing sent`,
+        'beam tips',
+        live.length > 0 ? 'PASS' : 'WARN',
+        `${live.length} tip addresses from api.solami.dev/onchain/tip-addresses (cached 10 min by senders); ` +
+          `${stillListed} of the ${pinned} fallback addresses pinned from Solami's SDK are still listed`,
       );
     } catch (error) {
-      this.add('beam', 'WARN', `tip addresses unavailable: ${text(error)}`);
+      this.add(
+        'beam tips',
+        'WARN',
+        `unavailable (${text(error)}): senders would tip one of the ${pinned} pinned addresses`,
+      );
+    }
+
+    const url = this.options.beamUrl ?? BEAM_HTTP_URL;
+    const label = this.options.beamUrl
+      ? `SOLAMI_BEAM_URL (${rpcHost(url)})`
+      : `${rpcHost(url)} (named in llms.txt; SOLAMI_BEAM_URL is unset, so Beam is off)`;
+    try {
+      const res = await this.deps.http(url, { jsonrpc: '2.0', id: 1, method: 'getHealth' });
+      const healthy = res.status === 200 && /"result"\s*:\s*"ok"/.test(res.body);
+      const why = healthy ? '' : ` (${explainSolamiError('beam', new Error(`HTTP ${res.status}: ${res.body}`)).hint})`;
+      this.add(
+        'beam http',
+        healthy ? 'PASS' : this.options.beamUrl ? 'FAIL' : 'WARN',
+        `${label}: HTTP ${res.status}, ${healthy ? 'getHealth ok: a tipped sendTransaction here goes out through Beam' : res.body.slice(0, 120)}${why}; nothing sent`,
+      );
+    } catch (error) {
+      const { hint } = explainSolamiError('beam', error);
+      this.add('beam http', this.options.beamUrl ? 'FAIL' : 'WARN', `${label}: ${text(error)} (${hint})`);
+    }
+
+    try {
+      const res = await this.deps.http(`${BEAM_LANDING_URL}/${UNKNOWN_SIGNATURE}`);
+      this.add(
+        'beam landing',
+        res.status === 404 || res.status === 200 ? 'PASS' : 'WARN',
+        `api.solami.dev/swqos/tx answers (HTTP ${res.status} for a signature it never saw): senders look up each Beam send there`,
+      );
+    } catch (error) {
+      this.add('beam landing', 'WARN', `landing lookup unavailable: ${text(error)}`);
     }
   }
 }

@@ -74,6 +74,8 @@ export interface SlotUpdate {
   leader: string | null;
   /** The leader's validator name from the validator table; null when unknown (the UI shows the short key). */
   leaderName: string | null;
+  /** Pushed by Solami Yellowstone gRPC (`grpc`, each confirmed slot) or read by polling RPC (`rpc`, the fallback). */
+  source?: 'grpc' | 'rpc';
 }
 
 /** Control messages from the server. */

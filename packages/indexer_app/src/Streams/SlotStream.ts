@@ -2,11 +2,14 @@ import { sleep } from '@epoch/common';
 import { Logger } from '@epoch/logger';
 import { type LiveIndexPayload, type LiveSlotPayload } from '@epoch/pg_models';
 import {
+  explainSolamiError,
   type GrpcEndpoint,
   GrpcStream,
   type GrpcStreamOptions,
   type GrpcStreamState,
   SlotStatus,
+  type SolamiUsage,
+  solamiUsage,
   type SubscribeContext,
   type SubscribeRequest,
   type SubscribeUpdate,
@@ -49,6 +52,8 @@ const FLUSH_MS = 500;
 const PRUNE_MS = 300_000;
 /** How often lag and the running estimate are logged at info level. */
 const STATUS_LOG_MS = 60_000;
+/** How often this process's Solami usage is written to solami_usage. */
+const USAGE_WRITE_MS = 10_000;
 
 export type IndexerRpc = Pick<
   SolanaRpc,
@@ -85,6 +90,8 @@ export interface SlotStreamDeps {
   rpc: IndexerRpc;
   store: IndexerStore;
   createGrpcStream?: (endpoints: GrpcEndpoint[], options: GrpcStreamOptions) => GrpcStreamLike;
+  /** Solami usage counters (gRPC, and the RPC client's own). Default: this process's `solamiUsage`. */
+  usage?: SolamiUsage;
   now?: () => number;
 }
 
@@ -199,6 +206,7 @@ export class SlotStream {
   ) {
     this.rpc = deps.rpc;
     this.store = deps.store;
+    this.usage = deps.usage ?? solamiUsage;
     this.now = deps.now ?? Date.now;
     this.createGrpc =
       deps.createGrpcStream ?? ((endpoints, grpcOptions) => new GrpcStream(endpoints, grpcOptions) as GrpcStreamLike);
@@ -212,6 +220,8 @@ export class SlotStream {
   }
 
   private readonly createGrpc: (endpoints: GrpcEndpoint[], options: GrpcStreamOptions) => GrpcStreamLike;
+  private readonly usage: SolamiUsage;
+  private lastUsageWrite = 0;
 
   get stats(): SlotStreamStats {
     const processed = this.lastLiveSlot ?? null;
@@ -332,19 +342,18 @@ export class SlotStream {
         return;
       } catch (error) {
         if (this.stopped) return;
+        const { hint } = explainSolamiError('grpc', error);
         if (this.options.mode === 'auto' && mode === 'grpc' && isFirehoseRefused(error)) {
-          logger.warn(
-            'Solami refused the transaction firehose on this key (plan streams need gRPC pay-as-you-go for it): ' +
-              'switching to hybrid (block meta over gRPC, blocks over RPC)',
-          );
+          logger.warn('Solami refused the transaction firehose on this key: switching to hybrid', { hint });
           mode = 'hybrid';
           continue;
         }
         if (this.options.mode === 'auto' && isAuthRefused(error)) {
-          logger.error('the gRPC key was refused; switching to RPC polling', error);
+          logger.error('the gRPC key was refused; switching to RPC polling', undefined, { hint });
           mode = 'rpc';
           continue;
         }
+        logger.error('the gRPC stream was refused', undefined, { hint });
         throw error;
       }
     }
@@ -356,6 +365,8 @@ export class SlotStream {
       compression: this.options.compression,
       isFatal: isRequestRefused,
       onState: (state) => this.onGrpcState(state),
+      usage: this.usage,
+      subscription: kind,
     });
     this.grpc = stream;
     if (this.stopped) stream.stop();
@@ -443,6 +454,7 @@ export class SlotStream {
   private async runRpcPolling(): Promise<void> {
     this.status = 'polling';
     this.endpoint = this.rpc.host;
+    this.usage.grpc({ status: 'off', lagSlots: null });
     const { stride, rpcPollMs } = this.options;
     let next: number | undefined;
     while (!this.stopped) {
@@ -749,6 +761,13 @@ export class SlotStream {
         lostSlots: stats.lostSlots,
       });
     }
+    if (this.mode && this.mode !== 'rpc') this.usage.grpc({ lagSlots: this.stats.lagSlots });
+    if (this.now() - this.lastUsageWrite >= USAGE_WRITE_MS) {
+      this.lastUsageWrite = this.now();
+      this.store.writeUsage(this.usage.report()).catch((error: unknown) => {
+        logger.debug('solami_usage write failed', { error: String(error) });
+      });
+    }
     if (this.now() - this.lastPrune > PRUNE_MS) {
       this.lastPrune = this.now();
       this.store.pruneLiveSlots(this.options.liveSlotsKeep).catch((error: unknown) => {
@@ -793,6 +812,7 @@ export class SlotStream {
     await this.flush();
     this.status = 'stopped';
     if (this.epochs) await this.store.writeLive(this.livePayload()).catch(() => undefined);
+    await this.store.writeUsage(this.usage.report()).catch(() => undefined);
     logger.info('slot stream stopped', { ...this.stats });
   }
 }

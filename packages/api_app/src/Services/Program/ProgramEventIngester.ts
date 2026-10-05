@@ -11,9 +11,17 @@ import {
   RpcAnswerError,
   type SignatureInfo,
 } from '../../Sources/ProgramLogsSource';
+import { type LiveStreamState, type ProgramTransaction } from '../../Sources/SolamiStream';
 import { type EventCursor, type ProgramEventStore } from './ProgramEventStore';
 
 const logger = Logger.create('ProgramEventIngester');
+
+/** A push source of the program's transactions: api_app's Solami gRPC stream (SolamiStream). */
+export interface ProgramTxStream {
+  readonly state: LiveStreamState;
+  onProgramTransaction(listener: (tx: ProgramTransaction) => void): () => void;
+  onState(listener: (state: LiveStreamState) => void): () => void;
+}
 
 export interface ProgramEventIngesterOptions {
   /** Unset → ingestion stays off (EPOCH_PROGRAM_ID is not set). */
@@ -29,6 +37,13 @@ export interface ProgramEventIngesterOptions {
   invalidate: (name: EventName) => void;
   /** PROGRAM_EVENTS_BACKFILL_LIMIT: the most transactions to read on a first start (no cursor yet); 0 = none. */
   backfillLimit: number;
+  /**
+   * The live source when the program runs on mainnet and SOLAMI_TOKEN is set: Yellowstone transactions
+   * (account_include = program, failed = false) through Solami. logsSubscribe takes over while it is not streaming.
+   */
+  stream?: ProgramTxStream;
+  /** How long the stream may be down before logsSubscribe takes over. Default 30 s. */
+  liveFallbackMs?: number;
   /** Catch-up poll interval. Default 60 s. */
   pollIntervalMs?: number;
   /** Parallel getTransaction calls. Default 2. */
@@ -61,9 +76,11 @@ export const cursorName = (programId: PublicKey): string => `program_events:${pr
  *   (`program_events:<programId>`: every transaction up to it has been read), or `backfillLimit` signatures on a
  *   first start; then getTransaction oldest first, `concurrency` at a time, with backoff on 429. Failed transactions
  *   are skipped; the cursor advances after each batch, so a restart resumes where it stopped.
- * - **Live**: logsSubscribe at `confirmed` through the dedicated websocket; failed transactions skipped, logs parsed
- *   directly (block time = arrival time). Live events never move the cursor: the next poll still walks every
- *   signature after it, so a dropped websocket loses nothing, and the store's (signature, ix) key dedupes.
+ * - **Live**: on mainnet with a Solami key, the program's transactions over Yellowstone gRPC (account_include =
+ *   program, failed = false, `confirmed`); otherwise, and whenever that stream is down for `liveFallbackMs`,
+ *   logsSubscribe through the dedicated websocket. Logs are parsed directly (block time = arrival time). Live events
+ *   never move the cursor: the next poll still walks every signature after it, so a dropped stream loses nothing;
+ *   duplicates (the two sources, a replay, the poll) are dropped by signature and by the store's (signature, ix) key.
  * Only `Program data:` lines written while the Epoch program is the innermost frame count (epoch-sdk
  * `parseEventsFromLogs`), so other programs' events in the same transaction are ignored.
  */
@@ -76,7 +93,10 @@ export class ProgramEventIngester {
   private timer?: NodeJS.Timeout;
   private resubscribeTimer?: NodeJS.Timeout;
   private subscription?: number;
-  private subscribedAt = 0;
+  /** When the live source in use (websocket or gRPC) started delivering. */
+  private liveSince = 0;
+  private streamOff?: () => void;
+  private fallbackTimer?: NodeJS.Timeout;
   private subscribeFailures = 0;
   private running?: Promise<number>;
   private liveQueue: Promise<void> = Promise.resolve();
@@ -112,8 +132,12 @@ export class ProgramEventIngester {
     if (this.active) return;
     this.active = true;
     this.halted = false;
-    logger.info('program event ingestion starting', { programId: programId.toBase58() });
-    this.subscribe();
+    logger.info('program event ingestion starting', {
+      programId: programId.toBase58(),
+      live: this.options.stream ? 'Solami gRPC (logsSubscribe as the fallback)' : 'logsSubscribe',
+    });
+    if (this.options.stream) this.useStream(this.options.stream);
+    else this.subscribe();
     void this.poll(); // the backfill
     this.timer = setInterval(() => void this.poll(), this.options.pollIntervalMs ?? 60_000);
     this.timer.unref();
@@ -127,6 +151,10 @@ export class ProgramEventIngester {
     this.halted = true;
     clearInterval(this.timer);
     clearTimeout(this.resubscribeTimer);
+    clearTimeout(this.fallbackTimer);
+    this.fallbackTimer = undefined;
+    this.streamOff?.();
+    this.streamOff = undefined;
     this.timer = undefined;
     const id = this.subscription;
     this.subscription = undefined;
@@ -184,7 +212,7 @@ export class ProgramEventIngester {
     const concurrency = Math.max(1, this.options.concurrency ?? 2);
     for (let start = 0; start < ordered.length && !this.halted; start += concurrency) {
       const batch = ordered.slice(start, start + concurrency);
-      for (const info of batch) if (this.missedByWebsocket(info, now)) missedLive++;
+      for (const info of batch) if (this.missedByLive(info, now)) missedLive++;
       const results = await Promise.all(batch.map((info) => this.read(programId, rpc, info)));
       let last: SignatureInfo | undefined;
       for (const [i, result] of results.entries()) {
@@ -199,8 +227,13 @@ export class ProgramEventIngester {
       }
       if (last) await this.options.store.setCursor(name, toCursor(last));
     }
-    if (missedLive > 0 && this.subscription !== undefined && this.active) {
-      await this.resubscribe(`${missedLive} transaction(s) reached the poll but not the websocket`);
+    if (missedLive > 0 && this.active) {
+      if (this.subscription !== undefined) {
+        await this.resubscribe(`${missedLive} transaction(s) reached the poll but not the websocket`);
+      } else if (this.options.stream?.state === 'streaming') {
+        // The gRPC stream reconnects by itself; the poll has stored what it missed.
+        logger.warn('the Solami gRPC stream missed program transactions the poll found', { missed: missedLive });
+      }
     }
     return read;
   }
@@ -303,12 +336,67 @@ export class ProgramEventIngester {
     }
   }
 
+  /** Solami gRPC as the live source; logsSubscribe runs only while it is not streaming. */
+  private useStream(stream: ProgramTxStream): void {
+    const offTx = stream.onProgramTransaction((tx) => this.onLive(tx.signature, tx.slot, tx.logs, tx.failed));
+    const offState = stream.onState((state) => this.onStreamState(state));
+    this.streamOff = () => {
+      offTx();
+      offState();
+    };
+    this.onStreamState(stream.state);
+  }
+
+  private onStreamState(state: LiveStreamState): void {
+    if (!this.active) return;
+    if (state === 'streaming') {
+      clearTimeout(this.fallbackTimer);
+      this.fallbackTimer = undefined;
+      this.liveSince = this.now();
+      if (this.subscription !== undefined) void this.unsubscribeLogs('Solami gRPC is streaming the program again');
+      return;
+    }
+    if (state === 'failed' || state === 'stopped') {
+      this.fallBackToLogs(`the Solami gRPC stream ${state === 'failed' ? 'was refused' : 'stopped'}`);
+      return;
+    }
+    // connecting, reconnecting: give it a moment before the websocket takes over.
+    if (this.subscription === undefined && !this.fallbackTimer) {
+      const delayMs = this.options.liveFallbackMs ?? 30_000;
+      this.fallbackTimer = setTimeout(() => {
+        this.fallbackTimer = undefined;
+        if (this.options.stream?.state !== 'streaming') {
+          this.fallBackToLogs(`the Solami gRPC stream has not streamed for ${Math.round(delayMs / 1_000)} s`);
+        }
+      }, delayMs);
+      this.fallbackTimer.unref();
+    }
+  }
+
+  private fallBackToLogs(reason: string): void {
+    clearTimeout(this.fallbackTimer);
+    this.fallbackTimer = undefined;
+    if (this.subscription !== undefined || !this.active) return;
+    logger.warn('program events: logsSubscribe takes over', { reason });
+    this.subscribe();
+  }
+
+  private async unsubscribeLogs(reason: string): Promise<void> {
+    const id = this.subscription;
+    this.subscription = undefined;
+    if (id === undefined) return;
+    logger.info('program events: back on Solami gRPC; logsSubscribe off', { reason });
+    await this.options.rpc
+      ?.removeOnLogsListener(id)
+      .catch((error: unknown) => logger.debug('removing the logs listener failed', { error: String(error) }));
+  }
+
   private subscribe(): void {
     const { programId, rpc } = this.require();
     if (!this.active) return;
     try {
       this.subscription = rpc.onLogs(programId, (notification, context) => this.onLogs(notification, context));
-      this.subscribedAt = this.now();
+      this.liveSince = this.now();
       this.subscribeFailures = 0;
     } catch (error) {
       this.subscribeFailures++;
@@ -333,31 +421,29 @@ export class ProgramEventIngester {
   }
 
   private onLogs(notification: LogsNotification, context: { slot: number }): void {
-    if (this.halted) return;
-    if (notification.err) {
-      this.markSeen(notification.signature);
+    this.onLive(notification.signature, context.slot, notification.logs, !!notification.err);
+  }
+
+  /** One live transaction (websocket or gRPC): parsed, stored and announced once per signature. */
+  private onLive(signature: string, slot: number, logs: readonly string[], failed: boolean): void {
+    if (this.halted || this.liveSeen.has(signature)) return;
+    if (failed) {
+      this.markSeen(signature);
       return;
     }
     const { programId } = this.require();
     const receivedAt = new Date(this.now()).toISOString();
     this.liveQueue = this.liveQueue
       .then(async () => {
-        const events = await this.toStored(
-          programId,
-          notification.signature,
-          context.slot,
-          receivedAt,
-          notification.logs,
-        );
+        // A copy queued behind the first one (both sources, or a replay after a reconnect).
+        if (this.liveSeen.has(signature)) return;
+        const events = await this.toStored(programId, signature, slot, receivedAt, logs);
         await this.publish(events);
         // Only once stored: a failed insert leaves it to the next poll.
-        this.markSeen(notification.signature);
+        this.markSeen(signature);
       })
       .catch((error: unknown) =>
-        logger.warn('live program event failed; the next poll reads it', {
-          signature: notification.signature,
-          error: String(error),
-        }),
+        logger.warn('live program event failed; the next poll reads it', { signature, error: String(error) }),
       );
   }
 
@@ -369,11 +455,12 @@ export class ProgramEventIngester {
     }
   }
 
-  /** A transaction the websocket should have delivered by now (it landed after we subscribed) but did not. */
-  private missedByWebsocket(info: SignatureInfo, now: number): boolean {
-    if (this.subscription === undefined || !info.blockTime || this.liveSeen.has(info.signature)) return false;
+  /** A transaction the live source should have delivered by now (it landed after it started) but did not. */
+  private missedByLive(info: SignatureInfo, now: number): boolean {
+    const live = this.subscription !== undefined || this.options.stream?.state === 'streaming';
+    if (!live || !info.blockTime || this.liveSeen.has(info.signature)) return false;
     const at = info.blockTime * 1_000;
-    return at > this.subscribedAt + 5_000 && at < now - LIVE_GRACE_MS;
+    return at > this.liveSince + 5_000 && at < now - LIVE_GRACE_MS;
   }
 
   /** Retries with backoff: longer and more often for HTTP 429. */

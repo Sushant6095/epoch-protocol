@@ -1,4 +1,12 @@
-import { type EpochDb, epochIndex, epochStakes, feeIndexLive, liveSlots } from '@epoch/pg_models';
+import {
+  type EpochDb,
+  epochIndex,
+  epochStakes,
+  feeIndexLive,
+  liveSlots,
+  SolamiUsageStore,
+  type SolamiUsageRow,
+} from '@epoch/pg_models';
 import { asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
 
 export type FeeIndexLiveRow = typeof feeIndexLive.$inferSelect;
@@ -40,12 +48,18 @@ export interface LiveRepository {
   /** The snapshot taken during `epoch`, else the next later one. */
   stakes(epoch: number): Promise<{ epoch: number; stakes: Map<string, bigint> } | null>;
   distribution(epoch: number): Promise<DistributionRows>;
+  /** Every component's Solami usage report (solami_usage). */
+  usageReports(): Promise<SolamiUsageRow[]>;
 }
 
 const BUCKETS_PER_DECADE = 4;
 
 export class PgLiveRepository implements LiveRepository {
   constructor(private readonly db: EpochDb) {}
+
+  usageReports(): Promise<SolamiUsageRow[]> {
+    return new SolamiUsageStore(this.db).all();
+  }
 
   async latestLive(): Promise<FeeIndexLiveRow | null> {
     const [row] = await this.db.select().from(feeIndexLive).orderBy(desc(feeIndexLive.epoch)).limit(1);

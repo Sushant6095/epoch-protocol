@@ -1,5 +1,6 @@
 import { sleep } from '@epoch/common';
 import { Logger } from '@epoch/logger';
+import { explainSolamiError, isSolamiHost, type SolamiUsage, solamiUsage } from '@epoch/solana';
 
 const logger = Logger.create('SolanaRpc');
 
@@ -80,6 +81,8 @@ export interface SolanaRpcOptions {
   /** Retries for network errors, HTTP 5xx/429 and rate limits. Default 3. */
   retries?: number;
   fetchFn?: Fetch;
+  /** Calls, latency and errors per method for the Solami usage report. Default: this process's `solamiUsage`. */
+  usage?: SolamiUsage;
 }
 
 /**
@@ -102,7 +105,15 @@ export class SolanaRpc {
   async call<T>(method: string, params: unknown[] = []): Promise<T> {
     const retries = this.options.retries ?? 3;
     const fetchFn = this.options.fetchFn ?? fetch;
+    const usage = this.options.usage ?? solamiUsage;
     for (let attempt = 0; ; attempt++) {
+      const started = Date.now();
+      let recorded = false;
+      const record = (outcome: 'ok' | 'error' | 'rate-limited', message?: string) => {
+        if (recorded) return;
+        recorded = true;
+        usage.recordRpc(this.url, method, Date.now() - started, outcome, message);
+      };
       try {
         const res = await fetchFn(this.url, {
           method: 'POST',
@@ -112,26 +123,51 @@ export class SolanaRpc {
         });
         if (res.status === 429 || res.status >= 500) {
           const retryAfter = Number(res.headers.get('retry-after'));
+          record(res.status === 429 ? 'rate-limited' : 'error', `HTTP ${res.status}`);
           throw Object.assign(new Error(`HTTP ${res.status}`), {
             retryable: true,
             waitMs: retryAfter > 0 ? retryAfter * 1_000 : undefined,
           });
         }
-        if (!res.ok) throw new Error(`HTTP ${res.status} from ${this.host}`);
+        if (!res.ok) {
+          // Solami answers a refused key with 401/403 and a JSON message ("unauthorized", "IP not allowed for this key").
+          const detail = await res.text().then(
+            (text) => redact(text).slice(0, 200),
+            () => '',
+          );
+          record('error', `HTTP ${res.status}`);
+          throw new Error(`HTTP ${res.status} from ${this.host}${detail ? `: ${detail}` : ''}`);
+        }
         const body = (await res.json()) as { result?: T; error?: { code: number; message: string } };
         if (body.error) {
           const error = new RpcError(body.error.code, redact(body.error.message));
+          // Answers about the request itself (a skipped slot, a block not there yet) are not endpoint errors.
+          if (error.code === RATE_LIMITED) record('rate-limited', error.message);
+          else record(SKIPPED_SLOT_CODES.has(error.code) || error.code === BLOCK_NOT_AVAILABLE ? 'ok' : 'error');
           if (error.code === RATE_LIMITED) throw Object.assign(error, { retryable: true });
           throw error;
         }
+        record('ok');
         return body.result as T;
       } catch (error) {
+        record('error', String((error as Error).message ?? error));
         const retryable =
           (error as { retryable?: boolean }).retryable === true ||
           (!(error instanceof RpcError) && !/^HTTP 4\d\d/.test(String((error as Error).message)));
         if (!retryable || attempt >= retries) {
-          if (error instanceof RpcError) throw error;
-          throw new Error(`RPC ${method} failed on ${this.host}: ${redact(String((error as Error).message ?? error))}`);
+          const solami = isSolamiHost(this.host);
+          if (error instanceof RpcError) {
+            if (error.code !== RATE_LIMITED || !solami) throw error;
+            throw new RpcError(
+              error.code,
+              `${error.message.replace(/^-?\d+: /, '')} (${explainSolamiError('rpc', error).hint})`,
+            );
+          }
+          const message = redact(String((error as Error).message ?? error));
+          const hint = solami ? explainSolamiError('rpc', error) : null;
+          throw new Error(
+            `RPC ${method} failed on ${this.host}: ${message}${hint && hint.kind !== 'other' ? ` (${hint.hint})` : ''}`,
+          );
         }
         const waitMs =
           (error as { waitMs?: number }).waitMs ??

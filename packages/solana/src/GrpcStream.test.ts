@@ -1,13 +1,16 @@
-import { type SubscribeRequest, type SubscribeUpdate } from '@triton-one/yellowstone-grpc';
+import { type SubscribeRequest, SubscribeUpdate } from '@triton-one/yellowstone-grpc';
 
 import {
   channelOptions,
+  countNativeBytes,
   type GeyserClient,
+  geyserClient,
   type GrpcEndpoint,
   grpcErrorText,
   GrpcStream,
   type GrpcStreamState,
 } from './GrpcStream';
+import { SolamiUsage } from './SolamiUsage';
 
 const slotUpdate = (slot: number): SubscribeUpdate =>
   ({ filters: ['s'], slot: { slot: String(slot), status: 1 }, createdAt: undefined }) as SubscribeUpdate;
@@ -149,5 +152,82 @@ describe('GrpcStream', () => {
     expect(channelOptions()).not.toHaveProperty('grpcDefaultCompressionAlgorithm');
     expect(channelOptions('zstd')).toMatchObject({ grpcDefaultCompressionAlgorithm: 1 });
     expect(channelOptions('gzip')).toMatchObject({ grpcDefaultCompressionAlgorithm: 0 });
+  });
+
+  it('hands zstd to the native client as a valid setting (a wrong value is refused before any connection)', async () => {
+    // Nothing listens on port 1: a valid configuration gets as far as dialing.
+    const closed = { name: 'local', url: 'http://127.0.0.1:1' };
+    const outcome = (client: GeyserClient) =>
+      client.connect().then(
+        () => 'connected',
+        (error: unknown) => grpcErrorText(error),
+      );
+    expect(await outcome(geyserClient(closed, 'zstd'))).toMatch(/failed to connect/);
+    expect(await outcome(geyserClient(closed, 'gzip'))).toMatch(/failed to connect/);
+    const wrong = geyserClient(closed);
+    (wrong as unknown as { _channelOptions: object })._channelOptions = {
+      ...channelOptions(),
+      grpcDefaultCompressionAlgorithm: 7,
+    };
+    expect(await outcome(wrong)).toMatch(/JsCompressionAlgorithm/);
+  });
+
+  it('counts bytes, updates and state for the usage report', async () => {
+    const updates = [slotUpdate(100), ping(), slotUpdate(101)];
+    const { create } = fakeClients([{ updates }]);
+    const usage = new SolamiUsage('test');
+    const stream = new GrpcStream(ENDPOINTS, {
+      createClient: create,
+      usage,
+      subscription: 'slots',
+      compression: 'zstd',
+    });
+    await stream.run(
+      () => ({}) as SubscribeRequest,
+      async (update) => {
+        if (update.slot?.slot === '101') stream.stop();
+      },
+    );
+    const bytes = updates.reduce((sum, u) => sum + SubscribeUpdate.encode(u).finish().length, 0);
+    expect(usage.report().grpc).toMatchObject({
+      subscription: 'slots',
+      compression: 'zstd',
+      endpoint: 'solami',
+      status: 'stopped',
+      bytes,
+      updates: 3,
+    });
+  });
+
+  it('reads byte counts from the native stream when it can, instead of re-encoding', async () => {
+    const native = { read: async () => Buffer.alloc(42) as Uint8Array | null };
+    const wrapper = { _napiDuplexStream: native };
+    const seen: number[] = [];
+    expect(countNativeBytes(wrapper, (n) => seen.push(n))).toBe(true);
+    await native.read();
+    await native.read();
+    expect(seen).toEqual([42, 42]);
+    expect(countNativeBytes({}, () => undefined)).toBe(false);
+  });
+
+  it('logs a refused key with what to change, and records it as the last error', async () => {
+    const refused = Object.assign(new Error('failed to open subscribe stream'), {
+      cause: new Error(
+        `gRPC status: code: 'The request does not have valid authentication credentials', message: "invalid api key"`,
+      ),
+    });
+    const { create } = fakeClients([{ fail: refused }]);
+    const usage = new SolamiUsage('test');
+    const stream = new GrpcStream([ENDPOINTS[0]], { createClient: create, usage, isFatal: () => true });
+    await expect(
+      stream.run(
+        () => ({}) as SubscribeRequest,
+        () => undefined,
+      ),
+    ).rejects.toBe(refused);
+    expect(usage.report().lastError).toMatchObject({
+      product: 'grpc',
+      message: expect.stringContaining('refused SOLAMI_TOKEN'),
+    });
   });
 });

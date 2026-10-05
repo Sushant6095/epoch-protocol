@@ -1,6 +1,6 @@
 import { findAssociatedTokenAddress } from '@epoch/epoch-sdk';
 import { buildClaimTx, type ClaimableItem, type LaunchClaimsState, readLaunchClaims } from '@epoch/meteora';
-import { type ConnectionManager, isExecutionFailure, TransactionSender } from '@epoch/solana';
+import { type BeamRoute, type ConnectionManager, isExecutionFailure, TransactionSender } from '@epoch/solana';
 import {
   ComputeBudgetProgram,
   type Keypair,
@@ -46,11 +46,15 @@ export interface LaunchClaimChain {
   treasuryTokenBalance(mint: PublicKey, treasury: PublicKey): Promise<bigint>;
 }
 
-/** Claims through `@epoch/meteora` on the launch cluster, with failover and a priority fee. */
+/**
+ * Claims through `@epoch/meteora` on the launch cluster, with failover and a priority fee; through Solami Beam when a
+ * route is given (mainnet with SOLAMI_BEAM_URL).
+ */
 export class RpcLaunchClaimChain implements LaunchClaimChain {
   constructor(
     private readonly connections: ConnectionManager,
     private readonly computeUnitPriceMicroLamports: number,
+    private readonly beam?: BeamRoute,
   ) {}
 
   readClaims(launch: ClaimLaunch): Promise<LaunchClaimsState | null> {
@@ -69,7 +73,7 @@ export class RpcLaunchClaimChain implements LaunchClaimChain {
       buildClaimTx({ connection, claim, dbcPool: launch.dbcPool, dammPool, signer: signer.publicKey }),
     );
     // The sender rebuilds the transaction with a compute-unit price; program errors are not retried.
-    return new TransactionSender(this.connections, signer).send(tx.instructions, [], {
+    return new TransactionSender(this.connections, signer, { beam: this.beam }).send(tx.instructions, [], {
       computeUnitPriceMicroLamports: this.computeUnitPriceMicroLamports,
       shouldRetry: (error) =>
         !isExecutionFailure({ message: String(error), logs: (error as { logs?: string[] }).logs }),
@@ -98,7 +102,7 @@ export class RpcLaunchClaimChain implements LaunchClaimChain {
     cranker: Keypair,
     computeUnitLimit: number,
   ): Promise<string> {
-    return new TransactionSender(this.connections, cranker).send(instructions, [], {
+    return new TransactionSender(this.connections, cranker, { beam: this.beam }).send(instructions, [], {
       computeUnitPriceMicroLamports: this.computeUnitPriceMicroLamports,
       computeUnitLimit,
       shouldRetry: (error) =>

@@ -10,7 +10,9 @@ import {
   type LiveSlotPayload,
   liveSlots,
   slotFees,
+  SolamiUsageStore,
 } from '@epoch/pg_models';
+import { type SolamiUsageReport } from '@epoch/solana';
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 
 import { type BlockFeesResult } from '../Blocks/BlockFees';
@@ -58,6 +60,8 @@ export interface IndexerStore {
   writeEpochIndex(epoch: number, value: number): Promise<EpochIndexWrite>;
   /** Keeps the newest `keep` live_slots rows. */
   pruneLiveSlots(keep: number): Promise<number>;
+  /** This process's Solami usage (solami_usage row `indexer`), read by GET /v1/live/solami. */
+  writeUsage(report: SolamiUsageReport): Promise<void>;
 }
 
 export const CURSOR_NAME = 'slot_stream';
@@ -245,5 +249,9 @@ export class PgIndexerStore implements IndexerStore {
     if (!edge) return 0;
     const result = await this.db.delete(liveSlots).where(lt(liveSlots.slot, edge.slot + 1));
     return result.rowCount ?? 0;
+  }
+
+  async writeUsage(report: SolamiUsageReport): Promise<void> {
+    await new SolamiUsageStore(this.db).save(report);
   }
 }

@@ -5,6 +5,7 @@ import { type EpochDb, PostgresConnectionManager, runMigrations } from '@epoch/p
 import { PublicKey } from '@solana/web3.js';
 import { TransactionRollbackError } from 'drizzle-orm';
 
+import { FakeGrpc, fixtureUpdate, YELLOWSTONE_PROGRAM } from '../../__fixtures__/YellowstoneFakes';
 import { EventBus, type StoredProgramEvent } from '../../Lib/EventBus';
 import {
   type IngestRpc,
@@ -14,6 +15,7 @@ import {
   type SignatureInfo,
   type TransactionLogs,
 } from '../../Sources/ProgramLogsSource';
+import { SolamiStream } from '../../Sources/SolamiStream';
 import { cursorName, ProgramEventIngester, type ProgramEventIngesterOptions } from './ProgramEventIngester';
 import { MemoryEventStore, PgEventStore } from './ProgramEventStore';
 
@@ -385,6 +387,64 @@ describe('ProgramEventIngester', () => {
     await ingester.stop();
     expect(rpc.removed).toEqual([1, 2]);
     expect(ingester.started).toBe(false);
+  });
+
+  it('takes live events from Solami gRPC (Yellowstone fixtures), dedupes them, and falls back to logsSubscribe', async () => {
+    // The fixture's program transactions, as the poll would list them later.
+    const [swept, deposited] = [YELLOWSTONE_PROGRAM.updates[2], YELLOWSTONE_PROGRAM.updates[3]];
+    const sweptSig = swept.signature as string;
+    const depositedSig = deposited.signature as string;
+    const rpc = new FakeRpc();
+    let grpc: FakeGrpc | undefined;
+    const stream = new SolamiStream({
+      endpoint: { name: 'solami', url: 'https://grpc.solami.dev', token: 'not-a-real-key' },
+      programId: PROGRAM.toBase58(),
+      createStream: (_endpoints, options) => (grpc = new FakeGrpc(options)),
+    });
+    const { ingester, emitted, store, clock } = build(rpc, { stream, liveFallbackMs: 20 });
+    clock.now = T0;
+    ingester.start();
+    await ingester.idle();
+    const fake = grpc as FakeGrpc;
+    expect(fake.request?.transactions.program.accountInclude).toEqual([PROGRAM.toBase58()]);
+
+    // Streaming: no websocket; each update is parsed into events (another program's `Program data:` ignored).
+    fake.status('streaming');
+    expect(rpc.listeners.size).toBe(0);
+    clock.now = T0 + 30_000;
+    await fake.deliver(fixtureUpdate(2));
+    await fake.deliver(fixtureUpdate(3));
+    // A replayed copy (a reconnect) adds nothing.
+    await fake.deliver(fixtureUpdate(2));
+    await ingester.idle();
+    expect(ids(emitted)).toEqual([`${sweptSig}:0:Swept`, `${sweptSig}:1:AdvanceRepaid`, `${depositedSig}:0:Deposited`]);
+    expect(emitted[0]).toMatchObject({ slot: 453_600_001, blockTime: new Date(T0 + 30_000).toISOString() });
+
+    // The poll lists both: neither is read again, and nothing is stored twice.
+    rpc.chain = [
+      { signature: sweptSig, slot: 453_600_001, blockTime: T0 / 1_000 + 29, logs: [] },
+      { signature: depositedSig, slot: 453_600_002, blockTime: T0 / 1_000 + 29, logs: [] },
+    ];
+    await ingester.catchUp();
+    expect(rpc.transactionCalls).toEqual([]);
+    expect(await store.query()).toHaveLength(3);
+
+    // Down for longer than liveFallbackMs: logsSubscribe takes over; back up: it is dropped again.
+    fake.status('reconnecting');
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect([...rpc.listeners.keys()]).toEqual([1]);
+    fake.status('streaming');
+    await ingester.idle();
+    expect(rpc.removed).toEqual([1]);
+    expect(rpc.listeners.size).toBe(0);
+
+    // Refused for good (a revoked key): logsSubscribe at once.
+    fake.refuse(new Error(`gRPC status: code: 'x', message: "api key revoked"`));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect([...rpc.listeners.keys()]).toEqual([2]);
+    expect(stream.state).toBe('failed');
+    await ingester.stop();
+    expect(rpc.removed).toEqual([1, 2]);
   });
 
   it('keeps ingesting when a bus listener throws', async () => {
