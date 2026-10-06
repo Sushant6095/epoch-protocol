@@ -1,0 +1,5 @@
+# Third-party reference screenshots stay on your machine: the repo is public.
+screens/**/ref-*
+# Structure comparisons contain the reference screenshots: keep them local too.
+screens/compare/
+screens/**/measurements.json

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "Meteora DBC and DAMM v2 pools plus Epoch's revenue-token accounts on devnet (sample until the first launch)",
+  "note": "Sample. Three fictional launches from the vault sample's validators, using the same revenue as vault.sample.json: rKEST sells 5% of Kestrel Nodes' 20.8 SOL an epoch on its curve (62% of a 5 SOL raise), rSALT sells 10% of Saltmarsh Nodes' 29.4 SOL and has graduated to DAMM v2 with buybacks running, rTIDE (15% of Tidewater Stake's 8 SOL) opens in epoch 1046. Supply 100,000 tokens each, fixed. Market cap is fully diluted (price × supply not yet burned): most of the supply sits in the curve until bought, then in the DAMM v2 pool. Implied yield is per epoch and never annualised: each token's cashflow ends with its term.",
+  "network": "devnet",
+  "launches": [
+    {
+      "mint": null,
+      "symbol": "rKEST",
+      "name": "Kestrel Nodes revenue token",
+      "validator": {
+        "name": "Kestrel Nodes",
+        "vote": null
+      },
+      "shareBps": 500,
+      "termEpochs": 100,
+      "startEpoch": 1043,
+      "endEpoch": 1142,
+      "status": "curve",
+      "opensAtEpoch": null,
+      "raise": {
+        "targetSol": 5,
+        "raisedSol": 3.1,
+        "progressPct": 62.0,
+        "buyers": 41
+      },
+      "priceSol": 0.000846,
+      "bandLowSol": 0.000624,
+      "bandHighSol": 0.000988,
+      "marketCapSol": 83.4,
+      "shareRevenuePerEpochSol": 1.04,
+      "impliedYieldPctPerEpoch": 1.25,
+      "backingRatio": 1.23
+    },
+    {
+      "mint": null,
+      "symbol": "rSALT",
+      "name": "Saltmarsh Nodes revenue token",
+      "validator": {
+        "name": "Saltmarsh Nodes",
+        "vote": null
+      },
+      "shareBps": 1000,
+      "termEpochs": 80,
+      "startEpoch": 1030,
+      "endEpoch": 1109,
+      "status": "graduated",
+      "opensAtEpoch": null,
+      "raise": {
+        "targetSol": 5,
+        "raisedSol": 5,
+        "progressPct": 100.0,
+        "buyers": 87
+      },
+      "priceSol": 0.00215,
+      "bandLowSol": 0.001411,
+      "bandHighSol": 0.002234,
+      "marketCapSol": 206.1,
+      "shareRevenuePerEpochSol": 2.94,
+      "impliedYieldPctPerEpoch": 1.43,
+      "backingRatio": 0.94
+    },
+    {
+      "mint": null,
+      "symbol": "rTIDE",
+      "name": "Tidewater Stake revenue token",
+      "validator": {
+        "name": "Tidewater Stake",
+        "vote": null
+      },
+      "shareBps": 1500,
+      "termEpochs": 60,
+      "startEpoch": 1046,
+      "endEpoch": 1105,
+      "status": "upcoming",
+      "opensAtEpoch": 1046,
+      "raise": {
+        "targetSol": 3,
+        "raisedSol": 0,
+        "progressPct": 0.0,
+        "buyers": 0
+      },
+      "priceSol": null,
+      "bandLowSol": 0.000432,
+      "bandHighSol": 0.000684,
+      "marketCapSol": null,
+      "shareRevenuePerEpochSol": 1.2,
+      "impliedYieldPctPerEpoch": null,
+      "backingRatio": null
+    }
+  ]
+}

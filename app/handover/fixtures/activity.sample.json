@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "Epoch program events and Predict calls in points (sample until the indexer and api_app stream them)",
+  "note": "Protocol sample data. Fictional validator names. Numbers obey the program rules (limit = min(25%/40% of 10 epochs revenue, 4 x bond, cap), 2% fee, 50% remit).",
+  "events": [
+    {
+      "id": "ev1",
+      "kind": "sweep",
+      "text": "Kestrel Nodes · repaid at source",
+      "amountSol": 10,
+      "value": null,
+      "unit": "SOL",
+      "signature": null
+    },
+    {
+      "id": "ev2",
+      "kind": "deposit",
+      "text": "Senior tranche · new lender",
+      "amountSol": 25,
+      "value": null,
+      "unit": "SOL",
+      "signature": null
+    },
+    {
+      "id": "ev3",
+      "kind": "predict",
+      "text": "Fee Index above 1,500 · epoch 1045 · YES",
+      "amountSol": null,
+      "value": 100,
+      "unit": "points",
+      "signature": null
+    },
+    {
+      "id": "ev4",
+      "kind": "advance",
+      "text": "Northwind Staking · drew credit",
+      "amountSol": 120,
+      "value": null,
+      "unit": "SOL",
+      "signature": null
+    },
+    {
+      "id": "ev5",
+      "kind": "index",
+      "text": "Epoch 1042 Fee Index final",
+      "amountSol": null,
+      "value": 1284,
+      "unit": "µL/CU",
+      "signature": null
+    },
+    {
+      "id": "ev6",
+      "kind": "sweep",
+      "text": "Saltmarsh Nodes · repaid at source",
+      "amountSol": 15,
+      "value": null,
+      "unit": "SOL",
+      "signature": null
+    },
+    {
+      "id": "ev7",
+      "kind": "withdraw",
+      "text": "Junior tranche · queue paid",
+      "amountSol": 20,
+      "value": null,
+      "unit": "SOL",
+      "signature": null
+    },
+    {
+      "id": "ev8",
+      "kind": "predict",
+      "text": "Fee Index above 1,500 · epoch 1045 · NO",
+      "amountSol": null,
+      "value": 100,
+      "unit": "points",
+      "signature": null
+    },
+    {
+      "id": "ev9",
+      "kind": "sweep",
+      "text": "Lumen Labs · repaid at source",
+      "amountSol": 6,
+      "value": null,
+      "unit": "SOL",
+      "signature": null
+    },
+    {
+      "id": "ev10",
+      "kind": "deposit",
+      "text": "Junior tranche · treasury",
+      "amountSol": 30,
+      "value": null,
+      "unit": "SOL",
+      "signature": null
+    }
+  ]
+}

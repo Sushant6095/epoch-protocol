@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [
+      "src/components/vendor/_raw/**",
+      "handover/**",
+      "design/**"
+    ],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "reason": "Brand UI face by decision (handover/03-DESIGN-SYSTEM.md): Geist for UI, Geist Mono for every number, Instrument Serif for one hero accent. A three-family hierarchy, not a single-font fallback."
+      }
+    ]
+  }
+}

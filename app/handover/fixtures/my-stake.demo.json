@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "kind": "demo",
+  "note": "Demo wallet (random address). Validators and their numbers are real; balances are invented.",
+  "asOf": "2026-09-29T00:30:00+05:30",
+  "source": "Demo wallet (invented balances); validator data from Solana mainnet RPC, Stakewiz and validators.app",
+  "wallet": "tFPVqpVspft3xEmA9cEYZ23zNt4aCKTkK9maKoVDBDFt",
+  "idleSol": 4.21,
+  "stakeAccounts": [
+    {
+      "validator": "Helius",
+      "initials": "HE",
+      "vote": "he1iusunGwqrNtafDtLdhsUQDFvo13z9sUa36PauBtk",
+      "stakeAccountShort": "ikgG…e3Z4",
+      "sinceEpoch": 1012,
+      "sol": 60,
+      "apyPct": 5.21,
+      "stakingApyPct": 5.05,
+      "tipsApyPct": 0.16,
+      "commissionPct": 0,
+      "health": "healthy",
+      "healthReasons": [
+        "Top-18",
+        "very large"
+      ]
+    },
+    {
+      "validator": "NTT DOCOMO GLOBAL",
+      "initials": "ND",
+      "vote": "FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk",
+      "stakeAccountShort": "r3GJ…2yvf",
+      "sinceEpoch": 1030,
+      "sol": 25,
+      "apyPct": 4.94,
+      "stakingApyPct": 4.8,
+      "tipsApyPct": 0.14,
+      "commissionPct": 5,
+      "health": "healthy",
+      "healthReasons": [
+        "1,988 delegators"
+      ]
+    },
+    {
+      "validator": "Project 0 Horizon",
+      "initials": "P0",
+      "vote": "mrgn2vsZ5EJ8YEfAMNPXmRux7th9cNfBasQ1JJvVwPn",
+      "stakeAccountShort": "nCWh…PX6e",
+      "sinceEpoch": 1036,
+      "sol": 15,
+      "apyPct": 5.12,
+      "stakingApyPct": 4.96,
+      "tipsApyPct": 0.16,
+      "commissionPct": 0,
+      "health": "watch",
+      "healthReasons": [
+        "below break-even",
+        "86% one delegator"
+      ]
+    }
+  ],
+  "perEpochSol": 0.018892,
+  "monthSol": 0.4224,
+  "yearSol": 5.13,
+  "lifetimeSol": 0.455,
+  "blendedApyPct": 5.13,
+  "suggestions": [
+    {
+      "name": "Solana Mobile Validator",
+      "vote": "SKRuTecmFDZHjs2DxRTJNEK7m7hunKGTWJiaZ3tMVVA",
+      "city": "Dallas",
+      "country": "US",
+      "epochsActive": 785,
+      "apyPct": 5.21,
+      "delegators": 25607,
+      "biggestDelegatorSharePct": 11,
+      "healthPerEpochSol": 9.19
+    },
+    {
+      "name": "polkachu.com",
+      "vote": "voEskim7SFWrPx1tV2PVisqyrJejxmDEARX11mtZ5vo",
+      "city": "Strasbourg",
+      "country": "FR",
+      "epochsActive": 480,
+      "apyPct": 5.2,
+      "delegators": 265,
+      "biggestDelegatorSharePct": 46,
+      "healthPerEpochSol": 0.36
+    },
+    {
+      "name": "ParaFi Technologies",
+      "vote": "pt1LsjkNwqCKdYYfc35ToDkqtEG9pswLTJNaMo8inft",
+      "city": "Salt Lake City",
+      "country": "US",
+      "epochsActive": 372,
+      "apyPct": 5.13,
+      "delegators": 160,
+      "biggestDelegatorSharePct": 45,
+      "healthPerEpochSol": 0.45
+    }
+  ],
+  "alerts": [
+    {
+      "key": "offline",
+      "title": "Validator goes offline",
+      "description": "delinquent for more than 10 minutes"
+    },
+    {
+      "key": "fee",
+      "title": "Fee goes up",
+      "description": "commission or MEV fee raised"
+    },
+    {
+      "key": "breakeven",
+      "title": "Validator starts losing money",
+      "description": "earns less than its vote fees"
+    },
+    {
+      "key": "rewards",
+      "title": "Rewards landed",
+      "description": "once per epoch, with the amount"
+    }
+  ]
+}

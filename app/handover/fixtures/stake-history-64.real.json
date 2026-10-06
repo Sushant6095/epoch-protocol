@@ -1,0 +1,393 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-09-29T00:30:00+05:30",
+  "source": "Solana mainnet RPC, Jito Kobe, Stakewiz, validators.app",
+  "kind": "real",
+  "unit": "SOL",
+  "rows": [
+    {
+      "epoch": 980,
+      "totalActiveSol": 428210000,
+      "activatingSol": 3430000,
+      "deactivatingSol": 3070000
+    },
+    {
+      "epoch": 981,
+      "totalActiveSol": 428660000,
+      "activatingSol": 3480000,
+      "deactivatingSol": 5130000
+    },
+    {
+      "epoch": 982,
+      "totalActiveSol": 427110000,
+      "activatingSol": 3640000,
+      "deactivatingSol": 5900000
+    },
+    {
+      "epoch": 983,
+      "totalActiveSol": 424950000,
+      "activatingSol": 1740000,
+      "deactivatingSol": 3150000
+    },
+    {
+      "epoch": 984,
+      "totalActiveSol": 423630000,
+      "activatingSol": 3880000,
+      "deactivatingSol": 2580000
+    },
+    {
+      "epoch": 985,
+      "totalActiveSol": 425020000,
+      "activatingSol": 2630000,
+      "deactivatingSol": 1630000
+    },
+    {
+      "epoch": 986,
+      "totalActiveSol": 426120000,
+      "activatingSol": 1260000,
+      "deactivatingSol": 1340000
+    },
+    {
+      "epoch": 987,
+      "totalActiveSol": 426130000,
+      "activatingSol": 2040000,
+      "deactivatingSol": 2370000
+    },
+    {
+      "epoch": 988,
+      "totalActiveSol": 425890000,
+      "activatingSol": 1930000,
+      "deactivatingSol": 1990000
+    },
+    {
+      "epoch": 989,
+      "totalActiveSol": 425930000,
+      "activatingSol": 2660000,
+      "deactivatingSol": 1690000
+    },
+    {
+      "epoch": 990,
+      "totalActiveSol": 426990000,
+      "activatingSol": 1440000,
+      "deactivatingSol": 2130000
+    },
+    {
+      "epoch": 991,
+      "totalActiveSol": 426400000,
+      "activatingSol": 2120000,
+      "deactivatingSol": 2180000
+    },
+    {
+      "epoch": 992,
+      "totalActiveSol": 426440000,
+      "activatingSol": 2610000,
+      "deactivatingSol": 1430000
+    },
+    {
+      "epoch": 993,
+      "totalActiveSol": 427720000,
+      "activatingSol": 1250000,
+      "deactivatingSol": 1870000
+    },
+    {
+      "epoch": 994,
+      "totalActiveSol": 427190000,
+      "activatingSol": 2090000,
+      "deactivatingSol": 1970000
+    },
+    {
+      "epoch": 995,
+      "totalActiveSol": 427400000,
+      "activatingSol": 3900000,
+      "deactivatingSol": 3250000
+    },
+    {
+      "epoch": 996,
+      "totalActiveSol": 428150000,
+      "activatingSol": 3290000,
+      "deactivatingSol": 1850000
+    },
+    {
+      "epoch": 997,
+      "totalActiveSol": 429680000,
+      "activatingSol": 2250000,
+      "deactivatingSol": 2330000
+    },
+    {
+      "epoch": 998,
+      "totalActiveSol": 429700000,
+      "activatingSol": 2880000,
+      "deactivatingSol": 3260000
+    },
+    {
+      "epoch": 999,
+      "totalActiveSol": 429410000,
+      "activatingSol": 1990000,
+      "deactivatingSol": 3440000
+    },
+    {
+      "epoch": 1000,
+      "totalActiveSol": 428060000,
+      "activatingSol": 2740000,
+      "deactivatingSol": 1870000
+    },
+    {
+      "epoch": 1001,
+      "totalActiveSol": 429020000,
+      "activatingSol": 2780000,
+      "deactivatingSol": 5920000
+    },
+    {
+      "epoch": 1002,
+      "totalActiveSol": 425980000,
+      "activatingSol": 1610000,
+      "deactivatingSol": 1560000
+    },
+    {
+      "epoch": 1003,
+      "totalActiveSol": 426130000,
+      "activatingSol": 2400000,
+      "deactivatingSol": 1320000
+    },
+    {
+      "epoch": 1004,
+      "totalActiveSol": 427310000,
+      "activatingSol": 1320000,
+      "deactivatingSol": 2360000
+    },
+    {
+      "epoch": 1005,
+      "totalActiveSol": 426360000,
+      "activatingSol": 2950000,
+      "deactivatingSol": 1630000
+    },
+    {
+      "epoch": 1006,
+      "totalActiveSol": 427770000,
+      "activatingSol": 2210000,
+      "deactivatingSol": 1240000
+    },
+    {
+      "epoch": 1007,
+      "totalActiveSol": 428840000,
+      "activatingSol": 1010000,
+      "deactivatingSol": 1220000
+    },
+    {
+      "epoch": 1008,
+      "totalActiveSol": 428720000,
+      "activatingSol": 2140000,
+      "deactivatingSol": 2590000
+    },
+    {
+      "epoch": 1009,
+      "totalActiveSol": 428360000,
+      "activatingSol": 7490000,
+      "deactivatingSol": 3420000
+    },
+    {
+      "epoch": 1010,
+      "totalActiveSol": 432520000,
+      "activatingSol": 2730000,
+      "deactivatingSol": 2690000
+    },
+    {
+      "epoch": 1011,
+      "totalActiveSol": 432650000,
+      "activatingSol": 3250000,
+      "deactivatingSol": 1570000
+    },
+    {
+      "epoch": 1012,
+      "totalActiveSol": 434420000,
+      "activatingSol": 1840000,
+      "deactivatingSol": 1510000
+    },
+    {
+      "epoch": 1013,
+      "totalActiveSol": 434840000,
+      "activatingSol": 1410000,
+      "deactivatingSol": 2300000
+    },
+    {
+      "epoch": 1014,
+      "totalActiveSol": 434050000,
+      "activatingSol": 1910000,
+      "deactivatingSol": 1120000
+    },
+    {
+      "epoch": 1015,
+      "totalActiveSol": 434930000,
+      "activatingSol": 1130000,
+      "deactivatingSol": 1490000
+    },
+    {
+      "epoch": 1016,
+      "totalActiveSol": 434670000,
+      "activatingSol": 1860000,
+      "deactivatingSol": 1140000
+    },
+    {
+      "epoch": 1017,
+      "totalActiveSol": 435490000,
+      "activatingSol": 1070000,
+      "deactivatingSol": 980000
+    },
+    {
+      "epoch": 1018,
+      "totalActiveSol": 435680000,
+      "activatingSol": 1320000,
+      "deactivatingSol": 1850000
+    },
+    {
+      "epoch": 1019,
+      "totalActiveSol": 435240000,
+      "activatingSol": 1960000,
+      "deactivatingSol": 3810000
+    },
+    {
+      "epoch": 1020,
+      "totalActiveSol": 433490000,
+      "activatingSol": 2690000,
+      "deactivatingSol": 2820000
+    },
+    {
+      "epoch": 1021,
+      "totalActiveSol": 433440000,
+      "activatingSol": 2760000,
+      "deactivatingSol": 1160000
+    },
+    {
+      "epoch": 1022,
+      "totalActiveSol": 435120000,
+      "activatingSol": 3150000,
+      "deactivatingSol": 1470000
+    },
+    {
+      "epoch": 1023,
+      "totalActiveSol": 436890000,
+      "activatingSol": 2220000,
+      "deactivatingSol": 3050000
+    },
+    {
+      "epoch": 1024,
+      "totalActiveSol": 436140000,
+      "activatingSol": 2300000,
+      "deactivatingSol": 1370000
+    },
+    {
+      "epoch": 1025,
+      "totalActiveSol": 437130000,
+      "activatingSol": 2200000,
+      "deactivatingSol": 1200000
+    },
+    {
+      "epoch": 1026,
+      "totalActiveSol": 438200000,
+      "activatingSol": 1620000,
+      "deactivatingSol": 1470000
+    },
+    {
+      "epoch": 1027,
+      "totalActiveSol": 438420000,
+      "activatingSol": 1200000,
+      "deactivatingSol": 2790000
+    },
+    {
+      "epoch": 1028,
+      "totalActiveSol": 436900000,
+      "activatingSol": 2910000,
+      "deactivatingSol": 630000
+    },
+    {
+      "epoch": 1029,
+      "totalActiveSol": 439250000,
+      "activatingSol": 1300000,
+      "deactivatingSol": 1140000
+    },
+    {
+      "epoch": 1030,
+      "totalActiveSol": 439480000,
+      "activatingSol": 810000,
+      "deactivatingSol": 1710000
+    },
+    {
+      "epoch": 1031,
+      "totalActiveSol": 438650000,
+      "activatingSol": 1450000,
+      "deactivatingSol": 980000
+    },
+    {
+      "epoch": 1032,
+      "totalActiveSol": 439190000,
+      "activatingSol": 1060000,
+      "deactivatingSol": 3480000
+    },
+    {
+      "epoch": 1033,
+      "totalActiveSol": 436840000,
+      "activatingSol": 2810000,
+      "deactivatingSol": 980000
+    },
+    {
+      "epoch": 1034,
+      "totalActiveSol": 438740000,
+      "activatingSol": 1310000,
+      "deactivatingSol": 870000
+    },
+    {
+      "epoch": 1035,
+      "totalActiveSol": 439250000,
+      "activatingSol": 1890000,
+      "deactivatingSol": 1450000
+    },
+    {
+      "epoch": 1036,
+      "totalActiveSol": 439760000,
+      "activatingSol": 1970000,
+      "deactivatingSol": 2190000
+    },
+    {
+      "epoch": 1037,
+      "totalActiveSol": 439610000,
+      "activatingSol": 1640000,
+      "deactivatingSol": 1080000
+    },
+    {
+      "epoch": 1038,
+      "totalActiveSol": 440230000,
+      "activatingSol": 870000,
+      "deactivatingSol": 1250000
+    },
+    {
+      "epoch": 1039,
+      "totalActiveSol": 439910000,
+      "activatingSol": 1560000,
+      "deactivatingSol": 1660000
+    },
+    {
+      "epoch": 1040,
+      "totalActiveSol": 439860000,
+      "activatingSol": 1280000,
+      "deactivatingSol": 1230000
+    },
+    {
+      "epoch": 1041,
+      "totalActiveSol": 439970000,
+      "activatingSol": 1620000,
+      "deactivatingSol": 1000000
+    },
+    {
+      "epoch": 1042,
+      "totalActiveSol": 440640000,
+      "activatingSol": 1300000,
+      "deactivatingSol": 4450000
+    },
+    {
+      "epoch": 1043,
+      "totalActiveSol": 437540000,
+      "activatingSol": 4120000,
+      "deactivatingSol": 1170000
+    }
+  ]
+}

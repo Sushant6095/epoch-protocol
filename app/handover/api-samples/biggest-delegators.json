@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "data": {
+    "schemaVersion": 1,
+    "kind": "real",
+    "asOf": "2026-10-01T18:20:07+05:30",
+    "source": "Solana mainnet RPC: every delegated stake account, grouped by withdraw authority",
+    "rows": [
+      {
+        "name": "4ZJh…kbPY",
+        "kind": "Wallet",
+        "address": "4ZJhPQAgUseCsWhKvJLTmmRRUV74fdoTpQLNfKoekbPY",
+        "stakeSol": 26954725,
+        "validators": 343
+      },
+      {
+        "name": "JitoSOL pool",
+        "kind": "Liquid staking",
+        "address": "6iQKfEyhr3bZMotVkW6beNZz5CPAkiwvgV2CTje9pVSS",
+        "stakeSol": 10344041,
+        "validators": 672
+      },
+      {
+        "name": "BNSOL pool",
+        "kind": "Liquid staking",
+        "address": "75NPzpxoh8sXGuSENFMREidq6FMzEx4g2AfcBEB6qjCV",
+        "stakeSol": 10245193,
+        "validators": 5
+      },
+      {
+        "name": "8fxe…CvpM",
+        "kind": "Wallet",
+        "address": "8fxe1qGoDVLtqe9PAFyV4kR6zryTDyGQYb9AZQVUCvpM",
+        "stakeSol": 7981412,
+        "validators": 26
+      },
+      {
+        "name": "6xJD…jYJF",
+        "kind": "Wallet",
+        "address": "6xJDhgA7UE6cLPDhFnyT1AVndaD6Be54phdxB1ofjYJF",
+        "stakeSol": 5648474,
+        "validators": 1
+      },
+      {
+        "name": "JupSOL pool",
+        "kind": "Liquid staking",
+        "address": "EMjuABxELpYWYEwjkKmQKBNCwdaFAy4QYAs6W9bDQDNw",
+        "stakeSol": 5162608,
+        "validators": 7
+      },
+      {
+        "name": "ECvr…eCrQ",
+        "kind": "Wallet",
+        "address": "ECvrAXzuimn3hvtdJQqwvJHPkdGDtWgPibhg36HVeCrQ",
+        "stakeSol": 5002415,
+        "validators": 2
+      },
+      {
+        "name": "58iD…SRMe",
+        "kind": "Wallet",
+        "address": "58iDuwY2Lcnaqv7rrEENBqun4UiwUJc8zCecLqTASRMe",
+        "stakeSol": 5002395,
+        "validators": 2
+      },
+      {
+        "name": "6YzZ…gqVF",
+        "kind": "Wallet",
+        "address": "6YzZyjTyC81c9kKqgdFjZNyDxd68UHMGLbFDqDbgqVF",
+        "stakeSol": 5002390,
+        "validators": 2
+      },
+      {
+        "name": "5dPq…pGNh",
+        "kind": "Wallet",
+        "address": "5dPq2Zehaf4wR5kyvd4ZtyyvuQYD2Ld27icJNygcpGNh",
+        "stakeSol": 5002383,
+        "validators": 2
+      }
+    ]
+  }
+}

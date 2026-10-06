@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "Epoch program FeeIndex, FeeQuote and SwapPosition accounts on devnet (sample until the market is live)",
+  "note": "Sample, in the same world as fee-index.sample.json and vault.sample.json: epoch 1044 is 91.6% done, 1043's index (1,330) is proposed and in its dispute window, 1042 (1,284) is final. Epoch's seeded market maker quotes the next five epochs at 50 SOL each with a 20% clip. Saltmarsh Nodes (29.4 SOL of revenue an epoch) and Kestrel Nodes (20.8) hold Receive-fixed swaps of 15 and 10.5 SOL on 1045-1049, at least half their revenue, so the scorer marks both hedged and they borrow at 40% in vault.sample.json. 'You' is the demo wallet, the operator of Fernhill Validator (18 SOL an epoch): hedged on 1045 and 1046 so far.",
+  "network": "devnet",
+  "currentEpoch": 1044,
+  "index": {
+    "finalEpoch": 1042,
+    "finalValue": 1284,
+    "proposed": {
+      "epoch": 1043,
+      "value": 1330,
+      "disputeEndsSlot": 451420000
+    },
+    "avg8": 1248
+  },
+  "quotes": [
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1042,
+      "fixedRate": 1270,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 33.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 450144000,
+      "epochStartSlot": 450144000,
+      "makerCollateralSol": 10.193,
+      "lockedCollateralSol": 0,
+      "openSwaps": 0,
+      "swaps": 4,
+      "status": "settled",
+      "index": {
+        "value": 1284,
+        "status": "final"
+      },
+      "netToTakersSol": -0.193
+    },
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1043,
+      "fixedRate": 1280,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 37.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 450576000,
+      "epochStartSlot": 450576000,
+      "makerCollateralSol": 10.0,
+      "lockedCollateralSol": 7.5,
+      "openSwaps": 5,
+      "swaps": 5,
+      "status": "settling",
+      "index": {
+        "value": 1330,
+        "status": "proposed"
+      },
+      "netToTakersSol": null
+    },
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1044,
+      "fixedRate": 1290,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 39.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 451008000,
+      "epochStartSlot": 451008000,
+      "makerCollateralSol": 10.0,
+      "lockedCollateralSol": 7.9,
+      "openSwaps": 5,
+      "swaps": 5,
+      "status": "live",
+      "index": null,
+      "netToTakersSol": null
+    },
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1045,
+      "fixedRate": 1295,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 38.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 451440000,
+      "epochStartSlot": 451440000,
+      "makerCollateralSol": 10.0,
+      "lockedCollateralSol": 7.7,
+      "openSwaps": 4,
+      "swaps": 4,
+      "status": "open",
+      "index": null,
+      "netToTakersSol": null
+    },
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1046,
+      "fixedRate": 1300,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 34.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 451872000,
+      "epochStartSlot": 451872000,
+      "makerCollateralSol": 10.0,
+      "lockedCollateralSol": 6.9,
+      "openSwaps": 3,
+      "swaps": 3,
+      "status": "open",
+      "index": null,
+      "netToTakersSol": null
+    },
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1047,
+      "fixedRate": 1305,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 25.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 452304000,
+      "epochStartSlot": 452304000,
+      "makerCollateralSol": 10.0,
+      "lockedCollateralSol": 5.1,
+      "openSwaps": 2,
+      "swaps": 2,
+      "status": "open",
+      "index": null,
+      "netToTakersSol": null
+    },
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1048,
+      "fixedRate": 1310,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 25.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 452736000,
+      "epochStartSlot": 452736000,
+      "makerCollateralSol": 10.0,
+      "lockedCollateralSol": 5.1,
+      "openSwaps": 2,
+      "swaps": 2,
+      "status": "open",
+      "index": null,
+      "netToTakersSol": null
+    },
+    {
+      "address": null,
+      "maker": null,
+      "makerLabel": "Epoch market maker (seeded)",
+      "epoch": 1049,
+      "fixedRate": 1315,
+      "maxNotionalSol": 50,
+      "filledNotionalSol": 25.5,
+      "maxMoveBps": 2000,
+      "expirySlot": 453168000,
+      "epochStartSlot": 453168000,
+      "makerCollateralSol": 10.0,
+      "lockedCollateralSol": 5.1,
+      "openSwaps": 2,
+      "swaps": 2,
+      "status": "open",
+      "index": null,
+      "netToTakersSol": null
+    }
+  ],
+  "stats": {
+    "openInterestSol": 226.5,
+    "openSwaps": 23,
+    "hedgedValidators": 2,
+    "lastSettled": {
+      "epoch": 1042,
+      "swaps": 4,
+      "notionalSol": 33.5,
+      "netToTakersSol": -0.193
+    }
+  },
+  "hedgeRule": {
+    "epochsAhead": 5,
+    "minNotionalShareOfRevenuePct": 50,
+    "text": "A validator counts as hedged while it holds Receive-fixed swaps on each of the next 5 epochs, each at least half its average revenue per epoch. Hedged validators borrow up to 40% of 10 epochs' swept revenue instead of 25%."
+  },
+  "myHedge": {
+    "vote": null,
+    "name": "Fernhill Validator",
+    "averageRevenuePerEpochSol": 18,
+    "minNotionalSol": 9,
+    "hedgedEpochs": [
+      1045,
+      1046
+    ],
+    "epochsToHedge": [
+      1047,
+      1048,
+      1049
+    ]
+  },
+  "myPositions": [
+    {
+      "address": null,
+      "quote": null,
+      "epoch": 1046,
+      "side": "receiveFixed",
+      "notionalSol": 9,
+      "fixedRate": 1300,
+      "maxMoveBps": 2000,
+      "collateralSol": 1.8,
+      "status": "open",
+      "index": null,
+      "pnlSol": null,
+      "openedSignature": null,
+      "settledSignature": null
+    },
+    {
+      "address": null,
+      "quote": null,
+      "epoch": 1045,
+      "side": "receiveFixed",
+      "notionalSol": 9,
+      "fixedRate": 1295,
+      "maxMoveBps": 2000,
+      "collateralSol": 1.8,
+      "status": "open",
+      "index": null,
+      "pnlSol": null,
+      "openedSignature": null,
+      "settledSignature": null
+    },
+    {
+      "address": null,
+      "quote": null,
+      "epoch": 1043,
+      "side": "receiveFixed",
+      "notionalSol": 3,
+      "fixedRate": 1280,
+      "maxMoveBps": 2000,
+      "collateralSol": 0.6,
+      "status": "settling",
+      "index": {
+        "value": 1330,
+        "status": "proposed"
+      },
+      "pnlSol": -0.117,
+      "openedSignature": null,
+      "settledSignature": null
+    },
+    {
+      "address": null,
+      "quote": null,
+      "epoch": 1042,
+      "side": "payFixed",
+      "notionalSol": 2,
+      "fixedRate": 1270,
+      "maxMoveBps": 2000,
+      "collateralSol": 0.4,
+      "status": "settled",
+      "index": {
+        "value": 1284,
+        "status": "final"
+      },
+      "pnlSol": 0.022,
+      "openedSignature": null,
+      "settledSignature": null
+    }
+  ],
+  "recentSwaps": [
+    {
+      "epoch": 1045,
+      "side": "payFixed",
+      "notionalSol": 4,
+      "fixedRate": 1295,
+      "who": "Wallet 7xKX…3QpL",
+      "vote": null,
+      "status": "open",
+      "pnlSol": null,
+      "signature": null
+    },
+    {
+      "epoch": 1049,
+      "side": "receiveFixed",
+      "notionalSol": 10.5,
+      "fixedRate": 1315,
+      "who": "Kestrel Nodes",
+      "vote": null,
+      "status": "open",
+      "pnlSol": null,
+      "signature": null
+    },
+    {
+      "epoch": 1049,
+      "side": "receiveFixed",
+      "notionalSol": 15,
+      "fixedRate": 1315,
+      "who": "Saltmarsh Nodes",
+      "vote": null,
+      "status": "open",
+      "pnlSol": null,
+      "signature": null
+    },
+    {
+      "epoch": 1046,
+      "side": "receiveFixed",
+      "notionalSol": 9,
+      "fixedRate": 1300,
+      "who": "You",
+      "vote": null,
+      "status": "open",
+      "pnlSol": null,
+      "signature": null
+    },
+    {
+      "epoch": 1045,
+      "side": "receiveFixed",
+      "notionalSol": 9,
+      "fixedRate": 1295,
+      "who": "You",
+      "vote": null,
+      "status": "open",
+      "pnlSol": null,
+      "signature": null
+    },
+    {
+      "epoch": 1048,
+      "side": "receiveFixed",
+      "notionalSol": 10.5,
+      "fixedRate": 1310,
+      "who": "Kestrel Nodes",
+      "vote": null,
+      "status": "open",
+      "pnlSol": null,
+      "signature": null
+    },
+    {
+      "epoch": 1048,
+      "side": "receiveFixed",
+      "notionalSol": 15,
+      "fixedRate": 1310,
+      "who": "Saltmarsh Nodes",
+      "vote": null,
+      "status": "open",
+      "pnlSol": null,
+      "signature": null
+    },
+    {
+      "epoch": 1043,
+      "side": "receiveFixed",
+      "notionalSol": 3,
+      "fixedRate": 1280,
+      "who": "You",
+      "vote": null,
+      "status": "settling",
+      "pnlSol": -0.117,
+      "signature": null
+    },
+    {
+      "epoch": 1042,
+      "side": "payFixed",
+      "notionalSol": 2,
+      "fixedRate": 1270,
+      "who": "You",
+      "vote": null,
+      "status": "settled",
+      "pnlSol": 0.022,
+      "signature": null
+    }
+  ]
+}

@@ -1,0 +1,493 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "Epoch program accounts Pool, Advance, Lender, WithdrawRequest (sample)",
+  "note": "Protocol sample data. Fictional validator names. Numbers obey the program rules (limit = min(25%/40% of 10 epochs revenue, 4 x bond, cap), 2% fee, 50% remit).",
+  "pool": {
+    "tvlSol": 1633,
+    "lenders": 1297,
+    "liveSinceEpoch": 1033,
+    "outstandingPrincipalSol": 189.52,
+    "utilizationPct": 11.6,
+    "utilizationCapPct": 60,
+    "lostByLendersSol": 0,
+    "defaults": 1
+  },
+  "tranches": {
+    "senior": {
+      "assetsSol": 1124,
+      "sharePrice": 1.0036,
+      "targetBpsPerEpoch": 3,
+      "apyPct": 8.1,
+      "roomBeforeJuniorMustGrowSol": 912,
+      "couponMetEpochs": 12,
+      "couponEpochsSinceLaunch": 12
+    },
+    "junior": {
+      "assetsSol": 509,
+      "sharePrice": 1.0105,
+      "apySinceLaunchPct": 23.7,
+      "sharePctOfVault": 31,
+      "minSharePct": 20,
+      "lockEpochs": 10,
+      "bondsUnderOpenAdvancesSol": 93
+    }
+  },
+  "series": {
+    "epochs": [
+      1033,
+      1034,
+      1035,
+      1036,
+      1037,
+      1038,
+      1039,
+      1040,
+      1041,
+      1042,
+      1043,
+      1044
+    ],
+    "seniorSharePrice": [
+      1.0003,
+      1.0006,
+      1.0009,
+      1.0012,
+      1.0015,
+      1.0018,
+      1.0021,
+      1.0024,
+      1.0027,
+      1.003,
+      1.0033,
+      1.00361
+    ],
+    "juniorSharePrice": [
+      1.00008,
+      1.00051,
+      1.00116,
+      1.00187,
+      1.00275,
+      1.00368,
+      1.00438,
+      1.00534,
+      1.00642,
+      1.00758,
+      1.00894,
+      1.01046
+    ],
+    "juniorYieldPctPerYear": [
+      2.2,
+      11.8,
+      17.5,
+      19.4,
+      23.9,
+      25,
+      19,
+      25.8,
+      29.3,
+      31.3,
+      36.5,
+      40.9
+    ],
+    "lentOutPct": [
+      2.1,
+      3.4,
+      4.6,
+      5.2,
+      6.8,
+      7.5,
+      6.9,
+      8.8,
+      9.6,
+      10.4,
+      11.2,
+      11.6
+    ]
+  },
+  "advances": [
+    {
+      "validator": "Northwind Staking",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 84,
+      "borrowedSol": 120,
+      "owesSol": 122.4,
+      "repaidSol": 48,
+      "bondSol": 30,
+      "epochsOpen": 2,
+      "status": "active",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Saltmarsh Nodes",
+      "hedged": true,
+      "limitRatePct": 40,
+      "score": 91,
+      "borrowedSol": 80,
+      "owesSol": 81.6,
+      "repaidSol": 15,
+      "bondSol": 20,
+      "epochsOpen": 1,
+      "status": "active",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Kestrel Nodes",
+      "hedged": true,
+      "limitRatePct": 40,
+      "score": 88,
+      "borrowedSol": 40,
+      "owesSol": 40.8,
+      "repaidSol": 30,
+      "bondSol": 10,
+      "epochsOpen": 3,
+      "status": "active",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Quarry One",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 72,
+      "borrowedSol": 25,
+      "owesSol": 25.5,
+      "repaidSol": 10,
+      "bondSol": 7,
+      "epochsOpen": 3,
+      "status": "late",
+      "lateEpochs": 1,
+      "note": null
+    },
+    {
+      "validator": "Fernhill Validator",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 79,
+      "borrowedSol": 20,
+      "owesSol": 20.4,
+      "repaidSol": 9,
+      "bondSol": 5,
+      "epochsOpen": 1,
+      "status": "active",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Tidewater Stake",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 76,
+      "borrowedSol": 15,
+      "owesSol": 15.3,
+      "repaidSol": 8,
+      "bondSol": 4,
+      "epochsOpen": 2,
+      "status": "active",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Lumen Labs",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 83,
+      "borrowedSol": 30,
+      "owesSol": 30.6,
+      "repaidSol": 24,
+      "bondSol": 8,
+      "epochsOpen": 4,
+      "status": "active",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Cobalt Ridge",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 86,
+      "borrowedSol": 35,
+      "owesSol": 35.7,
+      "repaidSol": 35,
+      "bondSol": 9,
+      "epochsOpen": 5,
+      "status": "active",
+      "lateEpochs": null,
+      "note": "last payment next"
+    },
+    {
+      "validator": "Basalt Validator",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 90,
+      "borrowedSol": 60,
+      "owesSol": 61.2,
+      "repaidSol": 61.2,
+      "bondSol": 15,
+      "epochsOpen": 6,
+      "status": "repaid",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Larkspur Labs",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 81,
+      "borrowedSol": 50,
+      "owesSol": 51.0,
+      "repaidSol": 51,
+      "bondSol": 13,
+      "epochsOpen": 5,
+      "status": "repaid",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Ironbark Staking",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 74,
+      "borrowedSol": 22,
+      "owesSol": 22.44,
+      "repaidSol": 22.44,
+      "bondSol": 6,
+      "epochsOpen": 5,
+      "status": "repaid",
+      "lateEpochs": null,
+      "note": null
+    },
+    {
+      "validator": "Marigold Node",
+      "hedged": false,
+      "limitRatePct": 25,
+      "score": 61,
+      "borrowedSol": 17,
+      "owesSol": 17.34,
+      "repaidSol": 17.34,
+      "bondSol": 12,
+      "epochsOpen": 9,
+      "status": "recovered",
+      "lateEpochs": null,
+      "note": "bond paid"
+    }
+  ],
+  "openAdvancesForStressTest": [
+    {
+      "validator": "Northwind",
+      "outstandingPrincipalSol": 72.94,
+      "bondSol": 30
+    },
+    {
+      "validator": "Saltmarsh",
+      "outstandingPrincipalSol": 65.29,
+      "bondSol": 20
+    },
+    {
+      "validator": "Quarry One",
+      "outstandingPrincipalSol": 15.2,
+      "bondSol": 7
+    },
+    {
+      "validator": "Fernhill",
+      "outstandingPrincipalSol": 11.18,
+      "bondSol": 5
+    },
+    {
+      "validator": "Kestrel",
+      "outstandingPrincipalSol": 10.59,
+      "bondSol": 10
+    },
+    {
+      "validator": "Tidewater",
+      "outstandingPrincipalSol": 7.16,
+      "bondSol": 4
+    },
+    {
+      "validator": "Lumen",
+      "outstandingPrincipalSol": 6.47,
+      "bondSol": 8
+    },
+    {
+      "validator": "Cobalt",
+      "outstandingPrincipalSol": 0.69,
+      "bondSol": 9
+    }
+  ],
+  "withdrawQueue": [
+    {
+      "id": 29,
+      "tranche": "senior",
+      "sol": 12.0,
+      "askedEpoch": 1042,
+      "status": "paid",
+      "paidEpoch": 1043
+    },
+    {
+      "id": 30,
+      "tranche": "junior",
+      "sol": 20.0,
+      "askedEpoch": 1040,
+      "status": "paid",
+      "paidEpoch": 1043
+    },
+    {
+      "id": 31,
+      "tranche": "senior",
+      "sol": 5.5,
+      "askedEpoch": 1044,
+      "status": "queued",
+      "paidEpoch": null
+    },
+    {
+      "id": 32,
+      "tranche": "senior",
+      "sol": 40.0,
+      "askedEpoch": 1044,
+      "status": "queued",
+      "paidEpoch": null
+    },
+    {
+      "id": 33,
+      "tranche": "junior",
+      "sol": 60.0,
+      "askedEpoch": 1044,
+      "status": "queued",
+      "paidEpoch": null
+    }
+  ],
+  "lenders": [
+    {
+      "label": "DAO treasury",
+      "walletShort": "4Tq9…mW2c",
+      "tranche": "junior",
+      "sol": 150,
+      "shareOfTranchePct": 29.5,
+      "sinceEpoch": 1033,
+      "untilEpoch": null
+    },
+    {
+      "label": "Fund wallet",
+      "walletShort": "Gx7R…p3Lk",
+      "tranche": "junior",
+      "sol": 120,
+      "shareOfTranchePct": 23.6,
+      "sinceEpoch": 1035,
+      "untilEpoch": null
+    },
+    {
+      "label": "9 other wallets",
+      "walletShort": null,
+      "tranche": "junior",
+      "sol": 239,
+      "shareOfTranchePct": 47,
+      "sinceEpoch": 1033,
+      "untilEpoch": 1044
+    },
+    {
+      "label": null,
+      "walletShort": "7Qm3…Zp2d",
+      "tranche": "senior",
+      "sol": 85,
+      "shareOfTranchePct": 7.6,
+      "sinceEpoch": 1036,
+      "untilEpoch": null
+    },
+    {
+      "label": null,
+      "walletShort": "Hk2P…c9Tn",
+      "tranche": "senior",
+      "sol": 60,
+      "shareOfTranchePct": 5.3,
+      "sinceEpoch": 1038,
+      "untilEpoch": null
+    },
+    {
+      "label": "1,284 other wallets",
+      "walletShort": null,
+      "tranche": "senior",
+      "sol": 979,
+      "shareOfTranchePct": 87.1,
+      "sinceEpoch": 1033,
+      "untilEpoch": 1044
+    }
+  ],
+  "params": [
+    {
+      "name": "Senior target",
+      "display": "0.03% / epoch",
+      "field": "senior_rate_bps_per_epoch",
+      "value": 3
+    },
+    {
+      "name": "Advance fee",
+      "display": "2% flat",
+      "field": "fee_bps",
+      "value": 200
+    },
+    {
+      "name": "Taken each epoch",
+      "display": "50% of sweep",
+      "field": "remit_bps",
+      "value": 5000
+    },
+    {
+      "name": "Credit limit",
+      "display": "25% · 40% hedged",
+      "field": "advance_bps_unhedged / _hedged",
+      "value": null
+    },
+    {
+      "name": "Bond cap",
+      "display": "4× bond",
+      "field": "bond_multiplier",
+      "value": 4
+    },
+    {
+      "name": "Protocol fee",
+      "display": "10% of income",
+      "field": "protocol_fee_bps",
+      "value": 1000
+    },
+    {
+      "name": "Most lent out",
+      "display": "60%",
+      "field": "max_utilization_bps",
+      "value": 6000
+    },
+    {
+      "name": "Junior minimum",
+      "display": "20% of vault",
+      "field": "min_junior_bps",
+      "value": 2000
+    },
+    {
+      "name": "Junior lock",
+      "display": "10 epochs",
+      "field": "junior_lock_epochs",
+      "value": 10
+    },
+    {
+      "name": "Default after",
+      "display": "3 late epochs or 20 open",
+      "field": "max_advance_epochs",
+      "value": 20
+    },
+    {
+      "name": "Minimum score",
+      "display": "60 / 100",
+      "field": "min_score",
+      "value": 6000
+    },
+    {
+      "name": "Vault cap (pre-alpha)",
+      "display": "5,000 SOL",
+      "field": "max_pool_assets",
+      "value": null
+    }
+  ]
+}

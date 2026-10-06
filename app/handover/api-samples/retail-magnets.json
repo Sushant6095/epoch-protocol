@@ -1,0 +1,62 @@
+{
+  "ok": true,
+  "data": {
+    "schemaVersion": 1,
+    "kind": "real",
+    "asOf": "2026-10-01T18:20:07+05:30",
+    "source": "Solana mainnet RPC: every delegated stake account, grouped by withdraw authority",
+    "note": "571,746 retail wallets hold 3.4% of stake; scan of 1,160,603 stake accounts",
+    "rows": [
+      {
+        "name": "Everstake",
+        "wallets": 119037,
+        "vote": "9QU2QSxhb24FUX3Tu2FpczXjpK3VYrvRudywSZaM29mF"
+      },
+      {
+        "name": "Ledger by Figment",
+        "wallets": 68793,
+        "vote": "26pV97Ce83ZQ6Kz9XT4td8tdoUFPTng8Fb8gPyc53dJx"
+      },
+      {
+        "name": "Phantom Validator",
+        "wallets": 61787,
+        "vote": "J2nUHEAgZFRyuJbFjdqPrAa9gyWDuc7hErtDQHPhsYRp"
+      },
+      {
+        "name": "Trust Nodes",
+        "wallets": 35708,
+        "vote": "FiijvR2ibXEHaFqB127CxrL3vSj19K2Kx1jf2RbK4BWS"
+      },
+      {
+        "name": "Solflare",
+        "wallets": 35389,
+        "vote": "EXhYxF25PJEHb3v5G1HY8Jn8Jm7bRjJtaxEghGrUuhQw"
+      },
+      {
+        "name": "Solana Mobile Validator",
+        "wallets": 25407,
+        "vote": "SKRuTecmFDZHjs2DxRTJNEK7m7hunKGTWJiaZ3tMVVA"
+      },
+      {
+        "name": "Solana Validator",
+        "wallets": 24090,
+        "vote": "BbM5kJgrwEj3tYFfBPnjcARB54wDUHkXmLUTkazUmt2x"
+      },
+      {
+        "name": "Bitwise Onchain Solutions 02",
+        "wallets": 22674,
+        "vote": "Chorus6Kis8tFHA7AowrPMcRJk3LbApHTYpgSNXzY5KE"
+      },
+      {
+        "name": "melea 🚀 SOL 🤑2K",
+        "wallets": 21349,
+        "vote": "GvZEwtCHZ7YtCkQCaLRVEXsyVvQkRDhJhQgB6akPme1e"
+      },
+      {
+        "name": "stake.systems",
+        "wallets": 14900,
+        "vote": "9tedbEYypEKXAMkHcg42rn3fXY1B8hB6cdE3ZTFouXLL"
+      }
+    ]
+  }
+}

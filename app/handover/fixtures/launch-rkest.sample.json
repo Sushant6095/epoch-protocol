@@ -1,0 +1,319 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "Meteora DBC pool, Epoch's revenue-token and buyback-escrow accounts on devnet (sample until the first launch)",
+  "note": "Sample. rKEST sells 5% of Kestrel Nodes' commission for 100 epochs (1043-1142). Kestrel's 10-epoch average revenue is 20.8 SOL an epoch, so the share is 1.04 SOL an epoch and was worth 104 SOL at registration: the curve runs from 60% to 95% of 0.00104 SOL per token. Epoch 1044's twelve buyback slices bought on the curve and burned 1,430 tokens.",
+  "network": "devnet",
+  "launch": {
+    "mint": null,
+    "symbol": "rKEST",
+    "name": "Kestrel Nodes revenue token",
+    "validator": {
+      "name": "Kestrel Nodes",
+      "vote": null
+    },
+    "shareBps": 500,
+    "termEpochs": 100,
+    "startEpoch": 1043,
+    "endEpoch": 1142,
+    "status": "curve",
+    "opensAtEpoch": null,
+    "raise": {
+      "targetSol": 5,
+      "raisedSol": 3.1,
+      "progressPct": 62.0,
+      "buyers": 41
+    },
+    "priceSol": 0.000846,
+    "bandLowSol": 0.000624,
+    "bandHighSol": 0.000988,
+    "marketCapSol": 83.4,
+    "shareRevenuePerEpochSol": 1.04,
+    "impliedYieldPctPerEpoch": 1.25,
+    "backingRatio": 1.23
+  },
+  "token": {
+    "supply": 100000,
+    "burned": 1430,
+    "holders": 43,
+    "decimals": 6,
+    "mintAuthority": null,
+    "metadataImmutable": true
+  },
+  "curve": {
+    "dbcPool": null,
+    "config": null,
+    "bandLowSol": 0.000624,
+    "bandHighSol": 0.000988,
+    "valuePerTokenSol": 0.00104,
+    "migrationThresholdSol": 5,
+    "creatorMigrationFeePct": 70,
+    "lockedLiquidityPct": 100,
+    "dammPool": null,
+    "graduatedEpoch": null
+  },
+  "escrow": {
+    "address": null,
+    "balanceSol": 0,
+    "slicesPerEpoch": 12,
+    "mode": "buyback"
+  },
+  "partnerFeesToSeniorSol": 0.031,
+  "upfrontToValidatorSol": null,
+  "priceSeries": [
+    {
+      "t": "2026-09-27T17:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.000624
+    },
+    {
+      "t": "2026-09-27T19:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0006389
+    },
+    {
+      "t": "2026-09-27T21:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0006509
+    },
+    {
+      "t": "2026-09-27T23:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0006619
+    },
+    {
+      "t": "2026-09-28T01:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0006724
+    },
+    {
+      "t": "2026-09-28T03:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0006825
+    },
+    {
+      "t": "2026-09-28T05:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0006923
+    },
+    {
+      "t": "2026-09-28T07:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0007019
+    },
+    {
+      "t": "2026-09-28T09:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0007113
+    },
+    {
+      "t": "2026-09-28T11:00:00+05:30",
+      "epoch": 1043,
+      "priceSol": 0.0007204
+    },
+    {
+      "t": "2026-09-28T13:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007295
+    },
+    {
+      "t": "2026-09-28T15:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007384
+    },
+    {
+      "t": "2026-09-28T17:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007472
+    },
+    {
+      "t": "2026-09-28T19:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007558
+    },
+    {
+      "t": "2026-09-28T21:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007644
+    },
+    {
+      "t": "2026-09-28T23:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007729
+    },
+    {
+      "t": "2026-09-29T01:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007813
+    },
+    {
+      "t": "2026-09-29T03:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007896
+    },
+    {
+      "t": "2026-09-29T05:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0007978
+    },
+    {
+      "t": "2026-09-29T07:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.000806
+    },
+    {
+      "t": "2026-09-29T09:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0008141
+    },
+    {
+      "t": "2026-09-29T11:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0008222
+    },
+    {
+      "t": "2026-09-29T13:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0008302
+    },
+    {
+      "t": "2026-09-29T15:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.0008381
+    },
+    {
+      "t": "2026-09-29T17:00:00+05:30",
+      "epoch": 1044,
+      "priceSol": 0.000846
+    }
+  ],
+  "buybacks": [
+    {
+      "epoch": 1044,
+      "slice": 12,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 118.3,
+      "priceSol": 0.000733,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 11,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 118.4,
+      "priceSol": 0.000732,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 10,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 118.6,
+      "priceSol": 0.000731,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 9,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 118.8,
+      "priceSol": 0.00073,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 8,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 118.9,
+      "priceSol": 0.000729,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 7,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 119.1,
+      "priceSol": 0.000728,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 6,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 119.3,
+      "priceSol": 0.000727,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 5,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 119.4,
+      "priceSol": 0.000726,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 4,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 119.6,
+      "priceSol": 0.000725,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 3,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 119.8,
+      "priceSol": 0.000724,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 2,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 119.9,
+      "priceSol": 0.000723,
+      "venue": "dbc",
+      "signature": null
+    },
+    {
+      "epoch": 1044,
+      "slice": 1,
+      "slices": 12,
+      "solIn": 0.0867,
+      "tokensBurned": 120.1,
+      "priceSol": 0.000722,
+      "venue": "dbc",
+      "signature": null
+    }
+  ],
+  "risks": [
+    "Revenue tokens can count as securities in many countries. This is a devnet demo with no real value, and nothing here is an offer.",
+    "Buybacks follow Kestrel Nodes' real commission revenue: if its stake or fees fall, so does the buyback.",
+    "Kestrel Nodes can't leave Epoch or lower its commission until its term ends, after epoch 1142's sweep: both need the withdraw authority the program holds.",
+    "If the DAMM v2 buyback isn't ready, holders can also redeem tokens for their share of the escrow (same backing, no market buy); trading on the pool goes on."
+  ]
+}

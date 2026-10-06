@@ -1,0 +1,222 @@
+/*
+ * Epoch global stylesheet (Tailwind v4 + shadcn/ui base-nova). Copy to app/src/styles/globals.css.
+ * Do NOT run `shadcn init`: it rewrites the first CSS file it finds (it picked handover/design/globals.css
+ * in the dry run) with its stock palette. Copy handover/design/components.json instead; `shadcn add` then
+ * leaves this file alone.
+ * Import order matters: Tailwind, tw-animate-css (enter/exit animations), shadcn/tailwind.css (base-nova's
+ * data-open/closed/checked variants and keyframes), then our tokens.
+ * <html> carries className="dark" (both themes are dark, so shadcn's dark: variants always apply)
+ * and data-theme="emerald" (or "graphite").
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* shadcn/ui reads these names; they point at Epoch tokens, so every pulled component is on-brand. */
+:root {
+  --radius: 0.75rem; /* → sm 8 (chips) · md 10 (controls) · lg 12 (cards) · xl 16 */
+  --background: var(--ep-bg);
+  --foreground: var(--ep-text);
+  --card: var(--ep-surface);
+  --card-foreground: var(--ep-text);
+  --popover: var(--ep-raised);
+  --popover-foreground: var(--ep-text);
+  --primary: var(--ep-accent);
+  --primary-foreground: var(--ep-accent-ink);
+  --secondary: var(--ep-hover);
+  --secondary-foreground: var(--ep-text);
+  --muted: var(--ep-inset);
+  --muted-foreground: var(--ep-muted);
+  --accent: var(--ep-hover); /* shadcn "accent" = hover background, NOT our brand accent */
+  --accent-foreground: var(--ep-text);
+  --destructive: var(--ep-warn); /* Epoch has no red */
+  --border: var(--ep-line);
+  --input: var(--ep-field-border);
+  --ring: var(--ep-accent);
+  --chart-1: var(--ep-chart-1);
+  --chart-2: var(--ep-chart-2);
+  --chart-3: var(--ep-chart-3);
+  --chart-4: var(--ep-chart-4);
+  --chart-5: var(--ep-text-2);
+  --sidebar: var(--ep-surface);
+  --sidebar-foreground: var(--ep-text);
+  --sidebar-primary: var(--ep-accent);
+  --sidebar-primary-foreground: var(--ep-accent-ink);
+  --sidebar-accent: var(--ep-hover);
+  --sidebar-accent-foreground: var(--ep-text);
+  --sidebar-border: var(--ep-line);
+  --sidebar-ring: var(--ep-accent);
+}
+
+@theme inline {
+  --font-sans: var(--ep-font-sans);
+  --font-mono: var(--ep-font-mono);
+  --font-serif: var(--ep-font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* shadcn semantic colours */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Epoch utilities: bg-ep-surface, text-ep-muted, border-ep-line, text-ep-accent, bg-ep-warn-soft … */
+  --color-ep-bg: var(--ep-bg);
+  --color-ep-bg-bar: var(--ep-bg-bar);
+  --color-ep-inset: var(--ep-inset);
+  --color-ep-surface: var(--ep-surface);
+  --color-ep-hover: var(--ep-hover);
+  --color-ep-raised: var(--ep-raised);
+  --color-ep-line: var(--ep-line);
+  --color-ep-line-strong: var(--ep-line-strong);
+  --color-ep-field: var(--ep-field-border);
+  --color-ep-text: var(--ep-text);
+  --color-ep-text-2: var(--ep-text-2);
+  --color-ep-muted: var(--ep-muted);
+  --color-ep-accent: var(--ep-accent);
+  --color-ep-accent-ink: var(--ep-accent-ink);
+  --color-ep-accent-soft: var(--ep-accent-soft);
+  --color-ep-accent-line: var(--ep-accent-line);
+  --color-ep-info: var(--ep-info);
+  --color-ep-info-soft: var(--ep-info-soft);
+  --color-ep-info-line: var(--ep-info-line);
+  --color-ep-warn: var(--ep-warn);
+  --color-ep-warn-soft: var(--ep-warn-soft);
+  --color-ep-warn-line: var(--ep-warn-line);
+
+  --ease-ep-out: var(--ep-ease-out);
+  --shadow-ep-glow: var(--ep-glow);
+
+  --animate-ep-pulse: ep-pulse 1.6s ease-in-out infinite;
+  @keyframes ep-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.85); }
+  }
+}
+
+/* Numbers: every figure, address and mono label. `<span className="num">1,284</span>` */
+@utility num {
+  font-family: var(--ep-font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* 11 px uppercase mono label used above every KPI and table header */
+@utility label-caps {
+  font-family: var(--ep-font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ep-muted);
+}
+
+/* The one serif accent phrase per hero: <em className="accent-serif">Solana validators.</em> */
+@utility accent-serif {
+  font-family: var(--ep-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+@utility page-gutter {
+  padding-inline: 16px;
+  @media (width >= 64rem) {
+    padding-inline: var(--ep-gutter);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    background: var(--ep-bg);
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ep-accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--ep-accent-soft);
+    color: var(--ep-text);
+  }
+}
+
+/* Safety net: with reduced motion, nothing loops or travels (the live dot, shimmer and pulled components
+   included). Components still set their end state; GSAP and anime.js have their own guards. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Value-changed tint (180 ms): an overlay whose OPACITY animates, so it obeys the transform/opacity law.
+   Toggle data-flash="up" | "down" on the number's wrapper for one frame to re-fire it. */
+@utility flash-host {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -2px -4px;
+    border-radius: var(--ep-radius-chip);
+    opacity: 0;
+    pointer-events: none;
+  }
+  &[data-flash="up"]::after {
+    background: var(--ep-accent-soft);
+    animation: ep-flash var(--ep-flash) var(--ep-ease-out);
+  }
+  &[data-flash="down"]::after {
+    background: var(--ep-warn-soft);
+    animation: ep-flash var(--ep-flash) var(--ep-ease-out);
+  }
+}
+
+@keyframes ep-flash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

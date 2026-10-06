@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "api_app Predict in points mode (sample)",
+  "note": "Points mode (decisions 2 and 3, 1 Oct 2026): Fee Index markets only, no SOL, no fee, no wallet transaction. Every signed-in wallet gets 100 points each epoch (unused points do not carry over); a call is 10, 25, 50 or 100 points; when the final Fee Index resolves a market, the losing side's points are shared among the winners in proportion to their calls; the leaderboard ranks net points won over the last 30 epochs. Points have no cash value and cannot be bought, sold or transferred. The demo wallet has called 50 of its 100 points in epoch 1044.",
+  "rules": {
+    "mode": "points",
+    "pointsPerEpoch": 100,
+    "callSizesPoints": [
+      10,
+      25,
+      50,
+      100
+    ],
+    "pointsLeftThisEpoch": 50,
+    "feeBps": 0,
+    "leaderboardEpochs": 30,
+    "ageGate": "18+",
+    "regions": "where allowed"
+  },
+  "payoutFormula": "payout = a * (P + a) / (s * P + a)  // a = points called, P = pool in points, s = chosen side share; no fee in points mode",
+  "markets": [
+    {
+      "id": "fee-index-1045-above-1500",
+      "question": "Will epoch 1045’s Fee Index close above 1,500 µL/CU?",
+      "yesShare": 0.62,
+      "poolPoints": 31800,
+      "players": 1204,
+      "closesAtEpoch": 1045,
+      "status": "open",
+      "nowNote": null,
+      "answerSource": "Epoch Fee Index, final value after its dispute window"
+    },
+    {
+      "id": "fee-index-1044-above-1250",
+      "question": "Will epoch 1044’s Fee Index close above 1,250 µL/CU?",
+      "yesShare": 0.44,
+      "poolPoints": 14200,
+      "players": 611,
+      "closesAtEpoch": 1044,
+      "status": "closed",
+      "nowNote": "Epoch 1044 is running; its index is posted when it ends",
+      "answerSource": "Epoch Fee Index, final value after its dispute window"
+    },
+    {
+      "id": "fee-index-1043-above-1300",
+      "question": "Will epoch 1043’s Fee Index close above 1,300 µL/CU?",
+      "yesShare": 0.35,
+      "poolPoints": 9600,
+      "players": 402,
+      "closesAtEpoch": 1043,
+      "status": "closed",
+      "nowNote": "Proposed 1,330 µL/CU, in its dispute window",
+      "answerSource": "Epoch Fee Index, final value after its dispute window"
+    },
+    {
+      "id": "fee-index-1042-above-1200",
+      "question": "Will epoch 1042’s Fee Index close above 1,200 µL/CU?",
+      "yesShare": 0.62,
+      "poolPoints": 21000,
+      "players": 877,
+      "closesAtEpoch": 1042,
+      "status": "settled",
+      "nowNote": "Final 1,284 µL/CU: YES",
+      "answerSource": "Epoch Fee Index, final value after its dispute window"
+    }
+  ],
+  "myCalls": [
+    {
+      "label": "Fee Index above 1,500 · epoch 1045",
+      "side": "yes",
+      "points": 50,
+      "status": "open",
+      "estPayoutPoints": 81,
+      "netPoints": null
+    },
+    {
+      "label": "Fee Index above 1,250 · epoch 1044",
+      "side": "no",
+      "points": 100,
+      "status": "settling",
+      "estPayoutPoints": 178,
+      "netPoints": null
+    },
+    {
+      "label": "Fee Index above 1,200 · epoch 1042",
+      "side": "yes",
+      "points": 100,
+      "status": "won",
+      "estPayoutPoints": null,
+      "netPoints": 61
+    },
+    {
+      "label": "Fee Index above 1,300 · epoch 1041",
+      "side": "yes",
+      "points": 50,
+      "status": "lost",
+      "estPayoutPoints": null,
+      "netPoints": -50
+    }
+  ],
+  "leaderboard": [
+    {
+      "rank": 1,
+      "walletShort": "9cVx…mQ2x",
+      "netPoints": 1842,
+      "hitPct": 64,
+      "calls": 212
+    },
+    {
+      "rank": 2,
+      "walletShort": "Hn4k…Pz7a",
+      "netPoints": 1207,
+      "hitPct": 61,
+      "calls": 98
+    },
+    {
+      "rank": 3,
+      "walletShort": "3Rtq…aa9W",
+      "netPoints": 985,
+      "hitPct": 59,
+      "calls": 141
+    },
+    {
+      "rank": 4,
+      "walletShort": "Bb2L…u8Xe",
+      "netPoints": 730,
+      "hitPct": 66,
+      "calls": 44
+    },
+    {
+      "rank": 5,
+      "walletShort": "6yWd…kE3r",
+      "netPoints": 612,
+      "hitPct": 57,
+      "calls": 175
+    }
+  ]
+}
