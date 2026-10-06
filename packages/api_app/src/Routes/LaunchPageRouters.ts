@@ -13,6 +13,7 @@ import { LaunchParamsDto } from '../dto/Launch.dto';
 import {
   LaunchBuildBodyDto,
   LaunchCandlesQueryDto,
+  LaunchIndexedQueryDto,
   LaunchQuoteBodyDto,
   LaunchTradesQueryDto,
 } from '../dto/LaunchPage.dto';
@@ -41,5 +42,6 @@ export const launchPageRouter: HttpRouter = createRouter()
   .get('/:mint/candles', params, validate(LaunchCandlesQueryDto, 'query'), handle(LaunchPageController.candles))
   .get('/:mint/holders', params, handle(LaunchPageController.holders))
   .get('/:mint/fees', params, handle(LaunchPageController.fees))
+  .get('/:mint/indexed', params, validate(LaunchIndexedQueryDto, 'query'), handle(LaunchPageController.indexed))
   .post('/:mint/quote', tradeLimit, params, validate(LaunchQuoteBodyDto), handle(LaunchPageController.quote))
   .post('/:mint/build', tradeLimit, params, validate(LaunchBuildBodyDto), handle(LaunchPageController.build));

@@ -1,0 +1,101 @@
+{
+ "address": "BKH29Cr5mZf8eahp7vD28jaBqU9HavY9v6SAbphbSA2D",
+ "name": "SPEC-SOL",
+ "token_x": {
+  "address": "2AVjqmGbMqg7rSyHVv2deVdggsBgBtu1Bi69BUvE5WRv",
+  "name": "Spec",
+  "symbol": "SPEC",
+  "decimals": 6,
+  "is_verified": false,
+  "holders": 3836,
+  "freeze_authority_disabled": true,
+  "total_supply": 999994340.069363,
+  "price": 0.0002932319899571376,
+  "market_cap": 293230.3302844139
+ },
+ "token_y": {
+  "address": "So11111111111111111111111111111111111111112",
+  "name": "Wrapped SOL",
+  "symbol": "SOL",
+  "decimals": 9,
+  "is_verified": true,
+  "holders": 3820662,
+  "freeze_authority_disabled": true,
+  "total_supply": 635305533.4561284,
+  "price": 120.05165743456632,
+  "market_cap": 70636560185.46115
+ },
+ "token_x_amount": 103301103.51844499,
+ "token_y_amount": 253.99859222400002,
+ "created_at": 1791052359000,
+ "vault_x": "AV2uux75aHCkitEv1zooJ5h7xnJgc2JVo28Aw8GWjiBq",
+ "vault_y": "7jJsubNxeesWCoM5wtwFCwmYoHBxAqYCY2EBEqbHDxmA",
+ "alpha_vault": "11111111111111111111111111111111",
+ "pool_config": {
+  "collect_fee_mode": 1,
+  "base_fee_mode": 0,
+  "base_fee_pct": 1.0,
+  "protocol_fee_pct": 20,
+  "partner_fee_pct": 0,
+  "referral_fee_pct": 0,
+  "dynamic_fee_initialized": true,
+  "compounding_fee_pct": 0.0,
+  "pool_type": 0,
+  "concentrated_liquidity": false,
+  "min_price": 5.421214630269582e-23,
+  "max_price": 1.844605071373595e+16,
+  "activation_type": 1,
+  "activation_point": 1791052359,
+  "has_fee_scheduler": false,
+  "is_fee_scheduler_active": false
+ },
+ "tvl": 61069.62328202417,
+ "current_price": 2.4588178128006006e-06,
+ "has_farm": false,
+ "farm_apr": 0.0,
+ "farm_apy": 0.0,
+ "permanent_lock_liquidity": 61625.17376472151,
+ "vested_liquidity": {
+  "months_3": 0.0,
+  "months_6": 0.0
+ },
+ "volume": {
+  "30m": 18862.979777556822,
+  "1h": 30826.153405192526,
+  "2h": 68785.31271237225,
+  "4h": 283713.22769677977,
+  "12h": 478848.30856293,
+  "24h": 1100046.379128219
+ },
+ "fees": {
+  "30m": 158.10943695975857,
+  "1h": 255.5631248043478,
+  "2h": 569.4381168176584,
+  "4h": 2474.945236229714,
+  "12h": 4071.901344611321,
+  "24h": 9261.697935413647
+ },
+ "protocol_fees": {
+  "30m": 39.16145531623796,
+  "1h": 62.51069497042989,
+  "2h": 139.0034294681408,
+  "4h": 604.9926100307605,
+  "12h": 998.8727822513116,
+  "24h": 2270.453305970756
+ },
+ "fee_tvl_ratio": {
+  "30m": 0.2589002984832527,
+  "1h": 0.41847830569404015,
+  "2h": 0.9324408539216785,
+  "4h": 4.0526617051495935,
+  "12h": 6.667637895532728,
+  "24h": 15.165801650097661
+ },
+ "cumulative_metrics": {
+  "volume": 13330844.739233412,
+  "fees": 123398.90979228917
+ },
+ "is_blacklisted": false,
+ "launchpad": "met-dbc",
+ "tags": []
+}

@@ -1,7 +1,8 @@
 /**
- * Graduation: a DBC curve whose raise is complete migrates to a DAMM v2 pool through DBC `migration_damm_v2`. On
- * mainnet Meteora's migration keeper usually does it within minutes; the instruction is permissionless, so anyone can
- * (the payer funds the new pool's accounts). The DAMM v2 config comes from the DBC config's migration fee option.
+ * Graduation: a DBC curve whose raise is complete migrates to a DAMM v2 pool through DBC `migration_damm_v2`. Meteora's
+ * mainnet keepers only migrate SOL curves whose threshold is 10 SOL (docs.meteora.ag, DBC developer guide, "Migration
+ * Keepers"), below Epoch's raises, so cranks_app's `LaunchMigrationJob` sends it; the instruction is permissionless (the
+ * payer funds the new pool's accounts). The DAMM v2 config comes from the DBC config's migration fee option.
  */
 import { DAMM_V2_MIGRATION_FEE_ADDRESS, deriveDammV2PoolAddress } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { type Connection, type Keypair, PublicKey, type Transaction } from '@solana/web3.js';

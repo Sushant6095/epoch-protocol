@@ -5,6 +5,8 @@
  * validator's operator signs. Used by `launch-revenue-token.ts` and `register-revenue-token.ts`.
  */
 import {
+  checkLaunchConfig,
+  type DbcLaunchConfig,
   decodePool,
   decodeRevenueToken,
   decodeValidatorPosition,
@@ -19,9 +21,16 @@ import {
   registerRevenueToken,
   type RevenueTokenAccount,
 } from '@epoch/epoch-sdk';
+import { type ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { type Connection, PublicKey, Transaction, type TransactionInstruction } from '@solana/web3.js';
 
-import { rentExemptLamports, type RevenueTokenLimits, type ValidatorPositionState } from '../src';
+import {
+  type RegistrationConfigVerdict,
+  rentExemptLamports,
+  type RevenueTokenLimits,
+  toBigInt,
+  type ValidatorPositionState,
+} from '../src';
 
 /** The program's accounts every launch uses: the Pool PDA `["pool"]` and the partner treasury `["treasury", pool]`. */
 export interface EpochProgramKeys {
@@ -221,4 +230,49 @@ export async function readRegistered(
 ): Promise<RevenueTokenAccount | null> {
   const info = await connection.getAccountInfo(revenueToken, 'confirmed');
   return info ? decodeRevenueToken(info.data) : null;
+}
+
+/**
+ * A planned DBC config as `register_revenue_token` reads it (the fields `check_launch_config` checks), before the config
+ * account exists: the same values the SDK's `decodeDbcLaunchConfig` reads from the account after `createConfig`.
+ */
+export function plannedLaunchConfig(
+  config: ConfigParameters,
+  accounts: { quoteMint: PublicKey; feeClaimer: PublicKey; leftoverReceiver: PublicKey },
+): DbcLaunchConfig {
+  const baseFee = config.poolFees.baseFee;
+  return {
+    quoteMint: accounts.quoteMint,
+    feeClaimer: accounts.feeClaimer,
+    leftoverReceiver: accounts.leftoverReceiver,
+    baseFee: {
+      cliffFeeNumerator: toBigInt(baseFee.cliffFeeNumerator),
+      firstFactor: baseFee.firstFactor,
+      secondFactor: toBigInt(baseFee.secondFactor),
+      thirdFactor: toBigInt(baseFee.thirdFactor),
+      mode: baseFee.baseFeeMode,
+    },
+    liquidity: {
+      partnerPermanentLocked: config.partnerPermanentLockedLiquidityPercentage,
+      partnerUnlocked: config.partnerLiquidityPercentage,
+      partnerVesting: config.partnerLiquidityVestingInfo.vestingPercentage,
+      creatorPermanentLocked: config.creatorPermanentLockedLiquidityPercentage,
+      creatorUnlocked: config.creatorLiquidityPercentage,
+      creatorVesting: config.creatorLiquidityVestingInfo.vestingPercentage,
+    },
+    migrationOption: config.migrationOption,
+    tokenType: config.tokenType,
+    migrationFeeOption: config.migrationFeeOption,
+    fixedTokenSupplyFlag: config.tokenSupply ? 1 : 0,
+    migratedPoolFeeBps: config.migratedPoolFee.poolFeeBps,
+    migratedPoolBaseFeeMode: config.migratedPoolBaseFeeMode,
+  };
+}
+
+/** `check_launch_config` (the SDK's mirror of the program's checks), as the pre-flight's plain verdict. */
+export function registrationVerdict(config: DbcLaunchConfig, treasury: PublicKey): RegistrationConfigVerdict {
+  const result = checkLaunchConfig(config, treasury);
+  return result.ok
+    ? { ok: true, feeFloorBps: result.feeFloorBps, maxImpactBound: result.maxImpactBound }
+    : { ok: false, error: result.error, reason: result.reason };
 }

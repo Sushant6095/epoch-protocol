@@ -1,0 +1,1261 @@
+{
+  "at": "2026-10-06T01:54:12+05:30",
+  "cluster": "local stand-in (solana-test-validator, Meteora mainnet DBC/DAMM v2/Metaplex binaries), 64-slot epochs",
+  "program": "built from feat/r3-meteora (merged revenue-tokens review: execute_buyback pool, redeem without venue accounts, close with pool and vault, stricter register)",
+  "programId": "8iavauBSyvtsM9iaNbtqmaU62jWP8U1wAr1SQGftHhfQ",
+  "accounts": {
+    "pool": "CrSBeKMoSBEsjFHf98Aq6ioascraPai3DqsVvnhq3rvd",
+    "treasury": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+    "vault": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+    "mint": "8VnLEEgAxpUbnw5WLjjSMVien1XEuX6wBuibxo9yU1No",
+    "revenueToken": "BKnweefs2va1DBqSRzEEYLefHePUkzFvnmaySZHPeDaj",
+    "escrow": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo",
+    "dbcPool": "DSdtEHjGR81CPY2FZFDSVe8EuSftGRam6oshBftkDRqz",
+    "dammPool": "CaCNoooUhzc1gTLmTBQYuaa6XMpDQ13FokAPJ5CfEZPZ"
+  },
+  "steps": {
+    "initializePool": "5MctYg9hxRc93EVuroCMjMESmcBfCNH1qXuiVgUWEzoWhHSZStCLaDzatfA1zy4FzkvVBHHaydBTVMGp3D6PsJ2V",
+    "fundVoteFloor": "5GnAXqHBQDHAZJo6H83TPSoD9FGatfo7cnxCJ8Py3Nd71gG8PG6khZdZ4858dgk4gu7exsv8AFm3z3rvgLog4FAd",
+    "onboardWithBond": "65R3ffrPxmuJtAYNjxBEkpf7t3P21Po2c4dczRzEFrRZHghUuVhu1pjwXYsjXe9WwawcJGvsSduoboJLmd6oxhkG",
+    "createConfig": "5N9FGcS4xKQVxwmN5rnHGDZGKFjyhRMT1oJAu5xPvHyfZSEwu5Q5S9Nq2zdGCMdK1ozvYWCNYf6JuhroADwPW6vj",
+    "createPoolWithFirstBuy": "2a3jyWEDmJVNbRA5fzCng68n7bX5t2ZXxrVh6BGFVY3EWqQNr8xyKhkbpW4wfWMm6Kp9xNf1TTDhFraoYcKjAoY9",
+    "transferCreator": "48RNx5CFzz36FarsjbPGbmN2btLRB5KgaSSJWe1GiHB29avh1Z2mB96GEDQrLGEHtPcecA4HnUDCRG6gvfrp75zC",
+    "registerRevenueToken": "2fGs5f2vqg4qu1trKsNFnGwfZw2wU56E58xTy6bCuWgc6QHR94igjcdtTi8DiSjQn8PGmMx8Z6UcZ43W84DCrup1",
+    "configureRevenueToken": "66y93XXzBCfdPDsyqcJr9jfSqGjfy5GBfZ3hFE454cYez8EufT1LxNbzQN236nJ2Z7eqz7AqtZ2cRSbAcAQ52yjb",
+    "migrateToDammV2": "3HLHFqn3RQsB8k3u97jcBSViv7LExtWUR5pMDvK8pAmaqZXS37DDeZ4mozPCteoUeAKCAJX1YpkQj14HuAafFikT",
+    "syncRevenueTokenPool": "51Rv3Qfg5MnXvce1rj79FBaQL1sp1pXpkxUE3LQWKFSDr2KbxPZ2EcE3J2qE2jRUVs5x6uyHi2eZtMcRSi2AyCDK",
+    "closeRevenueToken": "4vmBKCyY6nFK5fFTwnSU2jooqsoxeuEvU5UM1ku4yPt6HCnv7AncSLXpVvTqELizG3P6qQ5e76UHY1i4pKQwZHv4",
+    "treasuryClaims": [
+      {
+        "kind": "tradingFee",
+        "signature": "iEW31YpkAhesFnUXcVCWGvEr2yJ2T6SPHjEjEC95ymuVKE7WVLCr3yRU1p4EfWCVj3cXRaTzy7d8z8Bo7UHz1fk"
+      },
+      {
+        "kind": "leftover",
+        "signature": "4MFgx8tNFAp13ksRXHe4eYcVL1PwxKQkeQ3CzLb91FgXzcw9DFeuKxEJ5yGv8WQZsoPvwyBqXwD1iwJXN7ptZsVQ"
+      },
+      {
+        "kind": "lpFee",
+        "signature": "2gu1sWN2NzdyvhwKyES5wcTnQMF8hXhkijizFzXSBpvA4jhh8FPUWbqkvHkcm4BS4cFKbdhwUMnQEHLokn5BSYJA"
+      }
+    ]
+  },
+  "trades": [
+    {
+      "t": "2026-10-06T01:22:06+05:30",
+      "slot": 108,
+      "signature": "2a3jyWEDmJVNbRA5fzCng68n7bX5t2ZXxrVh6BGFVY3EWqQNr8xyKhkbpW4wfWMm6Kp9xNf1TTDhFraoYcKjAoY9",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.02,
+      "tokenAmount": 3266.586757,
+      "trader": "8pAZsL1VyssU1eAZqCgxmZPFGg2bLC5o6yys1ViJDrf5"
+    },
+    {
+      "t": "2026-10-06T01:22:49+05:30",
+      "slot": 286,
+      "signature": "5b8Q1icAYLnM3442WzaBhasdbeZTVUWuDoEu2ooZ1K9evLxckW8bfpGBB6WbQfnrc96McR5hB3AwJBt8qJj9A7ts",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.15,
+      "tokenAmount": 22539.692754,
+      "trader": "CJ8YPaCqzvfHBNuxts3QaTLGYr2RB59cAkXceXcfsYWd"
+    },
+    {
+      "t": "2026-10-06T01:22:54+05:30",
+      "slot": 309,
+      "signature": "3T8cUrEX9DEZEqf2bM2EkNf8nHTDE7ZK6BCKJ8c9kwQbgmZ6HY8Y2ZHgFduyiao77xeEqzfLKEAmktCvt3FeXi7g",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.12,
+      "tokenAmount": 15863.380208,
+      "trader": "Ev4XG6dsDw3sC9MZHwBYjdCGujJtY9V1APuDbyzHYEHD"
+    },
+    {
+      "t": "2026-10-06T01:22:59+05:30",
+      "slot": 332,
+      "signature": "3HMyDYom5t9NPuSJtJF6jpWhaRjGSR77vxdGqPACqoLmGkyQJkt3tAiHArF1JVeQBmMWu6sor3BWkjQ8vZjTV9Pt",
+      "venue": "dbc",
+      "side": "sell",
+      "solAmount": 0.146242971,
+      "tokenAmount": 20000,
+      "trader": "CJ8YPaCqzvfHBNuxts3QaTLGYr2RB59cAkXceXcfsYWd"
+    },
+    {
+      "t": "2026-10-06T01:23:05+05:30",
+      "slot": 349,
+      "signature": "2H7WR6NNmXyaQMn9yStgxbT2fVikVcF5B3XWDvg5b6jvAdKwnn2gXYPEucb5n1tP4Khe1kPdeJWx4tuQX1uFZE4m",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.3,
+      "tokenAmount": 37680.605347,
+      "trader": "LARMe5ZxjmuT8RjsLtBvAngkNYj7d8nJXxdDcaerD7E"
+    },
+    {
+      "t": "2026-10-06T01:23:10+05:30",
+      "slot": 370,
+      "signature": "53DFzdnM22ATZfsbs4LFFaFZ8iSZ9bXitd8FAVMr2QKCKZeqJ3aRwAcehn8N2noAUma9ac5QPtJ7PezRHr6kGzjQ",
+      "venue": "dbc",
+      "side": "buy",
+      "solAmount": 0.064268394,
+      "tokenAmount": 6877.08611,
+      "trader": "Ev4XG6dsDw3sC9MZHwBYjdCGujJtY9V1APuDbyzHYEHD"
+    },
+    {
+      "t": "2026-10-06T01:23:40+05:30",
+      "slot": 498,
+      "signature": "4pBokLCiHqyCZntrPkWXCn29vPHFy8tFA4pZHSV6Jrn8teniN4qk7aRqNnFyUWZvExPCEwsFQcnqL4iqXXnKthtU",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.05,
+      "tokenAmount": 3915.752701,
+      "trader": "Ev4XG6dsDw3sC9MZHwBYjdCGujJtY9V1APuDbyzHYEHD"
+    },
+    {
+      "t": "2026-10-06T01:23:46+05:30",
+      "slot": 524,
+      "signature": "2JGFH91xQVwaxSfzSUu94RpibYmDBZ4GMHt3kaiixmmR8wZtMYeioRXg3R9QwNv4YnqgkvcN4ezQCpM3yMARwJr1",
+      "venue": "damm-v2",
+      "side": "sell",
+      "solAmount": 0.058427667,
+      "tokenAmount": 5000,
+      "trader": "LARMe5ZxjmuT8RjsLtBvAngkNYj7d8nJXxdDcaerD7E"
+    },
+    {
+      "t": "2026-10-06T01:24:14+05:30",
+      "slot": 643,
+      "signature": "3eDu7ooWrRKEH1CUeoLQhkCHWP97NezGG26USLaWnXxJxkzdTGSiYpdqj3HUmvB7hQC8nNtEE8srWfovZiXYje6p",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.001400644,
+      "tokenAmount": 164.805441,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    },
+    {
+      "t": "2026-10-06T01:24:17+05:30",
+      "slot": 653,
+      "signature": "C77d3LmMRA6EdnZLtXWmqqCpZ9MYDbChRD4nnhnZDb8a8ZftGNPr3REgRQq7s8Znem1hXahfcBpdHaqBS5WMYE4",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.001414485,
+      "tokenAmount": 163.366597,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    },
+    {
+      "t": "2026-10-06T01:24:21+05:30",
+      "slot": 672,
+      "signature": "4SnDcd49aNTqnYTeVsMHbe8GJWoZmzccdNoCy4MeZYAmcpxdM5bpdw6MUXupSAFnLRFM8Wk7Ztigu9wMwL74TmAM",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.001428477,
+      "tokenAmount": 161.705285,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    },
+    {
+      "t": "2026-10-06T01:24:23+05:30",
+      "slot": 682,
+      "signature": "3DhoRtYc16XVmpB9EjzzNGtJW5P5UZKRkrfYReKbhqQHPfgGxvkbjoXnaEGimrN8xm8VTxRfynVKLREBNoHeiqM3",
+      "venue": "damm-v2",
+      "side": "buy",
+      "solAmount": 0.001442603,
+      "tokenAmount": 160.048553,
+      "trader": "8ARgYb8yEmkzR51gYPAqTBhkMh2ZNPLjiTuAATzN6Ebo"
+    }
+  ],
+  "programEvents": [
+    {
+      "name": "ValidatorOnboarded",
+      "signature": "65R3ffrPxmuJtAYNjxBEkpf7t3P21Po2c4dczRzEFrRZHghUuVhu1pjwXYsjXe9WwawcJGvsSduoboJLmd6oxhkG",
+      "slot": 20
+    },
+    {
+      "name": "CollectorsSet",
+      "signature": "65R3ffrPxmuJtAYNjxBEkpf7t3P21Po2c4dczRzEFrRZHghUuVhu1pjwXYsjXe9WwawcJGvsSduoboJLmd6oxhkG",
+      "slot": 20
+    },
+    {
+      "name": "RevenueTokenRegistered",
+      "signature": "2fGs5f2vqg4qu1trKsNFnGwfZw2wU56E58xTy6bCuWgc6QHR94igjcdtTi8DiSjQn8PGmMx8Z6UcZ43W84DCrup1",
+      "slot": 110
+    },
+    {
+      "name": "RevenueTokenConfigured",
+      "signature": "66y93XXzBCfdPDsyqcJr9jfSqGjfy5GBfZ3hFE454cYez8EufT1LxNbzQN236nJ2Z7eqz7AqtZ2cRSbAcAQ52yjb",
+      "slot": 157
+    },
+    {
+      "name": "RevenueTokenPoolSynced",
+      "signature": "51Rv3Qfg5MnXvce1rj79FBaQL1sp1pXpkxUE3LQWKFSDr2KbxPZ2EcE3J2qE2jRUVs5x6uyHi2eZtMcRSi2AyCDK",
+      "slot": 546
+    },
+    {
+      "name": "RevenueShareSwept",
+      "signature": "KPnkr5tu9jsNb1GWuhH7JEYzFJSccZ5DRYLEa1kSERHeuv33m8WLH8GAYCwRvDTnJ81QgKbUXiny4rzadbpiJGb",
+      "slot": 642
+    },
+    {
+      "name": "Swept",
+      "signature": "KPnkr5tu9jsNb1GWuhH7JEYzFJSccZ5DRYLEa1kSERHeuv33m8WLH8GAYCwRvDTnJ81QgKbUXiny4rzadbpiJGb",
+      "slot": 642
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "3eDu7ooWrRKEH1CUeoLQhkCHWP97NezGG26USLaWnXxJxkzdTGSiYpdqj3HUmvB7hQC8nNtEE8srWfovZiXYje6p",
+      "slot": 643
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "C77d3LmMRA6EdnZLtXWmqqCpZ9MYDbChRD4nnhnZDb8a8ZftGNPr3REgRQq7s8Znem1hXahfcBpdHaqBS5WMYE4",
+      "slot": 653
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "4SnDcd49aNTqnYTeVsMHbe8GJWoZmzccdNoCy4MeZYAmcpxdM5bpdw6MUXupSAFnLRFM8Wk7Ztigu9wMwL74TmAM",
+      "slot": 672
+    },
+    {
+      "name": "BuybackExecuted",
+      "signature": "3DhoRtYc16XVmpB9EjzzNGtJW5P5UZKRkrfYReKbhqQHPfgGxvkbjoXnaEGimrN8xm8VTxRfynVKLREBNoHeiqM3",
+      "slot": 682
+    },
+    {
+      "name": "RevenueTokenClosed",
+      "signature": "4vmBKCyY6nFK5fFTwnSU2jooqsoxeuEvU5UM1ku4yPt6HCnv7AncSLXpVvTqELizG3P6qQ5e76UHY1i4pKQwZHv4",
+      "slot": 2693
+    },
+    {
+      "name": "TreasuryClaimed",
+      "signature": "iEW31YpkAhesFnUXcVCWGvEr2yJ2T6SPHjEjEC95ymuVKE7WVLCr3yRU1p4EfWCVj3cXRaTzy7d8z8Bo7UHz1fk",
+      "slot": 5462
+    },
+    {
+      "name": "TreasuryClaimed",
+      "signature": "4MFgx8tNFAp13ksRXHe4eYcVL1PwxKQkeQ3CzLb91FgXzcw9DFeuKxEJ5yGv8WQZsoPvwyBqXwD1iwJXN7ptZsVQ",
+      "slot": 5463
+    },
+    {
+      "name": "TreasuryClaimed",
+      "signature": "2gu1sWN2NzdyvhwKyES5wcTnQMF8hXhkijizFzXSBpvA4jhh8FPUWbqkvHkcm4BS4cFKbdhwUMnQEHLokn5BSYJA",
+      "slot": 5464
+    }
+  ],
+  "harness": [
+    {
+      "step": "set_paused(true)",
+      "at": "2026-10-05T20:01:15.571Z",
+      "signature": "4J61GJMUf4ypcQf1iJQNtHVVYKtzRCgF6wwGQmDfPKtkyFQHwJcE84f93u5o2z3iKRxnwMPiLWvaakgY6CC9kKrK",
+      "paused": true
+    },
+    {
+      "step": "buyback-job while paused",
+      "at": "2026-10-05T20:01:24.633Z",
+      "epoch": 38,
+      "outcomes": [
+        "done",
+        "done",
+        "done"
+      ],
+      "before": {
+        "epoch": 38,
+        "slotIndex": 0,
+        "paused": false,
+        "escrowLamports": "95204671",
+        "buybackCount": 4,
+        "slicesDone": 15,
+        "buybackEpoch": "10",
+        "totalSpent": "5686209",
+        "totalBurned": "649925876",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      },
+      "after": {
+        "epoch": 38,
+        "slotIndex": 39,
+        "paused": true,
+        "escrowLamports": "95204671",
+        "buybackCount": 4,
+        "slicesDone": 15,
+        "buybackEpoch": "10",
+        "totalSpent": "5686209",
+        "totalBurned": "649925876",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      },
+      "pass": true
+    },
+    {
+      "step": "set_paused(false)",
+      "at": "2026-10-05T20:02:13.947Z",
+      "signature": "52JGiAXWqp2yym2tthQXqUddF2AoS5J1yJS7p1b6JQnV544gHYhpmUJwFvuD3yJn7W1TxgbyEuGEqy5u1iTUWXPV",
+      "paused": false
+    },
+    {
+      "step": "buyback-job after unpausing",
+      "at": "2026-10-05T20:02:16.312Z",
+      "outcome": "done",
+      "before": {
+        "epoch": 41,
+        "slotIndex": 58,
+        "paused": true,
+        "escrowLamports": "95204671",
+        "buybackCount": 4,
+        "slicesDone": 15,
+        "buybackEpoch": "10",
+        "totalSpent": "5686209",
+        "totalBurned": "649925876",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      },
+      "after": {
+        "epoch": 42,
+        "slotIndex": 5,
+        "paused": false,
+        "escrowLamports": "0",
+        "buybackCount": null,
+        "slicesDone": null,
+        "buybackEpoch": null,
+        "totalSpent": null,
+        "totalBurned": null,
+        "totalRedeemed": null,
+        "totalRedeemedLamports": null
+      },
+      "pass": true
+    },
+    {
+      "step": "close after the grace period (BuybackJob)",
+      "at": "2026-10-05T20:02:55.125Z",
+      "signature": "4vmBKCyY6nFK5fFTwnSU2jooqsoxeuEvU5UM1ku4yPt6HCnv7AncSLXpVvTqELizG3P6qQ5e76UHY1i4pKQwZHv4",
+      "slot": 2693,
+      "err": null,
+      "operator": "2DPfWMML11Ya1rmUyTnUQucm111sBxVMfwrau5uQWuCC",
+      "escrow": {
+        "pre": 95204671,
+        "post": 0,
+        "delta": -95204671
+      },
+      "revenueToken": {
+        "pre": 4391760,
+        "post": 0,
+        "delta": -4391760
+      },
+      "buybackTokens": {
+        "pre": 2039280,
+        "post": 0,
+        "delta": -2039280
+      },
+      "vault": {
+        "pre": 890880,
+        "post": 95204671,
+        "delta": 94313791
+      },
+      "operatorBalance": {
+        "pre": 4960908520,
+        "post": 4968230440,
+        "delta": 7321920
+      },
+      "lamportsToPool": 94313791,
+      "events": 1,
+      "checks": {
+        "revenueTokenClosed": true,
+        "escrowEmptied": true,
+        "buybackTokensClosed": true,
+        "unclaimedEscrowToVault": true,
+        "rentToOperator": true,
+        "positionFreed": true
+      },
+      "pass": true
+    },
+    {
+      "step": "set_paused(true)",
+      "at": "2026-10-05T20:09:07.418Z",
+      "signature": "3HMp89FBdAHyNycgcJgqctLnhZhbaQYkwg6twwH6xN2rGCezJZSuh5XyoKevLFdyiC21fFPEQNX1nwn1A146hjhd",
+      "paused": true
+    },
+    {
+      "step": "buyback-job while paused",
+      "at": "2026-10-05T20:09:13.888Z",
+      "epoch": 69,
+      "outcomes": [
+        "done",
+        "done",
+        "done"
+      ],
+      "before": {
+        "epoch": 69,
+        "slotIndex": 1,
+        "paused": false,
+        "escrowLamports": "890880",
+        "buybackCount": 0,
+        "slicesDone": 0,
+        "buybackEpoch": "0",
+        "totalSpent": "0",
+        "totalBurned": "0",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      },
+      "after": {
+        "epoch": 69,
+        "slotIndex": 28,
+        "paused": true,
+        "escrowLamports": "890880",
+        "buybackCount": 0,
+        "slicesDone": 0,
+        "buybackEpoch": "0",
+        "totalSpent": "0",
+        "totalBurned": "0",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      },
+      "pass": true
+    },
+    {
+      "step": "set_paused(false)",
+      "at": "2026-10-05T20:09:17.921Z",
+      "signature": "4rajRYAiu12y8SARGn5Br3tXymyry5cfb3pDdCoYQoqk4j8fhvET5EP5D7nDgRKx5VhSrZPaa3U2tvKBo3H3EswY",
+      "paused": false
+    },
+    {
+      "step": "simulated commission",
+      "at": "2026-10-05T20:09:22.304Z",
+      "epoch": 70,
+      "lamports": 200000000,
+      "signature": "2QZL3D7CF3uAeWcE8tHK8Psh9vTU8Fd4LajWvDyKnvAXtSKpoQ6gKwPB6LpTkrWC6uB2UNhSZrSnRnfdXyY46Y6m"
+    },
+    {
+      "step": "sweep-job",
+      "at": "2026-10-05T20:09:22.550Z",
+      "state": {
+        "epoch": 70,
+        "slotIndex": 2,
+        "paused": false,
+        "escrowLamports": "100890880",
+        "buybackCount": 0,
+        "slicesDone": 0,
+        "buybackEpoch": "0",
+        "totalSpent": "0",
+        "totalBurned": "0",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      }
+    },
+    {
+      "step": "buyback-job after unpausing",
+      "at": "2026-10-05T20:09:23.385Z",
+      "outcome": "done",
+      "before": {
+        "epoch": 70,
+        "slotIndex": 2,
+        "paused": false,
+        "escrowLamports": "100890880",
+        "buybackCount": 0,
+        "slicesDone": 0,
+        "buybackEpoch": "0",
+        "totalSpent": "0",
+        "totalBurned": "0",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      },
+      "after": {
+        "epoch": 70,
+        "slotIndex": 5,
+        "paused": false,
+        "escrowLamports": "80048760",
+        "buybackCount": 1,
+        "slicesDone": 1,
+        "buybackEpoch": "70",
+        "totalSpent": "20842120",
+        "totalBurned": "2937278663",
+        "totalRedeemed": "0",
+        "totalRedeemedLamports": "0"
+      },
+      "pass": true
+    },
+    {
+      "step": "redeem after the term",
+      "at": "2026-10-05T20:09:27.772Z",
+      "signature": "inJN9ie7WpzKvMRbjuiPTAbmGbuDqAZT8r2PpQptNMaYixChBFnHKnQ9RrRThETrgk5daqbV374c1C593xAst3b",
+      "holder": "8nid7A3511zAHabJioEX9ny2B45hYgFsaUBoFRb2MGRS",
+      "amount": "2298656380",
+      "circulating": "997062721337",
+      "buybackHeld": "0",
+      "treasuryHeld": null,
+      "escrowAvailable": "79157880",
+      "expectedPayout": "182492",
+      "payout": "182492",
+      "checks": {
+        "payoutMatchesFormula": true,
+        "escrowPaidOut": true,
+        "supplyBurned": true,
+        "holderBurned": true,
+        "totalRedeemed": true,
+        "totalRedeemedLamports": true
+      },
+      "pass": true
+    },
+    {
+      "step": "commission and sweep",
+      "at": "2026-10-05T20:10:24.148Z",
+      "epoch": 74,
+      "signature": "5cskSgxRPT7AtPm6Zvmi58RauWS5xsC4h81xiHbeNksQSDbcp83EXK6pXAgnVmwXT9G8yxiWDY2yFiyTD9HbeYbQ",
+      "state": {
+        "epoch": 74,
+        "slotIndex": 2,
+        "paused": false,
+        "escrowLamports": "79866268",
+        "buybackCount": 1,
+        "slicesDone": 1,
+        "buybackEpoch": "70",
+        "totalSpent": "20842120",
+        "totalBurned": "2937278663",
+        "totalRedeemed": "2298656380",
+        "totalRedeemedLamports": "182492"
+      }
+    },
+    {
+      "step": "buyback-job while paused (after the sweep)",
+      "at": "2026-10-05T20:10:28.350Z",
+      "setPaused": "4kdFuUd3j6wQN6gK3jzRoWj8Qd6247HGuT7v2HVvcfJ5W4DRgWbWzV6fsQD3VZydpmSfUgpKxEYYgnhauPiQqC2t",
+      "outcomes": [
+        "done",
+        "done"
+      ],
+      "before": {
+        "epoch": 74,
+        "slotIndex": 2,
+        "paused": false,
+        "escrowLamports": "79866268",
+        "buybackCount": 1,
+        "slicesDone": 1,
+        "buybackEpoch": "70",
+        "totalSpent": "20842120",
+        "totalBurned": "2937278663",
+        "totalRedeemed": "2298656380",
+        "totalRedeemedLamports": "182492"
+      },
+      "after": {
+        "epoch": 74,
+        "slotIndex": 18,
+        "paused": true,
+        "escrowLamports": "79866268",
+        "buybackCount": 1,
+        "slicesDone": 1,
+        "buybackEpoch": "70",
+        "totalSpent": "20842120",
+        "totalBurned": "2937278663",
+        "totalRedeemed": "2298656380",
+        "totalRedeemedLamports": "182492"
+      },
+      "pass": true
+    },
+    {
+      "step": "buyback-job after unpausing (same epoch)",
+      "at": "2026-10-05T20:10:28.779Z",
+      "setPaused": "VdRU9pgVg3JZeWvdNjHnk4KXS6UGM1DtryWomvKMcVNYkf9pKqCStmmctH2Vm85SJLBWGr7MsH6p9ZQCqiPpu4r",
+      "before": {
+        "epoch": 74,
+        "slotIndex": 18,
+        "paused": true,
+        "escrowLamports": "79866268",
+        "buybackCount": 1,
+        "slicesDone": 1,
+        "buybackEpoch": "70",
+        "totalSpent": "20842120",
+        "totalBurned": "2937278663",
+        "totalRedeemed": "2298656380",
+        "totalRedeemedLamports": "182492"
+      },
+      "after": {
+        "epoch": 74,
+        "slotIndex": 20,
+        "paused": false,
+        "escrowLamports": "60122421",
+        "buybackCount": 2,
+        "slicesDone": 1,
+        "buybackEpoch": "74",
+        "totalSpent": "40585967",
+        "totalBurned": "5667150473",
+        "totalRedeemed": "2298656380",
+        "totalRedeemedLamports": "182492"
+      },
+      "pass": true
+    }
+  ],
+  "api": {
+    "ingest": {
+      "running": true,
+      "lastPollAt": "2026-10-06T01:54:01+05:30",
+      "stale": false,
+      "pools": [
+        {
+          "address": "DSdtEHjGR81CPY2FZFDSVe8EuSftGRam6oshBftkDRqz",
+          "venue": "dbc"
+        },
+        {
+          "address": "CaCNoooUhzc1gTLmTBQYuaa6XMpDQ13FokAPJ5CfEZPZ",
+          "venue": "damm-v2"
+        }
+      ],
+      "mode": "websocket",
+      "lagSeconds": null,
+      "pollSeconds": 30
+    },
+    "feesToLenders": {
+      "claimedSol": 0.00743505,
+      "pendingSol": 0,
+      "holder": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+      "note": "Epoch's partner fees (trading fees, surplus, migration fee, LP fees) are claimed into the Epoch lending pool as income; tokens burned, as is the supply the curve never sold."
+    },
+    "leftover": {
+      "receiver": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "tokens": 0,
+      "withdrawn": true,
+      "burned": true,
+      "burnedTokens": 917983.00023
+    },
+    "buybacks": {
+      "note": "Closed after its term (epoch 42): the 0.094313791 SOL holders had not redeemed went to the Epoch pool as income.",
+      "totals": {
+        "escrowedSol": 0.1,
+        "spentSol": 0.005686209,
+        "burned": 649.925876,
+        "redeemed": 0,
+        "redeemedSol": 0,
+        "buybacks": 4
+      },
+      "closed": {
+        "epoch": 42,
+        "at": "2026-10-06T01:32:16+05:30",
+        "signature": "4vmBKCyY6nFK5fFTwnSU2jooqsoxeuEvU5UM1ku4yPt6HCnv7AncSLXpVvTqELizG3P6qQ5e76UHY1i4pKQwZHv4",
+        "unclaimedToPoolSol": 0.094313791
+      },
+      "treasuryTotals": {
+        "toLendersSol": 0.00743505,
+        "tokensBurned": 917983.00023,
+        "claims": 3
+      }
+    },
+    "holders": {
+      "all": 6,
+      "buyers": 4
+    },
+    "tokenBurned": 918632.926106,
+    "wsFrames": {
+      "trade": 12,
+      "market": 12,
+      "snapshot": 2,
+      "fee:curveComplete": 1,
+      "fee:dammPoolCreated": 1,
+      "fee:partnerTradingFee": 1,
+      "fee:leftover": 1,
+      "fee:lpFee": 1
+    }
+  },
+  "amounts": {
+    "lamportsToPool": "7435050",
+    "leftoverBurned": "917983000230",
+    "claimBurned": "917983000230",
+    "buybackLamportsIn": "5686209",
+    "buybackBurned": "649925876",
+    "redeems": 0,
+    "closeLamportsToPool": "94313791",
+    "dammSeed": {
+      "expected": "149701658",
+      "seeded": "149701658"
+    },
+    "supplyNow": "81367073894"
+  },
+  "checks": [
+    {
+      "name": "treasury claims sent through the program (TreasuryClaimed)",
+      "expected": 3,
+      "actual": 3,
+      "pass": true
+    },
+    {
+      "name": "treasury claim kinds",
+      "expected": [
+        "tradingFee",
+        "leftover",
+        "lpFee"
+      ],
+      "actual": [
+        "tradingFee",
+        "leftover",
+        "lpFee"
+      ],
+      "pass": true
+    },
+    {
+      "name": "each claim transaction grew the vault by its lamportsToPool",
+      "expected": [
+        6415910,
+        0,
+        1019140
+      ],
+      "actual": [
+        6415910,
+        0,
+        1019140
+      ],
+      "pass": true
+    },
+    {
+      "name": "/buybacks treasury.totals.toLendersSol = sum(lamportsToPool)",
+      "expected": 0.00743505,
+      "actual": 0.00743505,
+      "pass": true
+    },
+    {
+      "name": "/fees toLenders.claimedSol = /buybacks treasury.totals.toLendersSol",
+      "expected": 0.00743505,
+      "actual": 0.00743505,
+      "pass": true
+    },
+    {
+      "name": "/fees toLenders.holder = the pool vault",
+      "expected": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+      "actual": "Ex3NPZMnL5rbhwxCD7Tv4VAVYhjcY9xoknf68hweJPc2",
+      "pass": true
+    },
+    {
+      "name": "/buybacks treasury.totals.tokensBurned (UI) = sum(tokensBurned)",
+      "expected": 917983.00023,
+      "actual": 917983.00023,
+      "pass": true
+    },
+    {
+      "name": "/buybacks treasury.address = the treasury PDA",
+      "expected": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "actual": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "pass": true
+    },
+    {
+      "name": "/fees partner = the treasury PDA",
+      "expected": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "actual": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "pass": true
+    },
+    {
+      "name": "/fees leftover.burned",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "/fees leftover.burnedTokens = the leftover claim tokensBurned",
+      "expected": 917983.00023,
+      "actual": 917983.00023,
+      "pass": true
+    },
+    {
+      "name": "/fees leftover.withdrawn",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "mint supply = launch supply - buyback burns - treasury burns - redemptions (raw units)",
+      "expected": "81367073894",
+      "actual": "81367073894",
+      "pass": true
+    },
+    {
+      "name": "/v1/launches/:mint token.burned = launch supply - supply now (every burn: buybacks + treasury)",
+      "expected": 918632.926106,
+      "actual": 918632.926106,
+      "pass": true
+    },
+    {
+      "name": "pool income_unallocated includes the claims (lamports)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "sweeps that paid a share (RevenueShareSwept)",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "name": "share = 50% of the 0.2 SOL swept (lamports)",
+      "expected": "100000000",
+      "actual": "100000000",
+      "pass": true
+    },
+    {
+      "name": "buyback slices (BuybackExecuted)",
+      "expected": 4,
+      "actual": 4,
+      "pass": true
+    },
+    {
+      "name": "RevenueTokenClosed totals = the events (escrowed, spent, burned)",
+      "expected": [
+        "100000000",
+        "5686209",
+        "649925876"
+      ],
+      "actual": [
+        "100000000",
+        "5686209",
+        "649925876"
+      ],
+      "pass": true
+    },
+    {
+      "name": "/buybacks closed: the close signature, epoch and SOL to the pool",
+      "expected": [
+        "4vmBKCyY6nFK5fFTwnSU2jooqsoxeuEvU5UM1ku4yPt6HCnv7AncSLXpVvTqELizG3P6qQ5e76UHY1i4pKQwZHv4",
+        0.094313791
+      ],
+      "actual": [
+        "4vmBKCyY6nFK5fFTwnSU2jooqsoxeuEvU5UM1ku4yPt6HCnv7AncSLXpVvTqELizG3P6qQ5e76UHY1i4pKQwZHv4",
+        0.094313791
+      ],
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.escrowedSol = RevenueTokenClosed.totalEscrowed",
+      "expected": 0.1,
+      "actual": 0.1,
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.spentSol = sum(lamportsIn)",
+      "expected": 0.005686209,
+      "actual": 0.005686209,
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.burned = sum(tokensBurned)",
+      "expected": 649.925876,
+      "actual": 649.925876,
+      "pass": true
+    },
+    {
+      "name": "/buybacks totals.buybacks",
+      "expected": 4,
+      "actual": 4,
+      "pass": true
+    },
+    {
+      "name": "/buybacks term from RevenueTokenRegistered",
+      "expected": {
+        "shareBps": 5000,
+        "termEpochs": 10,
+        "startEpoch": 2,
+        "endEpoch": 11
+      },
+      "actual": {
+        "shareBps": 5000,
+        "termEpochs": 10,
+        "startEpoch": 2,
+        "endEpoch": 11
+      },
+      "pass": true
+    },
+    {
+      "name": "/buybacks rows = the slices (epoch, slice, solIn)",
+      "expected": [
+        [
+          10,
+          3,
+          0.001442603
+        ],
+        [
+          10,
+          2,
+          0.001428477
+        ],
+        [
+          10,
+          1,
+          0.001414485
+        ],
+        [
+          10,
+          0,
+          0.001400644
+        ]
+      ],
+      "actual": [
+        [
+          10,
+          3,
+          0.001442603
+        ],
+        [
+          10,
+          2,
+          0.001428477
+        ],
+        [
+          10,
+          1,
+          0.001414485
+        ],
+        [
+          10,
+          0,
+          0.001400644
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "name": "/buybacks after the close: no venue, no schedule, empty escrow",
+      "expected": [
+        null,
+        null,
+        0
+      ],
+      "actual": [
+        null,
+        null,
+        0
+      ],
+      "pass": true
+    },
+    {
+      "name": "the vote registered another mint since (the studio-built rSTU)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "/page revenueToken: the record, flagged as another mint now",
+      "expected": [
+        "registry",
+        false,
+        true
+      ],
+      "actual": [
+        "registry",
+        false,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "name": "/v1/launches/:mint escrow.balanceSol: none of the shared escrow is this launch's any more",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "trades in the feed (6 on the curve, 2 on DAMM v2, 4 buyback slices)",
+      "expected": 12,
+      "actual": 12,
+      "pass": true
+    },
+    {
+      "name": "buyback trades in the feed = the slices (SOL in, lamports)",
+      "expected": [
+        "1400644",
+        "1414485",
+        "1428477",
+        "1442603"
+      ],
+      "actual": [
+        "1400644",
+        "1414485",
+        "1428477",
+        "1442603"
+      ],
+      "pass": true
+    },
+    {
+      "name": "/market venue and state",
+      "expected": [
+        "damm-v2",
+        "migrated"
+      ],
+      "actual": [
+        "damm-v2",
+        "migrated"
+      ],
+      "pass": true
+    },
+    {
+      "name": "/candles volume = the trades' SOL",
+      "expected": 0.914625,
+      "actual": 0.914625,
+      "pass": true
+    },
+    {
+      "name": "/holders: the treasury holds nothing after the burn",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "/page unavailable",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "name": "/page ingest.mode",
+      "expected": "websocket",
+      "actual": "websocket",
+      "pass": true
+    },
+    {
+      "name": "/page ingest.lagSeconds under 5 s, or null (no new row since the API restarted)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "WS trade frames = every trade in /trades, once each (ids)",
+      "expected": [
+        "2H7WR6NNmXyaQMn9yStgxbT2fVikVcF5B3XWDvg5b6jvAdKwnn2gXYPEucb5n1tP4Khe1kPdeJWx4tuQX1uFZE4m:1",
+        "2JGFH91xQVwaxSfzSUu94RpibYmDBZ4GMHt3kaiixmmR8wZtMYeioRXg3R9QwNv4YnqgkvcN4ezQCpM3yMARwJr1:0",
+        "2a3jyWEDmJVNbRA5fzCng68n7bX5t2ZXxrVh6BGFVY3EWqQNr8xyKhkbpW4wfWMm6Kp9xNf1TTDhFraoYcKjAoY9:2",
+        "3DhoRtYc16XVmpB9EjzzNGtJW5P5UZKRkrfYReKbhqQHPfgGxvkbjoXnaEGimrN8xm8VTxRfynVKLREBNoHeiqM3:0",
+        "3HMyDYom5t9NPuSJtJF6jpWhaRjGSR77vxdGqPACqoLmGkyQJkt3tAiHArF1JVeQBmMWu6sor3BWkjQ8vZjTV9Pt:1",
+        "3T8cUrEX9DEZEqf2bM2EkNf8nHTDE7ZK6BCKJ8c9kwQbgmZ6HY8Y2ZHgFduyiao77xeEqzfLKEAmktCvt3FeXi7g:1",
+        "3eDu7ooWrRKEH1CUeoLQhkCHWP97NezGG26USLaWnXxJxkzdTGSiYpdqj3HUmvB7hQC8nNtEE8srWfovZiXYje6p:0",
+        "4SnDcd49aNTqnYTeVsMHbe8GJWoZmzccdNoCy4MeZYAmcpxdM5bpdw6MUXupSAFnLRFM8Wk7Ztigu9wMwL74TmAM:0",
+        "4pBokLCiHqyCZntrPkWXCn29vPHFy8tFA4pZHSV6Jrn8teniN4qk7aRqNnFyUWZvExPCEwsFQcnqL4iqXXnKthtU:0",
+        "53DFzdnM22ATZfsbs4LFFaFZ8iSZ9bXitd8FAVMr2QKCKZeqJ3aRwAcehn8N2noAUma9ac5QPtJ7PezRHr6kGzjQ:1",
+        "5b8Q1icAYLnM3442WzaBhasdbeZTVUWuDoEu2ooZ1K9evLxckW8bfpGBB6WbQfnrc96McR5hB3AwJBt8qJj9A7ts:1",
+        "C77d3LmMRA6EdnZLtXWmqqCpZ9MYDbChRD4nnhnZDb8a8ZftGNPr3REgRQq7s8Znem1hXahfcBpdHaqBS5WMYE4:0"
+      ],
+      "actual": [
+        "2H7WR6NNmXyaQMn9yStgxbT2fVikVcF5B3XWDvg5b6jvAdKwnn2gXYPEucb5n1tP4Khe1kPdeJWx4tuQX1uFZE4m:1",
+        "2JGFH91xQVwaxSfzSUu94RpibYmDBZ4GMHt3kaiixmmR8wZtMYeioRXg3R9QwNv4YnqgkvcN4ezQCpM3yMARwJr1:0",
+        "2a3jyWEDmJVNbRA5fzCng68n7bX5t2ZXxrVh6BGFVY3EWqQNr8xyKhkbpW4wfWMm6Kp9xNf1TTDhFraoYcKjAoY9:2",
+        "3DhoRtYc16XVmpB9EjzzNGtJW5P5UZKRkrfYReKbhqQHPfgGxvkbjoXnaEGimrN8xm8VTxRfynVKLREBNoHeiqM3:0",
+        "3HMyDYom5t9NPuSJtJF6jpWhaRjGSR77vxdGqPACqoLmGkyQJkt3tAiHArF1JVeQBmMWu6sor3BWkjQ8vZjTV9Pt:1",
+        "3T8cUrEX9DEZEqf2bM2EkNf8nHTDE7ZK6BCKJ8c9kwQbgmZ6HY8Y2ZHgFduyiao77xeEqzfLKEAmktCvt3FeXi7g:1",
+        "3eDu7ooWrRKEH1CUeoLQhkCHWP97NezGG26USLaWnXxJxkzdTGSiYpdqj3HUmvB7hQC8nNtEE8srWfovZiXYje6p:0",
+        "4SnDcd49aNTqnYTeVsMHbe8GJWoZmzccdNoCy4MeZYAmcpxdM5bpdw6MUXupSAFnLRFM8Wk7Ztigu9wMwL74TmAM:0",
+        "4pBokLCiHqyCZntrPkWXCn29vPHFy8tFA4pZHSV6Jrn8teniN4qk7aRqNnFyUWZvExPCEwsFQcnqL4iqXXnKthtU:0",
+        "53DFzdnM22ATZfsbs4LFFaFZ8iSZ9bXitd8FAVMr2QKCKZeqJ3aRwAcehn8N2noAUma9ac5QPtJ7PezRHr6kGzjQ:1",
+        "5b8Q1icAYLnM3442WzaBhasdbeZTVUWuDoEu2ooZ1K9evLxckW8bfpGBB6WbQfnrc96McR5hB3AwJBt8qJj9A7ts:1",
+        "C77d3LmMRA6EdnZLtXWmqqCpZ9MYDbChRD4nnhnZDb8a8ZftGNPr3REgRQq7s8Znem1hXahfcBpdHaqBS5WMYE4:0"
+      ],
+      "pass": true
+    },
+    {
+      "name": "WS fee frames include the treasury claims and the lifecycle",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "/holders count.all = token accounts with a balance",
+      "expected": 6,
+      "actual": 6,
+      "pass": true
+    },
+    {
+      "name": "/holders top = the chain balances (token account, raw units)",
+      "expected": [
+        [
+          "279Uw78mUALBE6yNR9XNBpxJnDP3KkW2iRzjn4LuNN86",
+          "32680605347"
+        ],
+        [
+          "2hcXpBQqpmSi8FbtUNc6aR1Qynsvn5gWm9LSMB68RUN1",
+          "2539692754"
+        ],
+        [
+          "4E956SRGUs94B2ZFMB6duDy3rQVG8aa9oPeUdrhGCQwD",
+          "26656219019"
+        ],
+        [
+          "4TxYw3uHSx5ZTqozBdTcHc79TGgRip4XL57i3Lhd728o",
+          "16192390754"
+        ],
+        [
+          "AsaRodB2FRDVhZJJsYhHcFzXMu4PJa6tDvBqP1v8L54g",
+          "3266586757"
+        ],
+        [
+          "EspiHCYne3h1dKXsKuGeXtbeed7dpRp8udjeEfKhnVqe",
+          "31579263"
+        ]
+      ],
+      "actual": [
+        [
+          "279Uw78mUALBE6yNR9XNBpxJnDP3KkW2iRzjn4LuNN86",
+          "32680605347"
+        ],
+        [
+          "2hcXpBQqpmSi8FbtUNc6aR1Qynsvn5gWm9LSMB68RUN1",
+          "2539692754"
+        ],
+        [
+          "4E956SRGUs94B2ZFMB6duDy3rQVG8aa9oPeUdrhGCQwD",
+          "26656219019"
+        ],
+        [
+          "4TxYw3uHSx5ZTqozBdTcHc79TGgRip4XL57i3Lhd728o",
+          "16192390754"
+        ],
+        [
+          "AsaRodB2FRDVhZJJsYhHcFzXMu4PJa6tDvBqP1v8L54g",
+          "3266586757"
+        ],
+        [
+          "EspiHCYne3h1dKXsKuGeXtbeed7dpRp8udjeEfKhnVqe",
+          "31579263"
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "name": "/holders top sums to the supply (raw units)",
+      "expected": "81367073894",
+      "actual": "81367073894",
+      "pass": true
+    },
+    {
+      "name": "activity rows of kind buyback (registered, graduated, share, 4 slices, closed, 3 claims)",
+      "expected": 11,
+      "actual": 11,
+      "pass": true
+    },
+    {
+      "name": "activity slice rows = the slices (lamports)",
+      "expected": [
+        "1400644",
+        "1414485",
+        "1428477",
+        "1442603"
+      ],
+      "actual": [
+        "1400644",
+        "1414485",
+        "1428477",
+        "1442603"
+      ],
+      "pass": true
+    },
+    {
+      "name": "activity treasury rows: SOL to lenders = sum(lamportsToPool), and the burn",
+      "expected": [
+        "7435050",
+        3,
+        true
+      ],
+      "actual": [
+        "7435050",
+        3,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "name": "activity share row = the share swept (SOL)",
+      "expected": 0.1,
+      "actual": 0.1,
+      "pass": true
+    },
+    {
+      "name": "activity close row",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "launch preflight: Meteora validation, leftover receiver and the program registration checks pass",
+      "expected": [
+        true,
+        true,
+        true
+      ],
+      "actual": [
+        true,
+        true,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "name": "graduation by the crank seeded DAMM v2 with the threshold's 30% less Meteora's 0.2% protocol fee (lamports, ±1)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "/quote refuses slippageBps 0 (400)",
+      "expected": 400,
+      "actual": 400,
+      "pass": true
+    },
+    {
+      "name": "/build priorityFeeSol = 200000 CU x 100,000 µlamports",
+      "expected": 0.00002,
+      "actual": 0.00002,
+      "pass": true
+    },
+    {
+      "name": "/build transaction carries the compute budget (limit + price)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "/indexed: Meteora's data API indexes mainnet only, so it says why (devnet API)",
+      "expected": [
+        true,
+        null
+      ],
+      "actual": [
+        true,
+        null
+      ],
+      "pass": true
+    },
+    {
+      "name": "pause: no slice while the pool is paused (rR3E after its term; rSTU after its sweep)",
+      "expected": [
+        true,
+        true,
+        true
+      ],
+      "actual": [
+        true,
+        true,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "name": "unpause: the next slice runs (rSTU, same epoch)",
+      "expected": [
+        true
+      ],
+      "actual": [
+        true
+      ],
+      "pass": true
+    },
+    {
+      "name": "redeem during the term (FLAG_REDEEM_DURING_TERM): payout = escrow x amount / circulating",
+      "expected": [
+        true
+      ],
+      "actual": [
+        true
+      ],
+      "pass": true
+    },
+    {
+      "name": "close after the grace period: escrow to the vault, rent to the operator, position freed",
+      "expected": [
+        true
+      ],
+      "actual": [
+        true
+      ],
+      "pass": true
+    }
+  ],
+  "passed": 58,
+  "failed": 0
+}

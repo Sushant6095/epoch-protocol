@@ -52,6 +52,12 @@ endpoint below, the activity feed and the WS frames with the chain to the lampor
 passed ([the runbook's round-2 section](../runbooks/meteora-devnet-rehearsal.md#10-round-2-the-whole-loop-through-the-program-5-oct-2026)).
 The `ingest` feed fields in the examples are from that run (`LAUNCH_TRADES_BACKSTOP_SECONDS=30`).
 
+**Round 3 (6 Oct 2026), on the hardened program.** `rR3E` ran its whole life on the stand-in: launch, curve,
+graduation by Epoch's migration crank, DAMM v2, a share, four slices, the term's end, `close_revenue_token` after the
+grace period and the treasury's claims; then the validator registered a pool built by Meteora's studio CLI. 58 of 58
+checks passed, plus pause, redeem and close checks
+([results](../runbooks/meteora-e2e-2026-10-06.json), [Meteora tooling](../meteora/README.md)).
+
 ## Rules the page follows
 
 - **Words.**
@@ -98,12 +104,15 @@ The `ingest` feed fields in the examples are from that run (`LAUNCH_TRADES_BACKS
 | `GET /v1/launches/:mint/holders` | `LaunchHolders` | `public, max-age=30` | Largest 20 accounts, cached 2 min; read again after a trade or claim (at most every 5 s) |
 | `GET /v1/launches/:mint/fees` | `LaunchFees` | `public, max-age=15` | Pools' state cached 60 s, plus claim events |
 | `GET /v1/launches/:mint/buybacks` | `LaunchBuybackFeed` | `public, max-age=30` | Base58 mint only; from the program's cluster |
+| `GET /v1/launches/:mint/indexed` | `LaunchIndexed` | `public, max-age=30` | Graduated pools on mainnet: Meteora's DAMM v2 data API (`?timeframe=5m…24h`, 1h) |
 | `POST /v1/launches/:mint/quote` | `LaunchQuoteResponse` | `no-store` | Rate-limited per IP (30/min) |
 | `POST /v1/launches/:mint/build` | `LaunchBuildResponse` | `no-store` | Needs `consent: true`; rate-limited per IP |
 | `WS /v1/stream`, channel `launch:<mint>` | frames, below | — | Snapshot on subscribe, then live |
 
 `GET /v1/launches` (the list) and `GET /v1/launches/:mint` (the detail: token, curve, escrow, risks, price series) are
-unchanged; the first-paint bundle includes the detail.
+unchanged; the first-paint bundle includes the detail. The detail's `escrow.balanceSol` counts the escrow only while the
+program's `RevenueToken` names this mint: 0 once the token closed or its validator registered another (the escrow PDA is
+the vote's, not the mint's).
 
 ## First paint: `GET /v1/launches/:mint/page`
 
@@ -217,7 +226,8 @@ On the curve (`rLOC`), the same block reads:
 | `shareRevenuePerEpochSol` | The live estimate of what the buyback gets each epoch: the mainnet validator table's inflation and MEV commission × share. Use it for the implied yield. `0` while unknown (a vote account that is not a mainnet validator with stake). |
 | `pricedAtShareRevenuePerEpochSol` | What the curve was priced from at launch: the 10-epoch average, including sampled block revenue, × share. Show it as "priced at", next to the live figure. The two differ when block revenue is not part of what the program sweeps. |
 | `impliedYieldPctPerEpoch` | `shareRevenuePerEpochSol ÷ marketCapSol × 100`, in **% per epoch**. `null` without a market cap or share revenue. |
-| `graduation.state` | `upcoming` (no pool) · `curve` (trading on the curve) · `complete` (raise in, migration pending, usually minutes) · `migrated` (DAMM v2 live). |
+| `graduation.state` | `upcoming` (no pool) · `curve` (trading on the curve) · `complete` (raise in, migration pending: Epoch's crank migrates it on its next pass, as Meteora's keepers only take 10 SOL raises) · `migrated` (DAMM v2 live). |
+| `indexed` | After graduation on mainnet: Meteora's indexed view of the DAMM v2 pool (`tvlUsd`, `volume24hUsd`, `fees24hUsd`, `lockedLiquidityUsd`, `priceSol`, `freshness`), from its DAMM v2 data API, cached 60 s. `null` on the curve, on devnet (the API indexes mainnet only), or when the API does not answer: the on-chain fields above never depend on it. |
 | `graduation.meteoraUrl` | Meteora's pool page, on mainnet only. |
 | `day` | The last 24 hours from the trade feed. `priceChangePct` is null without two trades. |
 
@@ -313,7 +323,7 @@ quote ──► review (amounts, price impact, fee, min out, warnings, consent) 
 
    `POST /v1/launches/:mint/quote` `{ "side": "buy", "amount": 0.05, "slippageBps": 100 }`
    - `amount` is the SOL to spend for a buy, or the tokens to sell for a sell.
-   - `slippageBps` is 0–5,000; the default is 100 (1%).
+   - `slippageBps` is 1–5,000; the default is 100 (1%). 0 is refused (`400`): a swap always carries an explicit floor.
 
    On the curve (`rLOC`):
 
@@ -341,6 +351,9 @@ quote ──► review (amounts, price impact, fee, min out, warnings, consent) 
    `{ "side": "buy", "amount": 0.05, "slippageBps": 100, "owner": "<wallet>", "minimumOut": 14210.985214, "consent": true }`
    - Pass the reviewed quote's `minimumOut`, so the transaction enforces what the review showed.
    - Without `consent: true` the API answers `400 CONSENT_REQUIRED` and builds nothing.
+   - The transaction starts with a compute budget: a 200,000-unit limit (a curve buy uses about 57,000, a DAMM v2 swap
+     about 38,000) and a priority price, 100,000 µlamports by default (`LAUNCH_TRADE_PRIORITY_MICROLAMPORTS`).
+     `priorityFeeSol` (0.00002 by default) is that fee, on top of the 0.000005 signature fee: show it in the review.
 
    ```json
    {
@@ -350,7 +363,8 @@ quote ──► review (amounts, price impact, fee, min out, warnings, consent) 
      "feePayer": "6MTBgCMiLQLbXrMXmWa172Hv2hE2q1wANkfPZD2QMTA5",
      "blockhash": "8AqcAaMBqJrCn7HNjs2zXBFivAAZdvG9jnVsk7ztPTgh",
      "lastValidBlockHeight": 4734,
-     "explorerCluster": "devnet"
+     "explorerCluster": "devnet",
+     "priorityFeeSol": 0.00002
    }
    ```
 
@@ -569,6 +583,12 @@ and every ingested `BuybackExecuted` event for the mint, newest first (at most 2
 - `:mint` must be the base58 mint: use `links.buybacks`. A symbol answers `400 BAD_REQUEST` ("a base58 mint").
 - A mint no validator registered answers `200` with `revenueToken: null`, `term: null`, `schedule: null`, zero totals
   and `note: "No validator has registered this mint as a revenue token."`.
+- A token that ran its term and was closed (`close_revenue_token`) has no account any more, and its validator may have
+  registered another mint since (the escrow PDA is the vote's). The feed then answers from the program's events: `term`
+  from `RevenueTokenRegistered`, `totals` from `RevenueTokenClosed`, every slice, `venue: null`, `schedule: null`, an
+  empty `escrow`, and `closed: { epoch, at, signature, unclaimedToPoolSol }` (what holders had not redeemed after the
+  30-epoch grace period, now pool income). `note` says so, e.g. "Closed after its term (epoch 42): the 0.094313791 SOL
+  holders had not redeemed went to the Epoch pool as income.". `closed` is `null` on every other feed.
 - Without `EPOCH_PROGRAM_ID` the API answers `503 PROGRAM_NOT_CONFIGURED`: show the block as unavailable.
 
 `rLOC`, registered, before its first sweep. Its escrow holds 0.1 SOL that was sent by hand to stand in for a share:
@@ -608,6 +628,7 @@ and every ingested `BuybackExecuted` event for the mint, newest first (at most 2
 | `totals` | `escrowedSol`, `spentSol`, `burned` and `redeemed` (token UI units), `redeemedSol`, `buybacks` (count) |
 | `buybacks[]` | `LaunchBuyback` rows: `epoch`, `slice` of `slices`, `solIn`, `tokensBurned`, `priceSol` (SOL per token paid, fees included), `venue`, `signature`. Build the explorer link on the program's cluster (`network`). |
 | `treasury` | Epoch's treasury claims for the mint, present for every mint (see [Treasury claims](#treasury-claims)) |
+| `closed` | Set once the token closed after its term (above); show "Term over: closed" with `unclaimedToPoolSol`, and hide the redeem action |
 
 How the program runs it:
 
@@ -688,7 +709,7 @@ its fee claimer is a plain wallet, not the treasury PDA.
 | Field | Meaning |
 | --- | --- |
 | `source` | `program`: the program's account, the authority. `registry`: the launch record's terms, for a token that is not registered. |
-| `registeredOnChain` | `true`: registered with this mint. `false`: not registered yet, or the vote account registered another mint (`note` says which). `null`: unknown; the API has no program id or the read failed (`note` says so). |
+| `registeredOnChain` | `true`: registered with this mint. `false`: not registered yet, closed after its term (`note` says so and points at `/buybacks`), or the vote account registered another mint (`note` says which). `null`: unknown; the API has no program id or the read failed (`note` says so). |
 | `address`, `buybackEscrow`, `treasury` | The program's PDAs: `["revenue_token", vote]`, `["buyback", vote]`, `["treasury", pool]` |
 | `shareBps`, `termEpochs` | The share of the validator's gross revenue (1–5,000 bps) and the term (10–1,000 epochs). Immutable. |
 | `startEpoch`, `endEpoch` | The first and last epoch whose sweep pays the share. The term starts the epoch after registration (`registeredEpoch + 1`). |

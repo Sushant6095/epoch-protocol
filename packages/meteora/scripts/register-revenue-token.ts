@@ -8,24 +8,25 @@
  *   pnpm --filter @epoch/meteora register -- --symbol <SYM> [--cluster devnet|mainnet] [--rpc <url>] [--execute]
  *
  * Checks the cluster, the program and its Pool, the terms, the validator's position (onboarded, Active, no revenue
- * token, the program holds its withdraw authority, the operator key), the mint and its DBC config (fee claimer = the
- * treasury PDA), the operator's balance, and simulates the instruction. On success it writes the program's term (its
+ * token, the program holds its withdraw authority, the operator key), the mint and its DBC config (the program's own
+ * `check_launch_config` through the SDK: fee claimer and leftover receiver = the treasury PDA, the graduated liquidity
+ * locked forever, the fee floor), the operator's balance, and simulates the instruction. On success it writes the program's term (its
  * start epoch) and the signature into the launch record. Keys come from paths only and are never printed.
  */
 import { parseArgs } from 'util';
 
-import { Connection, PublicKey } from '@solana/web3.js';
+import { decodeDbcLaunchConfig } from '@epoch/epoch-sdk';
+import { type AccountInfo, Connection, PublicKey } from '@solana/web3.js';
 
 import {
   checkCluster,
   checkEpochPool,
   checkPayerBalance,
   checkProgram,
-  checkRegistrableConfig,
   checkRegistrableMint,
+  checkRegistrationConfig,
   checkRevenueTokenTerms,
   checkValidatorPosition,
-  dbcClient,
   formatSol,
   type LaunchCluster,
   type LaunchRegistryEntry,
@@ -58,9 +59,21 @@ import {
   registrationLabels,
   registrationLines,
   registrationTransaction,
+  registrationVerdict,
   REVENUE_TOKEN_LIMITS,
   revenueTokenAccounts,
 } from './epochProgram';
+
+/** The launched DBC config through the program's own checks (decoded at the program's offsets by the SDK). */
+function configCheck(account: AccountInfo<Buffer> | null, treasury: PublicKey): PreflightCheck {
+  const name = 'Registration checks';
+  if (!account) return { name, status: 'fail', detail: 'the DBC config is not on this cluster' };
+  try {
+    return checkRegistrationConfig(registrationVerdict(decodeDbcLaunchConfig(account.data), treasury));
+  } catch (error) {
+    return { name, status: 'fail', detail: error instanceof Error ? error.message : String(error) };
+  }
+}
 
 const USAGE = `Usage: pnpm --filter @epoch/meteora register -- --symbol <SYM> [options]
 
@@ -144,12 +157,10 @@ async function main(): Promise<void> {
   );
   out(`RPC                ${new URL(rpc).host}`);
 
-  const [genesis, state, config, mintInfo] = await Promise.all([
+  const [genesis, state, configAccount, mintInfo] = await Promise.all([
     connection.getGenesisHash(),
     readEpochProgram(connection, keys, vote),
-    dbcClient(connection)
-      .state.getPoolConfig(entry.dbcConfig)
-      .catch(() => null),
+    connection.getAccountInfo(new PublicKey(entry.dbcConfig), 'confirmed').catch(() => null),
     readTokenMint({ connection, mint }),
   ]);
   const already = state.revenueToken;
@@ -170,15 +181,7 @@ async function main(): Promise<void> {
           registeringNow: true,
         })),
     checkRegistrableMint(mintInfo),
-    checkRegistrableConfig(
-      config && {
-        feeClaimer: config.feeClaimer.toBase58(),
-        quoteMint: config.quoteMint.toBase58(),
-        migrationOption: config.migrationOption,
-        tokenType: config.tokenType,
-      },
-      keys.treasury.toBase58(),
-    ),
+    configCheck(configAccount, keys.treasury),
   ];
   if (already) {
     checks.push(

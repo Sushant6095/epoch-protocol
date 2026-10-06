@@ -2,7 +2,12 @@
  * The launch script's pre-flight checks, as pure functions of what it read: each returns pass, warn or fail with one line
  * of detail. A launch is sent only when nothing failed (and, on mainnet, after the operator types the symbol).
  */
-import { type ConfigParameters, type PoolConfig } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import {
+  type ConfigParameters,
+  type PoolConfig,
+  validateConfigParameters,
+} from '@meteora-ag/dynamic-bonding-curve-sdk';
+import { type PublicKey } from '@solana/web3.js';
 
 import { LAMPORTS_PER_SOL, NATIVE_MINT, TOKEN_PROGRAM_ID } from './constants';
 import { endEpochOf } from './math';
@@ -334,12 +339,53 @@ export function checkRegistrableMint(
     : fail(name, problems.join('; '));
 }
 
-/** The leftover receiver should be the treasury PDA: the program withdraws the unsold supply from it and burns it. */
+/**
+ * The leftover receiver must be the treasury PDA: Epoch's configs have a fixed supply, and for those
+ * `register_revenue_token` refuses any other receiver (`NotTreasuryLeftoverReceiver`, security review R-2). The program
+ * withdraws the unsold supply to the treasury and burns it.
+ */
 export function checkLeftoverReceiver(receiver: string, treasuryPda: string): PreflightCheck {
   const name = 'Leftover receiver';
   return receiver === treasuryPda
     ? pass(name, 'the treasury PDA (the program burns the unsold supply)')
-    : warn(name, `${receiver} is not the treasury PDA: the program can only burn a leftover the treasury receives`);
+    : fail(
+        name,
+        `${receiver} is not the treasury PDA ${treasuryPda}: register_revenue_token refuses a fixed-supply config whose leftover goes elsewhere (NotTreasuryLeftoverReceiver)`,
+      );
+}
+
+/** What the program's config checks said about a DBC config (`@epoch/epoch-sdk` `checkLaunchConfig`, plain values). */
+export type RegistrationConfigVerdict =
+  { ok: true; feeFloorBps: number; maxImpactBound: number } | { ok: false; error: string; reason: string };
+
+/**
+ * The DBC config passes `register_revenue_token`'s own checks (`check_launch_config`: SOL quote, DAMM v2, SPL Token,
+ * the treasury as fee claimer and leftover receiver, 100% of the graduated liquidity locked forever, a fee floor that
+ * bounds a buyback's price impact), run before anyone signs. A config that fails here would launch a token the
+ * validator can never register.
+ */
+export function checkRegistrationConfig(verdict: RegistrationConfigVerdict): PreflightCheck {
+  const name = 'Registration checks';
+  return verdict.ok
+    ? pass(
+        name,
+        `check_launch_config passes: fee floor ${verdict.feeFloorBps} bps, so a buyback slice may move the price at most ${verdict.maxImpactBound} bps`,
+      )
+    : fail(name, `${verdict.reason}: register_revenue_token would refuse it (${verdict.error})`);
+}
+
+/**
+ * Meteora's own validation of the planned config: the DBC SDK's `validateConfigParameters`, which `createConfig` runs
+ * (fees, curve, supply, migration options, the 10% day-one LP lock), so a dry run reports what a real launch would hit.
+ */
+export function checkMeteoraValidation(planned: ConfigParameters, leftoverReceiver: PublicKey): PreflightCheck {
+  const name = 'Meteora config validation';
+  try {
+    validateConfigParameters({ ...planned, leftoverReceiver });
+    return pass(name, 'the DBC SDK accepts the config (validateConfigParameters)');
+  } catch (error) {
+    return fail(name, error instanceof Error ? error.message : String(error));
+  }
 }
 
 /** The program starts the term with the epoch after registration; a different `startEpoch` in the config is ignored. */

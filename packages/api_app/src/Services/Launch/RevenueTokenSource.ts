@@ -200,11 +200,18 @@ export class ProgramRevenueTokenSource implements RevenueTokenSource {
         chain.epoch(),
       ]);
       if (!token) {
+        // The launch record says it was registered and its term is over: `close_revenue_token` closed the account.
+        const closed =
+          entry.registeredEpoch !== undefined &&
+          entry.registeredEpoch !== null &&
+          epoch > endEpochOf(entry.startEpoch, entry.termEpochs);
         return {
           ...registryRevenueToken(
             entry,
             programId,
-            "Not registered with the program yet: the terms are the launch record's.",
+            closed
+              ? 'Closed after its term (close_revenue_token): its buybacks, redemptions and where the escrow went are in /buybacks.'
+              : "Not registered with the program yet: the terms are the launch record's.",
           ),
           registeredOnChain: false,
         };

@@ -43,7 +43,8 @@ export interface LaunchConfigInput {
   initialBuySol?: number;
   /**
    * Who can withdraw the unused supply after graduation; default LAUNCH_LEFTOVER_RECEIVER, else the Epoch treasury PDA
-   * (the program withdraws the leftover from it and burns it).
+   * (the program withdraws the leftover from it and burns it). It must be the treasury PDA: `register_revenue_token`
+   * refuses a fixed-supply config whose leftover goes elsewhere, so the pre-flight fails on any other address.
    */
   leftoverReceiver?: string;
 }

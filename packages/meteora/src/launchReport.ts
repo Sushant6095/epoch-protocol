@@ -60,7 +60,7 @@ export function launchPlanLines(plan: LaunchPlan): string[] {
     `Sqrt prices        ${sqrtLow} → ${sqrtHigh} (Q64.64, ${curve.sqrtPrices.length} points, buildCurveWithCustomSqrtPrices)`,
     `Raise              ${n(curve.migrationThresholdSol)} SOL = DBC migrationQuoteThreshold (the whole supply on the band would raise ${n(curve.fullSupplyRaiseSol, 3)} SOL)`,
     `Supply             ${n(curve.tokensOnCurve, 2)} on the curve · ≈ ${n(dammSeedTokens, 2)} seed DAMM v2 · ${n(curve.leftoverTokens, 0)} leftover (to the leftover receiver after graduation)`,
-    `Graduation         70% × ${n(curve.migrationThresholdSol)} = ${n(curve.upfrontToValidatorSol)} SOL to the pool creator (the validator, upfront); 30% = ${n(curve.dammSeedSol)} SOL seeds DAMM v2, 100% of its LP permanently locked with the partner`,
+    `Graduation         70% × ${n(curve.migrationThresholdSol)} = ${n(curve.upfrontToValidatorSol)} SOL to the pool creator (the validator, upfront); the other 30% less Meteora's 0.2% protocol migration fee = ${n(curve.dammSeedSol)} SOL seeds DAMM v2, 100% of its LP permanently locked with the partner`,
     `Fees               curve ${n(curveFeeBps, 2)} bps, all to the partner (Epoch's treasury PDA: claimed into the lending pool for lenders); DAMM v2 ${[25, 30, 100, 200, 400, 600][curve.config.migrationFeeOption] ?? '?'} bps after graduation`,
     `Market cap         ${n(marketCapAtStart, 4)} SOL at the start price → ${n(band.bandHighSol * config.supply, 4)} SOL at graduation (fully diluted)`,
     `Implied yield      ${yieldAtStart === null ? '—' : `${n(yieldAtStart, 3)}%`} per epoch at the start price → ${yieldAtGraduation === null ? '—' : `${n(yieldAtGraduation, 3)}%`} at graduation (never annualised: the cashflow ends with the term)`,

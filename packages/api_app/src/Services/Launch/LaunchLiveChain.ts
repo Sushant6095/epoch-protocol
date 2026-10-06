@@ -89,6 +89,8 @@ export class RpcLaunchLiveChain implements LaunchLiveChain {
   constructor(
     private readonly connections: ConnectionManager,
     private readonly url: string,
+    /** The swap's priority fee, micro-lamports per compute unit (LAUNCH_TRADE_PRIORITY_MICROLAMPORTS). */
+    private readonly priorityMicroLamports?: number,
   ) {
     this.ingest = new Connection(url, { commitment: 'confirmed', disableRetryOnRateLimit: true });
   }
@@ -133,6 +135,15 @@ export class RpcLaunchLiveChain implements LaunchLiveChain {
     owner: string,
     minimumOut?: number,
   ): Promise<Transaction> {
-    return buildTradeTx({ connection: this.connections.primary, launch, side, amount, slippageBps, owner, minimumOut });
+    return buildTradeTx({
+      connection: this.connections.primary,
+      launch,
+      side,
+      amount,
+      slippageBps,
+      owner,
+      minimumOut,
+      priorityMicroLamports: this.priorityMicroLamports,
+    });
   }
 }

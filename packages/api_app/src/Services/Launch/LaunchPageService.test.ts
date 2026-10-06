@@ -1,5 +1,15 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 import { FIELD_OFFSETS, findPoolPda, findVaultPda } from '@epoch/epoch-sdk';
-import { LaunchTradeError } from '@epoch/meteora';
+import {
+  DataApiError,
+  LaunchTradeError,
+  mapIndexedCandles,
+  mapIndexedPool,
+  mapIndexedVolume,
+  mapProtocolMetrics,
+} from '@epoch/meteora';
 import { PublicKey, Transaction } from '@solana/web3.js';
 
 import {
@@ -27,6 +37,7 @@ import { type StoredProgramEvent } from '../../Lib/EventBus';
 import { type LaunchStreamMessage } from '../../types/LaunchPage.types';
 import { MemoryEventStore } from '../Program/ProgramEventStore';
 import { BuybackFeed } from './BuybackFeed';
+import { LaunchIndexedSource } from './LaunchIndexedSource';
 import { LaunchTradeIngester } from './LaunchTradeIngester';
 import { type StoredLaunchFeeEvent } from './LaunchTradeStore';
 import { buybackEscrowAddress, partnerTreasuryAddress, revenueTokenAddress } from './RevenueTokenSource';
@@ -90,6 +101,7 @@ describe('LaunchPageService', () => {
           curveCompletedAt: null,
         },
         day: { volumeSol: 0, trades: 0, buys: 0, sells: 0, priceChangePct: null },
+        indexed: null,
         freshness: { asOf: '2026-10-03T19:30:00+05:30', ageSeconds: 0, stale: false },
       });
     });
@@ -589,6 +601,8 @@ describe('LaunchPageService', () => {
         explorerCluster: 'devnet',
         validForSeconds: 60,
         quote: { minimumOut: 31_000, venue: 'dbc' },
+        // 200,000 CU at 100,000 micro-lamports: the most the priority fee can cost.
+        priorityFeeSol: 0.00002,
       });
       const tx = Transaction.from(Buffer.from(built.transaction, 'base64'));
       expect(tx.feePayer?.toBase58()).toBe(TRADER);
@@ -777,5 +791,103 @@ describe('LaunchPageService', () => {
       `https://explorer.solana.com/tx/${trade.signature}?cluster=custom&customUrl=http%3A%2F%2F127.0.0.1%3A38899`,
     );
     expect(curveMidRaise().dbcPool).toBe(DBC_POOL);
+  });
+});
+
+describe("LaunchPageService with Meteora's DAMM v2 data API", () => {
+  const datapi = (name: string): unknown =>
+    JSON.parse(readFileSync(join(__dirname, '../../../../meteora/src/__fixtures__/datapi', `${name}.json`), 'utf8'));
+  /** The data API answering with the recorded SPEC-SOL responses, whatever pool is asked for. */
+  const fakeApi = (
+    overrides: Partial<Record<'pool' | 'ohlcv' | 'volumeHistory' | 'protocolMetrics', jest.Mock>> = {},
+  ) => ({
+    pool: jest.fn(async () => mapIndexedPool(datapi('pool'))),
+    ohlcv: jest.fn(async () => mapIndexedCandles(datapi('ohlcv-1h'))),
+    volumeHistory: jest.fn(async () => mapIndexedVolume(datapi('volume-history-1h'))),
+    protocolMetrics: jest.fn(async () => mapProtocolMetrics(datapi('protocol-metrics'))),
+    ...overrides,
+  });
+  const graduated = { state: { curve: rehearsalCurve(), damm: rehearsalDamm() } };
+
+  it('adds the indexed pool to a graduated market, and leaves the chain read as it is', async () => {
+    const api = fakeApi();
+    const harness = launchPageHarness({
+      ...graduated,
+      page: { indexed: new LaunchIndexedSource(api, { ttlMs: 60_000, now: () => NOW }), now: () => NOW },
+      now: NOW,
+    });
+    const market = await harness.page.market(MINT);
+    expect(market.venue).toBe('damm-v2');
+    expect(market.indexed).toEqual({
+      source: "Meteora's DAMM v2 data API (damm-v2.datapi.meteora.ag): indexed, seconds behind the chain",
+      tvlUsd: 61069.62,
+      volume24hUsd: 1100046.38,
+      fees24hUsd: 9261.7,
+      lockedLiquidityUsd: 61625.17,
+      priceSol: 0.00000245882,
+      freshness: { asOf: '2026-10-03T19:30:00+05:30', ageSeconds: 0, stale: false },
+    });
+    expect(market.priceSol).toBe(Number(rehearsalDamm().priceSol.toPrecision(6)));
+    expect(api.pool).toHaveBeenCalledWith(DAMM_POOL);
+  });
+
+  it('serves the full indexed view: pool, candles, volume and the protocol totals', async () => {
+    const harness = launchPageHarness({
+      ...graduated,
+      page: { indexed: new LaunchIndexedSource(fakeApi(), { ttlMs: 60_000, now: () => NOW }), now: () => NOW },
+      now: NOW,
+    });
+    const view = await harness.page.indexed(MINT, { timeframe: '1h' });
+    expect(view).toMatchObject({
+      available: true,
+      reason: null,
+      dammPool: DAMM_POOL,
+      pool: { name: 'SPEC-SOL', holders: 3836, launchpad: 'met-dbc', baseFeePct: 1, dynamicFee: true },
+      protocol: { pools: 1596468, refreshedAt: '2026-10-06T01:08:00+05:30' },
+    });
+    expect(view.candles?.candles).toHaveLength(5);
+    expect(view.candles?.candles[0]).toMatchObject({ time: 1791208800, t: '2026-10-05T19:30:00+05:30' });
+    expect(view.volumeHistory?.buckets.at(-1)?.volumeUsd).toBe(0);
+  });
+
+  it('says why there is nothing: not graduated, off, not indexed yet, or the API down', async () => {
+    const onCurve = launchPageHarness({
+      page: { indexed: new LaunchIndexedSource(fakeApi(), { ttlMs: 60_000 }) },
+    });
+    expect(await onCurve.page.indexed(MINT, {})).toMatchObject({
+      available: false,
+      reason: expect.stringContaining('has not graduated'),
+    });
+    expect((await onCurve.page.market(MINT)).indexed).toBeNull();
+
+    const off = launchPageHarness({ ...graduated, page: { indexed: null, indexedOff: 'devnet: not indexed' } });
+    expect(await off.page.indexed(MINT, {})).toMatchObject({ available: false, reason: 'devnet: not indexed' });
+
+    const unknown = launchPageHarness({
+      ...graduated,
+      page: { indexed: new LaunchIndexedSource(fakeApi({ pool: jest.fn(async () => null) }), { ttlMs: 60_000 }) },
+    });
+    expect(await unknown.page.indexed(MINT, {})).toMatchObject({
+      available: false,
+      reason: expect.stringContaining('has not indexed this pool yet'),
+    });
+
+    const down = launchPageHarness({
+      ...graduated,
+      page: {
+        indexed: new LaunchIndexedSource(
+          fakeApi({ pool: jest.fn(async () => Promise.reject(new DataApiError(503, 'data API 503: busy'))) }),
+          { ttlMs: 60_000 },
+        ),
+      },
+    });
+    expect(await down.page.indexed(MINT, {})).toMatchObject({
+      available: false,
+      reason: 'the DAMM v2 data API did not answer (data API 503: busy)',
+    });
+    // The market still answers from the chain.
+    const market = await down.page.market(MINT);
+    expect(market.indexed).toBeNull();
+    expect(market.venue).toBe('damm-v2');
   });
 });

@@ -55,5 +55,28 @@ describe('LaunchChain', () => {
     } satisfies LaunchRegistryEntry;
     expect(await readLaunchChain(entry, reader)).toMatchObject({ escrowSol: 0.1, failed: [] });
     expect(reader.escrowSol).toHaveBeenCalledWith(ESCROW);
+
+    // Round 3: the token closed after its term and the validator registered another mint. The escrow PDA is the
+    // vote's, so its SOL is the new token's share, not this launch's.
+    const revenueToken = 'BKnweefs2va1DBqSRzEEYLefHePUkzFvnmaySZHPeDaj';
+    const registered = { ...entry, revenueToken };
+    reader.revenueTokenMint = jest.fn().mockResolvedValue('7M3xZjTXnQ91V9n7VXvnoaYx7pdj69kZ4dcQ3Lh8jGV2');
+    expect(await readLaunchChain(registered, reader)).toMatchObject({ escrowSol: 0, failed: [] });
+    expect(reader.revenueTokenMint).toHaveBeenCalledWith(revenueToken);
+    // Closed and not replaced: no account, nothing in the escrow is the launch's.
+    reader.revenueTokenMint = jest.fn().mockResolvedValue(null);
+    expect(await readLaunchChain(registered, reader)).toMatchObject({ escrowSol: 0 });
+    // Still this mint's: the escrow counts.
+    reader.revenueTokenMint = jest.fn().mockResolvedValue(entry.mint);
+    expect(await readLaunchChain(registered, reader)).toMatchObject({ escrowSol: 0.1 });
+  });
+
+  it('reads the mint a RevenueToken account names: null once it closed; another account is a failed read', async () => {
+    const data = new Uint8Array(400);
+    const getAccountInfo = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ data });
+    const connections = { withFailover: <T>(read: (c: unknown) => Promise<T>) => read({ getAccountInfo }) };
+    const reader = new RpcLaunchChainReader(connections as never);
+    expect(await reader.revenueTokenMint(ESCROW)).toBeNull();
+    await expect(reader.revenueTokenMint(ESCROW)).rejects.toThrow();
   });
 });

@@ -11,9 +11,11 @@ import {
   checkInitialBuy,
   checkLeftoverReceiver,
   checkMetadataJson,
+  checkMeteoraValidation,
   checkPayerBalance,
   checkProgram,
   checkRegistrableConfig,
+  checkRegistrationConfig,
   checkRegistrableMint,
   checkRegistry,
   checkRevenueTokenTerms,
@@ -186,7 +188,11 @@ describe('pre-flight checks', () => {
 
     it('leftover receiver and start epoch', () => {
       expect(checkLeftoverReceiver(TREASURY, TREASURY).status).toBe('pass');
-      expect(checkLeftoverReceiver('wallet', TREASURY).status).toBe('warn');
+      // A fixed-supply config whose leftover goes elsewhere can never be registered (security review R-2).
+      expect(checkLeftoverReceiver('wallet', TREASURY)).toMatchObject({
+        status: 'fail',
+        detail: expect.stringContaining('NotTreasuryLeftoverReceiver'),
+      });
       expect(checkStartEpoch(undefined, 801).status).toBe('pass');
       expect(checkStartEpoch(801, 801).status).toBe('pass');
       expect(checkStartEpoch(900, 801)).toMatchObject({ status: 'warn', detail: expect.stringContaining('(801') });
@@ -220,6 +226,38 @@ describe('pre-flight checks', () => {
         checkRegistrableMint({ ...mint, tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' }).status,
       ).toBe('fail');
       expect(checkRegistrableMint(null).status).toBe('fail');
+    });
+  });
+
+  describe('what the program and Meteora will check', () => {
+    const planned = revenueCurveConfig({ bandLowSol: 1e-6, bandHighSol: 2e-6, supply: 1_000_000, decimals: 6 }).config;
+
+    it("reports the program's verdict on the config: the fee floor, or the error registration would hit", () => {
+      expect(checkRegistrationConfig({ ok: true, feeFloorBps: 100, maxImpactBound: 200 })).toEqual({
+        name: 'Registration checks',
+        status: 'pass',
+        detail: 'check_launch_config passes: fee floor 100 bps, so a buyback slice may move the price at most 200 bps',
+      });
+      expect(
+        checkRegistrationConfig({ ok: false, error: 'LiquidityNotLocked', reason: 'only 90% is locked forever' }),
+      ).toMatchObject({
+        status: 'fail',
+        detail: 'only 90% is locked forever: register_revenue_token would refuse it (LiquidityNotLocked)',
+      });
+    });
+
+    it("runs Meteora's own config validation on the planned config", () => {
+      const receiver = new PublicKey('CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA');
+      expect(checkMeteoraValidation(planned, receiver)).toMatchObject({ status: 'pass' });
+      // DAMM v1 graduation is deprecated for new configs (DBC 0.2.1, SDK 1.5.12).
+      expect(checkMeteoraValidation({ ...planned, migrationOption: 0 }, receiver)).toMatchObject({ status: 'fail' });
+      // Less than 10% of the graduated liquidity locked on day one.
+      expect(
+        checkMeteoraValidation(
+          { ...planned, partnerPermanentLockedLiquidityPercentage: 5, partnerLiquidityPercentage: 95 },
+          receiver,
+        ),
+      ).toMatchObject({ status: 'fail' });
     });
   });
 

@@ -56,6 +56,21 @@ export interface LaunchBuybackFeed extends Meta {
   /** Newest first. */
   buybacks: LaunchBuyback[];
   treasury: LaunchTreasuryClaims;
+  /**
+   * Set once the token ran its term and `close_revenue_token` closed it (the `RevenueToken` account is gone; the
+   * validator may since have registered another mint): the history and totals then come from the program's events.
+   */
+  closed: LaunchRevenueTokenClosed | null;
+}
+
+/** `RevenueTokenClosed`: the escrow's last SOL went to the Epoch pool (or, once spent, the rent to the operator). */
+export interface LaunchRevenueTokenClosed {
+  epoch: number | null;
+  /** ISO 8601 (IST) when known. */
+  at: string | null;
+  signature: string;
+  /** What holders had not redeemed after the grace period, added to the lending pool as income. */
+  unclaimedToPoolSol: number;
 }
 
 /** `TreasuryClaimed.kind`: what the partner treasury claimed from Meteora. */

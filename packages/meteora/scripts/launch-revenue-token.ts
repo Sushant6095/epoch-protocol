@@ -38,6 +38,7 @@ import {
   deriveDbcPoolAuthority,
   deriveDbcTokenVaultAddress,
   deriveMintMetadata,
+  type ConfigParameters,
   DYNAMIC_BONDING_CURVE_PROGRAM_ID,
   METAPLEX_PROGRAM_ID,
   SwapMode,
@@ -54,8 +55,10 @@ import {
   checkInitialBuy,
   checkLeftoverReceiver,
   checkMetadataJson,
+  checkMeteoraValidation,
   checkPayerBalance,
   checkProgram,
+  checkRegistrationConfig,
   checkRegistry,
   checkRevenueTokenTerms,
   checkStartEpoch,
@@ -109,6 +112,7 @@ import {
   type EpochProgramKeys,
   epochProgramKeys,
   type EpochProgramRead,
+  plannedLaunchConfig,
   planRegistration,
   readEpochProgram,
   readRegistered,
@@ -117,6 +121,7 @@ import {
   registrationLabels,
   registrationLines,
   registrationTransaction,
+  registrationVerdict,
   REVENUE_TOKEN_LIMITS,
   revenueTokenAccounts,
 } from './epochProgram';
@@ -773,6 +778,7 @@ async function main(): Promise<void> {
           status: 'fail',
           detail: "holds no SOL: migration to DAMM v2 would fail (it fronts the new pool's rent)",
         },
+    checkMeteoraValidation(plan.curve.config, leftoverReceiver),
     ...programChecks({
       program,
       programState,
@@ -780,6 +786,7 @@ async function main(): Promise<void> {
       cluster: args.cluster,
       leftoverReceiver,
       operatorKey: operatorKeypair?.publicKey ?? null,
+      plannedConfig: plan.curve.config,
     }),
     ...checkRegistry(registry, {
       symbol: launch.symbol,
@@ -1027,6 +1034,8 @@ function programChecks(input: {
   cluster: LaunchCluster;
   leftoverReceiver: PublicKey;
   operatorKey: PublicKey | null;
+  /** The DBC config the launch will create, checked as `register_revenue_token` will check it. */
+  plannedConfig: ConfigParameters;
 }): PreflightCheck[] {
   const { program, programState, launch } = input;
   if (!program || !programState) {
@@ -1047,6 +1056,16 @@ function programChecks(input: {
       detail: `${program.treasury.toBase58()} = ["treasury", pool]: the fee claimer register_revenue_token requires`,
     },
     checkLeftoverReceiver(input.leftoverReceiver.toBase58(), program.treasury.toBase58()),
+    checkRegistrationConfig(
+      registrationVerdict(
+        plannedLaunchConfig(input.plannedConfig, {
+          quoteMint: NATIVE_MINT,
+          feeClaimer: program.treasury,
+          leftoverReceiver: input.leftoverReceiver,
+        }),
+        program.treasury,
+      ),
+    ),
     checkRevenueTokenTerms(launch, REVENUE_TOKEN_LIMITS),
     ...checkValidatorPosition(programState.position, {
       cluster: input.cluster,

@@ -4,7 +4,14 @@ import { PublicKey } from '@solana/web3.js';
 import { type StoredProgramEvent } from '../../Lib/EventBus';
 import { type ProgramEpochInfo } from '../../Sources/EpochProgramSource';
 import { type EventQuery } from '../Program/ProgramEventStore';
-import { BuybackFeed, type BuybackChainReader, buybackSchedule, toLaunchBuyback, treasuryClaims } from './BuybackFeed';
+import {
+  BuybackFeed,
+  type BuybackChainReader,
+  buybackSchedule,
+  closedFeed,
+  toLaunchBuyback,
+  treasuryClaims,
+} from './BuybackFeed';
 
 const key = (n: number) => new PublicKey(new Uint8Array(32).fill(n));
 const MINT = key(100);
@@ -342,5 +349,121 @@ describe('BuybackFeed', () => {
     await expect(new BuybackFeed({ chain: chain(null), events, now }).get('notakey0')).rejects.toMatchObject({
       statusCode: 400,
     });
+  });
+});
+
+describe('BuybackFeed for a closed revenue token', () => {
+  const event = (
+    name: StoredProgramEvent['name'],
+    slot: number,
+    data: StoredProgramEvent['data'],
+  ): StoredProgramEvent => ({
+    signature: `${name}-${slot}`,
+    ix: 0,
+    slot,
+    epoch: Math.floor(slot / 64),
+    blockTime: slot === 2_693 ? '2026-10-05T20:02:16.000Z' : null,
+    name,
+    data: { vote: key(20).toBase58(), mint: MINT.toBase58(), ...data },
+  });
+  // Round 3 on localnet: registered at epoch 1 (term 2-11), 4 slices, closed at epoch 42 with 0.094313791 SOL unredeemed.
+  const HISTORY = [
+    event('RevenueTokenClosed', 2_693, {
+      totalEscrowed: '100000000',
+      totalSpent: '5686209',
+      totalBurned: '649925876',
+      totalRedeemed: '2000000',
+      lamportsToPool: '94313791',
+    }),
+    event('RevenueTokenRedeemed', 1_000, { holder: key(9).toBase58(), tokensBurned: '2000000', lamportsOut: '182492' }),
+    { ...buyback(1), slot: 650 },
+    { ...buyback(0), slot: 640 },
+    event('RevenueTokenConfigured', 120, { slicesPerEpoch: 4, windowSlots: 48 }),
+    event('RevenueTokenRegistered', 100, {
+      revenueToken: key(130).toBase58(),
+      shareBps: 5_000,
+      termEpochs: 10,
+      startEpoch: '2',
+      termEndEpoch: '12',
+    }),
+  ];
+  const chain: BuybackChainReader = {
+    network: 'devnet',
+    revenueTokenByMint: async () => null,
+    escrowAvailable: async () => 59n * SOL,
+    decimals: async () => 6,
+    epochInfo: async () => info(10, 80),
+    escrowAddress: () => key(131),
+    treasuryAddress: () => TREASURY,
+  };
+  const events = {
+    query: async (query?: EventQuery) => (query?.names?.includes('TreasuryClaimed') ? CLAIMS : HISTORY),
+  };
+  const now = () => new Date('2026-10-05T20:30:00Z');
+
+  it('keeps its history and totals from the program events, and says where the escrow went', async () => {
+    const feed = await new BuybackFeed({ chain, events, now }).get(MINT.toBase58());
+    expect(feed).toMatchObject({
+      revenueToken: key(130).toBase58(),
+      vote: key(20).toBase58(),
+      venue: null,
+      term: { shareBps: 5_000, termEpochs: 10, startEpoch: 2, endEpoch: 11 },
+      // The shared ["buyback", vote] escrow may hold another mint's share by now: none of it is this token's.
+      escrow: { address: null, balanceSol: 0, mode: 'buyback' },
+      schedule: null,
+      totals: {
+        escrowedSol: 0.1,
+        spentSol: 0.005686209,
+        burned: 649.925876,
+        redeemed: 2,
+        redeemedSol: 0.000182492,
+        buybacks: 2,
+      },
+      closed: {
+        epoch: 42,
+        at: '2026-10-06T01:32:16+05:30',
+        signature: 'RevenueTokenClosed-2693',
+        unclaimedToPoolSol: 0.094313791,
+      },
+    });
+    expect(feed.note).toMatch(/^Closed after its term \(epoch 42\): the 0\.094313791 SOL holders had not redeemed/);
+    expect(feed.buybacks.map((row) => [row.slice, row.slices])).toEqual([
+      [1, 4],
+      [0, 4],
+    ]);
+    expect(feed.treasury.totals.claims).toBe(4);
+  });
+
+  it('is the plain unregistered feed when the mint never closed', async () => {
+    const feed = await new BuybackFeed({
+      chain,
+      events: { query: async (query?: EventQuery) => (query?.names?.includes('TreasuryClaimed') ? [] : []) },
+      now,
+    }).get(MINT.toBase58());
+    expect(feed).toMatchObject({ revenueToken: null, closed: null, totals: { buybacks: 0 } });
+    expect(feed.note).toMatch(/No validator/);
+  });
+
+  it('counts only the last term when the mint was registered, closed and registered again', () => {
+    const older = [
+      event('RevenueTokenClosed', 90, {
+        totalEscrowed: '1',
+        totalSpent: '1',
+        totalBurned: '1',
+        totalRedeemed: '0',
+        lamportsToPool: '0',
+      }),
+      { ...buyback(5), slot: 50 },
+      event('RevenueTokenRegistered', 10, {
+        revenueToken: key(129).toBase58(),
+        shareBps: 1,
+        termEpochs: 10,
+        startEpoch: '0',
+        termEndEpoch: '10',
+      }),
+    ];
+    const body = closedFeed([...HISTORY, ...older], 6, 200)!;
+    expect(body.buybacks.map((row) => row.slice)).toEqual([1, 0]);
+    expect(body.revenueToken).toBe(key(130).toBase58());
   });
 });

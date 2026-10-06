@@ -27,6 +27,7 @@ export {
   backingRatio,
   curveBand,
   type CurveBand,
+  dammSeedLamports,
   dammSeedSol,
   endEpochOf,
   epochsLeft,
@@ -34,6 +35,7 @@ export {
   launchBand,
   type LaunchBand,
   marketCapSol,
+  PROTOCOL_MIGRATION_FEE_BPS,
   shareRevenuePerEpochSol,
   type ShareTerms,
   shareValueSol,
@@ -73,6 +75,11 @@ export {
 export {
   buildTradeTx,
   type BuildTradeTxParams,
+  computeBudgetInstructions,
+  DEFAULT_TRADE_PRIORITY_MICROLAMPORTS,
+  MAX_SLIPPAGE_BPS,
+  MIN_SLIPPAGE_BPS,
+  TRADE_COMPUTE_UNIT_LIMIT,
   type DammQuoteResult,
   dammSwapAmounts,
   type DbcQuoteResult,
@@ -192,6 +199,27 @@ export {
 // Graduation
 export { buildMigrateToDammV2Tx, type MigrationReadiness, migrationReadiness } from './migration';
 
+// Meteora's DAMM v2 data API (indexed pool stats, candles, volume, protocol totals): depth for graduated launches
+export {
+  DAMM_V2_DATA_API_URL,
+  DammDataApi,
+  type DammDataApiOptions,
+  type DammIndexedCandle,
+  type DammIndexedPool,
+  type DammIndexedVolume,
+  type DammProtocolMetrics,
+  DATA_API_TIMEFRAMES,
+  DataApiError,
+  type DataApiRange,
+  type DataApiSeries,
+  type DataApiTimeframe,
+  type DataApiWindows,
+  mapIndexedCandles,
+  mapIndexedPool,
+  mapIndexedVolume,
+  mapProtocolMetrics,
+} from './dataApi';
+
 // Holders
 export { type HolderLabels, mapTopHolders, readTopHolders, type TopHolder } from './holders';
 
@@ -227,9 +255,12 @@ export {
   checkInitialBuy,
   checkLeftoverReceiver,
   checkMetadataJson,
+  checkMeteoraValidation,
   checkPayerBalance,
   checkProgram,
   checkRegistrableConfig,
+  checkRegistrationConfig,
+  type RegistrationConfigVerdict,
   checkRegistrableMint,
   checkRegistry,
   checkRevenueTokenTerms,

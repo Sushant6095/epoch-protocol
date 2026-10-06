@@ -6,6 +6,7 @@ import {
   loadConfig,
 } from '@epoch/config-sdk';
 import { Logger } from '@epoch/logger';
+import { DammDataApi } from '@epoch/meteora';
 import { PostgresConnectionManager } from '@epoch/pg_models';
 import { ConnectionManager, type GrpcEndpoint } from '@epoch/solana';
 import { Connection } from '@solana/web3.js';
@@ -17,6 +18,7 @@ import { RateLimiter } from '../../Lib/RateLimiter';
 import { optional } from '../MarketData';
 import { type StreamHub } from '../Stream/StreamHub';
 import { RpcLaunchChainReader } from './LaunchChain';
+import { LaunchIndexedSource } from './LaunchIndexedSource';
 import { RpcLaunchLiveChain } from './LaunchLiveChain';
 import { LaunchPageService } from './LaunchPageService';
 import { GrpcRealtimeSource, type LaunchRealtimeSource, WebsocketRealtimeSource } from './LaunchRealtime';
@@ -79,6 +81,23 @@ export function launchRealtimeSource(
   );
 }
 
+/**
+ * Meteora's DAMM v2 data API for graduated pools (LAUNCH_INDEXED_DATA): it indexes mainnet only, so `auto` turns it on
+ * for mainnet launches. Cached for a minute per pool and series.
+ */
+export function launchIndexedSource(
+  config: Pick<LaunchPageConfig, 'LAUNCH_INDEXED_DATA' | 'LAUNCH_DAMM_DATA_API_URL'>,
+  cluster: LaunchConfig['LAUNCH_CLUSTER'],
+): { indexed: LaunchIndexedSource | null; indexedOff?: string } {
+  if (config.LAUNCH_INDEXED_DATA === 'off') return { indexed: null, indexedOff: 'off (LAUNCH_INDEXED_DATA=off)' };
+  if (config.LAUNCH_INDEXED_DATA === 'auto' && cluster !== 'mainnet') {
+    return { indexed: null, indexedOff: `Meteora's data API indexes mainnet pools; this API serves ${cluster}` };
+  }
+  return {
+    indexed: new LaunchIndexedSource(new DammDataApi({ baseUrl: config.LAUNCH_DAMM_DATA_API_URL }), { ttlMs: 60_000 }),
+  };
+}
+
 /** The Launch page's services (plan F13), built from LaunchPageConfig and the launch services on first use. */
 export function getLaunchPageServices(): LaunchPageServices {
   if (pageServices) return pageServices;
@@ -94,7 +113,11 @@ export function getLaunchPageServices(): LaunchPageServices {
     ? new PgLaunchTradeStore(PostgresConnectionManager.getDb())
     : new MemoryLaunchTradeStore();
   const programSource = getServices().program;
-  const live = new RpcLaunchLiveChain(connections, launchConfig.LAUNCH_RPC_URL);
+  const live = new RpcLaunchLiveChain(
+    connections,
+    launchConfig.LAUNCH_RPC_URL,
+    config.LAUNCH_TRADE_PRIORITY_MICROLAMPORTS,
+  );
   // The ingester and the page service call each other (graduations, new trades): wire through closures.
   const wiring: { page?: LaunchPageService } = {};
   const ingester = new LaunchTradeIngester({
@@ -135,6 +158,8 @@ export function getLaunchPageServices(): LaunchPageServices {
     marketCacheMs: config.LAUNCH_MARKET_CACHE_SECONDS * 1_000,
     staleMs: config.LAUNCH_STALE_SECONDS * 1_000,
     maxBuySol: config.LAUNCH_TRADE_MAX_SOL,
+    tradePriorityMicroLamports: config.LAUNCH_TRADE_PRIORITY_MICROLAMPORTS,
+    ...launchIndexedSource(config, launchConfig.LAUNCH_CLUSTER),
   });
   wiring.page = page;
   pageServices = {

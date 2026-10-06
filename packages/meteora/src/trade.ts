@@ -25,7 +25,13 @@ import {
   type VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import type BN from 'bn.js';
-import { type Connection, PublicKey, type Transaction } from '@solana/web3.js';
+import {
+  ComputeBudgetProgram,
+  type Connection,
+  PublicKey,
+  type Transaction,
+  type TransactionInstruction,
+} from '@solana/web3.js';
 
 import { DEFAULT_SLIPPAGE_BPS, NATIVE_MINT, SOL_DECIMALS } from './constants';
 import { sqrtPriceX64ToPrice } from './curve';
@@ -134,11 +140,26 @@ export function toTradeQuote(raw: RawSwapAmounts): LaunchTradeQuote {
 const minimumWithSlippage = (amount: bigint, slippageBps: number): bigint =>
   (amount * BigInt(10_000 - slippageBps)) / 10_000n;
 
+/** The slippage a ticket may ask for: explicit and bounded, never 0 or unlimited (Meteora skill, safety invariants). */
+export const MIN_SLIPPAGE_BPS = 1;
+export const MAX_SLIPPAGE_BPS = 5_000;
+
 const checkSlippage = (slippageBps: number): void => {
-  if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 10_000) {
-    throw new RangeError(`slippageBps must be an integer from 0 to 9,999, got ${slippageBps}`);
+  if (!Number.isInteger(slippageBps) || slippageBps < MIN_SLIPPAGE_BPS || slippageBps > MAX_SLIPPAGE_BPS) {
+    throw new RangeError(
+      `slippageBps must be an integer from ${MIN_SLIPPAGE_BPS} to ${MAX_SLIPPAGE_BPS.toLocaleString('en-US')}, got ${slippageBps}`,
+    );
   }
 };
+
+/**
+ * Compute budget for a trade. In the rehearsal a DBC `swap2` with SOL wrapping and token-account setup used at most
+ * 61,232 CU and a DAMM v2 `swap2` 37,834 (fixtures `dbc-buy-completes-curve`, `damm-buy`); 200,000 leaves three times
+ * that without inflating the priority fee (limit × price).
+ */
+export const TRADE_COMPUTE_UNIT_LIMIT = 200_000;
+/** The trade's priority fee when the caller sets none, micro-lamports per CU (the studio's default). */
+export const DEFAULT_TRADE_PRIORITY_MICROLAMPORTS = 100_000;
 
 /** The SDKs throw plain Errors; give the ticket a code. */
 function tradeError(error: unknown): unknown {
@@ -470,6 +491,12 @@ export interface BuildTradeTxParams extends QuoteTradeParams {
    * a fresh quote's minimum.
    */
   minimumOut?: number;
+  /**
+   * Priority fee, micro-lamports per compute unit (default `DEFAULT_TRADE_PRIORITY_MICROLAMPORTS`; 0 sets none): an
+   * unprioritized swap tends to drop on a busy mainnet. The transaction also caps its compute at
+   * `TRADE_COMPUTE_UNIT_LIMIT`, so the fee is at most limit × price.
+   */
+  priorityMicroLamports?: number;
 }
 
 /**
@@ -528,9 +555,25 @@ export async function buildTradeTx(params: BuildTradeTxParams): Promise<Transact
       minimumAmountOut: toBN(minimumAmountOut),
     });
   }
+  transaction.instructions = [
+    ...computeBudgetInstructions(params.priorityMicroLamports ?? DEFAULT_TRADE_PRIORITY_MICROLAMPORTS),
+    ...transaction.instructions.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId)),
+  ];
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   transaction.recentBlockhash = blockhash;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
   transaction.feePayer = owner;
   return transaction;
+}
+
+/** The compute budget a trade carries: the limit, and the price when it is above 0 (pure). */
+export function computeBudgetInstructions(priorityMicroLamports: number): TransactionInstruction[] {
+  if (!Number.isInteger(priorityMicroLamports) || priorityMicroLamports < 0) {
+    throw new RangeError(`priorityMicroLamports must be a whole number of 0 or more, got ${priorityMicroLamports}`);
+  }
+  const instructions = [ComputeBudgetProgram.setComputeUnitLimit({ units: TRADE_COMPUTE_UNIT_LIMIT })];
+  if (priorityMicroLamports > 0) {
+    instructions.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityMicroLamports }));
+  }
+  return instructions;
 }

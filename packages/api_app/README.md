@@ -126,7 +126,10 @@ events newest first (at most 200) and a `treasury` section from its `TreasuryCla
 lending pool as income (`toLendersSol`) and tokens burned, the newest 200 `claims` (kind, epoch, source pool, LP
 position, `toLendersSol`, `tokensBurned`, signature) and `claimable: "/v1/launches/<mint>/fees"`, where the Launch page
 shows what is still unclaimed on Meteora. Treasury totals add up the newest 10,000 claims. The treasury section is
-there for any mint, registered as a revenue token or not.
+there for any mint, registered as a revenue token or not. Once a token closed after its term (`close_revenue_token`:
+the account is gone, and the validator may have registered another mint on the same `["buyback", vote]` escrow), the
+feed answers from the program's events instead (`closedFeed`): the term from `RevenueTokenRegistered`, the totals from
+`RevenueTokenClosed`, every slice, and `closed` (epoch, signature, the unredeemed SOL that went to the pool).
 
 **Pool snapshots** (`Services/Program/PoolSnapshotRecorder.ts`, with Postgres and the program). On each new `Accrued`
 event the Pool is read and `pool_snapshots` gets (or replaces) the row of the event's epoch: senior/junior assets and
@@ -766,6 +769,9 @@ signing flow, is [docs/pages/launch.md](../../docs/pages/launch.md). Code: `Rout
 | `LAUNCH_STALE_SECONDS`             | `120`   | Older reads are flagged `stale`.                                      |
 | `LAUNCH_TRADE_MAX_SOL`             | `10`    | Largest buy `/build` and `/quote` accept.                             |
 | `LAUNCH_TRADE_REQUESTS_PER_MINUTE` | `30`    | Quotes and builds per IP.                                             |
+| `LAUNCH_TRADE_PRIORITY_MICROLAMPORTS` | `100000` | 0–10,000,000: the compute-unit price `/build` sets (200,000-unit limit; `priorityFeeSol` in the response). |
+| `LAUNCH_INDEXED_DATA`              | `auto`  | Meteora's DAMM v2 data API for graduated pools (`market.indexed`, `/indexed`): `auto` (mainnet only, as the API indexes mainnet), `on`, `off`. |
+| `LAUNCH_DAMM_DATA_API_URL`         | `https://damm-v2.datapi.meteora.ag` | Read through `@epoch/meteora` `DammDataApi`, cached 60 s (protocol totals 5 min); 10 requests a second at most. |
 
 ## How the derived figures are computed
 

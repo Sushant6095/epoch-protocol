@@ -7,6 +7,7 @@ import { type Keypair, type PublicKey } from '@solana/web3.js';
 
 import { JobRunner } from './JobRunner';
 import { LaunchFeeClaimJob } from './Jobs/LaunchFeeClaimJob';
+import { LaunchMigrationJob } from './Jobs/LaunchMigrationJob';
 import { RpcLaunchClaimChain } from './Launch/LaunchClaimChain';
 import { LaunchRegistryFile } from './Launch/LaunchRegistryFile';
 import { type TreasuryClaimRoute, treasuryClaimRoute } from './Launch/TreasuryClaims';
@@ -77,6 +78,37 @@ export function createLaunchFeeClaimJob(config: LaunchClaimsConfig, program?: La
 }
 
 /**
+ * The graduation crank for the same registry: migrates completed curves to DAMM v2 with the crank key (else the treasury
+ * key) as payer; without either, or under LAUNCH_CLAIMS_DRY_RUN, it simulates. Undefined when LAUNCH_MIGRATE_ENABLED is
+ * off.
+ */
+export function createLaunchMigrationJob(
+  config: LaunchClaimsConfig,
+  program?: LaunchClaimsProgram,
+): LaunchMigrationJob | undefined {
+  if (!config.LAUNCH_MIGRATE_ENABLED) return undefined;
+  if (!config.LAUNCHES_PATH) throw new Error('LAUNCHES_PATH is required for launch migrations');
+  const registry = new LaunchRegistryFile(config.LAUNCHES_PATH, config.LAUNCH_CLUSTER);
+  const beamConfig = loadConfig(BeamConfigSchema);
+  const beam = beamRoute({
+    url: beamConfig.SOLAMI_BEAM_URL,
+    tipLamports: beamConfig.SOLAMI_BEAM_TIP_LAMPORTS,
+    tipAddressesUrl: beamConfig.SOLAMI_TIP_ADDRESSES_URL,
+    cluster: config.LAUNCH_CLUSTER,
+  });
+  return new LaunchMigrationJob({
+    launches: () => registry.load(),
+    chain: new RpcLaunchClaimChain(
+      new ConnectionManager(config.LAUNCH_RPC_URL, config.LAUNCH_RPC_FALLBACK_URL),
+      config.LAUNCH_CLAIM_CU_PRICE_MICROLAMPORTS,
+      beam,
+    ),
+    payer: program?.cranker ?? (config.TREASURY_KEYPAIR_PATH ? loadKeypair(config.TREASURY_KEYPAIR_PATH) : undefined),
+    dryRun: config.LAUNCH_CLAIMS_DRY_RUN,
+  });
+}
+
+/**
  * Starts the launch fee claims on their own loop (every LAUNCH_CLAIM_INTERVAL_MINUTES, first run at start) when
  * LAUNCH_CLAIMS_ENABLED. With `program`, the partner treasury's claims go through the Epoch program. Returns the stop
  * function, or undefined when off.
@@ -90,8 +122,10 @@ export function startLaunchFeeClaims(
     return undefined;
   }
   const job = createLaunchFeeClaimJob(config, program);
-  // A runner with no boundary steps: the job is its only poller, run every interval.
-  const runner = new JobRunner(async () => 0n, [], [], [job], {
+  const migration = createLaunchMigrationJob(config, program);
+  // A runner with no boundary steps: the jobs are its pollers, run every interval (graduations first, so a pool that
+  // just migrated is claimed in the same pass).
+  const runner = new JobRunner(async () => 0n, [], [], migration ? [migration, job] : [job], {
     pollMs: config.LAUNCH_CLAIM_INTERVAL_MINUTES * 60_000,
     alertAfterMs: Number.MAX_SAFE_INTEGER,
   });
@@ -104,6 +138,7 @@ export function startLaunchFeeClaims(
     treasuryKey: !!config.TREASURY_KEYPAIR_PATH,
     treasuryPda: job.treasury?.toBase58() ?? null,
     creatorKeys: config.LAUNCH_CREATOR_KEYPAIR_PATHS.length,
+    migrations: migration ? 'on' : 'off',
     dryRun: config.LAUNCH_CLAIMS_DRY_RUN,
   });
   return stop;

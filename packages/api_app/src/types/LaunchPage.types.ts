@@ -54,6 +54,72 @@ export interface LaunchMarket {
   };
   /** Last 24 hours, from the trade feed. */
   day: { volumeSol: number; trades: number; buys: number; sells: number; priceChangePct: number | null };
+  /**
+   * Meteora's indexed view of the graduated pool (DAMM v2 data API), in USD: null before graduation, off mainnet, before
+   * Meteora indexes the pool, or when the API does not answer. The chain fields above stay the record; the full view is
+   * `GET /v1/launches/:mint/indexed`.
+   */
+  indexed: LaunchIndexedSummary | null;
+  freshness: Freshness;
+}
+
+/** The graduated pool as Meteora's DAMM v2 data API indexes it (USD values are Meteora's). */
+export interface LaunchIndexedSummary {
+  source: string;
+  tvlUsd: number;
+  volume24hUsd: number;
+  fees24hUsd: number;
+  /** Liquidity that can never be withdrawn, USD (all of it for an Epoch launch). */
+  lockedLiquidityUsd: number;
+  /** The indexed pool price, SOL per token (compare `priceSol`, read from the chain). */
+  priceSol: number;
+  freshness: Freshness;
+}
+
+/** `GET /v1/launches/:mint/indexed?timeframe=1h`: the graduated pool through Meteora's DAMM v2 data API. */
+export interface LaunchIndexed extends Meta {
+  network: LaunchNetwork;
+  mint: string;
+  dammPool: string | null;
+  /** false: see `reason` (not graduated, not mainnet, not indexed yet, the API did not answer); use /market and /candles. */
+  available: boolean;
+  reason: string | null;
+  pool: {
+    name: string;
+    tvlUsd: number;
+    priceSol: number;
+    tokenAmount: number;
+    solAmount: number;
+    holders: number;
+    /** USD by window: `30m`, `1h`, `2h`, `4h`, `12h`, `24h`. */
+    volumeUsd: Record<string, number>;
+    feesUsd: Record<string, number>;
+    protocolFeesUsd: Record<string, number>;
+    cumulative: { volumeUsd: number; feesUsd: number } | null;
+    lockedLiquidityUsd: number;
+    baseFeePct: number;
+    dynamicFee: boolean;
+    launchpad: string | null;
+    createdAt: string;
+  } | null;
+  /** Meteora's candles: prices in SOL per token, volume in USD (the trade feed's are in `/candles`). */
+  candles: {
+    timeframe: string;
+    candles: { t: string; time: number; open: number; high: number; low: number; close: number; volumeUsd: number }[];
+  } | null;
+  /** The newest bucket reads 0 until it closes. */
+  volumeHistory: {
+    timeframe: string;
+    buckets: { t: string; time: number; volumeUsd: number; feesUsd: number; protocolFeesUsd: number }[];
+  } | null;
+  /** DAMM v2 across Meteora, for scale. */
+  protocol: {
+    tvlUsd: number;
+    volume24hUsd: number;
+    fees24hUsd: number;
+    pools: number;
+    refreshedAt: string | null;
+  } | null;
   freshness: Freshness;
 }
 
@@ -256,6 +322,11 @@ export interface LaunchBuildResponse extends LaunchQuoteResponse {
   lastValidBlockHeight: number;
   /** For explorer links: `devnet`, or null for mainnet. */
   explorerCluster: string | null;
+  /**
+   * The most the transaction's priority fee can cost, SOL (compute-unit limit × price; it carries both instructions so
+   * it lands on a busy mainnet). The wallet adds the signature fee.
+   */
+  priorityFeeSol: number;
 }
 
 /**

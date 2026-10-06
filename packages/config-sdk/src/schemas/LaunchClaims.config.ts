@@ -82,6 +82,11 @@ export const LaunchClaimsConfigSchema = z
     LAUNCH_CLAIM_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(1_440).default(30),
     /** Simulate every claim and log the result; send nothing, even with keys. */
     LAUNCH_CLAIMS_DRY_RUN: flag('false'),
+    /**
+     * Graduate completed curves to DAMM v2 in the same loop (permissionless; the crank key pays about 0.023 SOL a pool).
+     * Meteora's mainnet keepers only migrate SOL curves with a 10 SOL threshold, so Epoch's smaller raises need it.
+     */
+    LAUNCH_MIGRATE_ENABLED: flag('true'),
     LAUNCH_CLAIM_CU_PRICE_MICROLAMPORTS: computeUnitPrice,
   })
   .superRefine((value, ctx) => {

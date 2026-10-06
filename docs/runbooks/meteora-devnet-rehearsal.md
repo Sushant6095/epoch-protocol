@@ -414,6 +414,52 @@ equalled its quote** to the base unit, in and out.
 
 The program behaved as specified throughout: no program bug was found.
 
+## 11. Round 3: the hardened program, a whole term, and Meteora's studio (6 Oct 2026)
+
+6 Oct 2026, 01:21–01:45 IST, on a fresh stand-in (same setup as round 2), with `programs/epoch` from `feat/r3-meteora`.
+That build includes the revenue-tokens review: `execute_buyback` takes the pool, `redeem` drops the venue accounts,
+`close_revenue_token` takes the pool and vault, and `register_revenue_token` is stricter. It was 957,464 bytes, at the
+same throwaway id. The record is [meteora-e2e-2026-10-06.json](meteora-e2e-2026-10-06.json): **58 of 58 API checks**,
+plus the harness's pause, redeem and close checks. The studio side is in
+[STUDIO-CROSSCHECK.md](../meteora/STUDIO-CROSSCHECK.md).
+
+| Step | Signature | Result |
+| --- | --- | --- |
+| Launch `rR3E` (share 50%, 10 epochs, 0.5 SOL raise, 1%/1% fees) | `createConfig` `5N9FGcS4…`, `createPool` `2a3jyWED…`, `transferCreator` `48RNx5CF…` | Preflight: "Meteora config validation PASS", "Leftover receiver PASS", "Registration checks PASS: check_launch_config passes: fee floor 100 bps, so a buyback slice may move the price at most 200 bps" |
+| `register_revenue_token`, `configure_revenue_token` (impact cap 200 bps, the new bound) | `2fGs5f2v…`, `66y93XXz…` | Term epochs 2–11 |
+| 6 curve trades, the last completing the raise | `5b8Q1icA…` … `53DFzdnM…` | |
+| **Graduation by `LaunchMigrationJob`** (`launch-claims --once`) | `3HLHFqn3…` | DAMM v2 `CaCNoooU…`; seed 149,701,658 lamports = `dammSeedLamports(500,005,536)` (30% less the 0.2% protocol fee) |
+| 2 DAMM v2 trades, `sync_revenue_token_pool` | `4pBokLCi…`, `2JGFH91x…`, `51Rv3Qfg…` | |
+| Epoch 10: 0.2 SOL commission, sweep, 4 slices | `KPnkr5tu…`; `3eDu7ooW…`, `C77d3LmM…`, `4SnDcd49…`, `3DhoRtYc…` | Share 0.1 SOL; slices 1,400,644–1,442,603 lamports, each held to the 200 bps impact bound |
+| **Pause** (epoch 38, after the term): `set_paused(true)`, BuybackJob ×3 | `4J61GJMU…` | No slice; see the crank note below |
+| **Close** (epoch 42 = term end + 30): BuybackJob | `4vmBKCyY…` | `RevenueTokenClosed`: 0.094313791 SOL unredeemed → the vault (pool income); rent 0.00732192 SOL → the operator; position freed |
+| The validator registers a **studio-built** pool (`rSTU`), redemption allowed in term | `5m3dNKcd…`, `58x6f9hc…` | Term 63–72 |
+| **Pause, unpause** (epoch 69–70) | `3HMp89FB…`, `4rajRYAi…`; share `3Faqeg12…`; slice `4nYzWv4p…` | No slice while paused; after unpausing, 0.02084212 SOL bought and burned 2,937.278663 |
+| **Redeem in term** (`FLAG_REDEEM_DURING_TERM`) | `inJN9ie7…` | 2,298.65638 rSTU → 182,492 lamports = ⌊79,157,880 × 2,298,656,380 ÷ 997,062,721,337⌋; supply, escrow and totals moved by exactly that |
+| **Pause after the sweep** (epoch 74) | `4kdFuUd3…`, `VdRU9pgV…`, slice `qWRmYpi5…` | Refused while paused; the same epoch's slice ran once unpaused |
+| Treasury claims through the program | rR3E `iEW31Ypk…`, `4MFgx8tN…`, `2gu1sWN2…`; rSTU `2TVQjX3S…`, `4HrtHcBU…` | 0.00743505 + 0.004040452 SOL to the pool; 917,983.00023 + 917,983.000231 tokens burned |
+
+What the API showed after the close: `/buybacks` for `rR3E` keeps its history (the term, the 4 slices, totals from
+`RevenueTokenClosed`, `closed.unclaimedToPoolSol` 0.094313791). `/page` says the vote now has another mint. The
+detail's escrow is 0, since the shared `["buyback", vote]` escrow is `rSTU`'s now.
+
+### Found and fixed
+
+1. After the close and the re-registration, `/buybacks` answered "No validator has registered this mint" with zero
+   totals, and `/v1/launches/:mint` showed the next token's escrow as this token's. Both are fixed (`closedFeed`; the
+   detail checks which mint the `RevenueToken` names). `/page`'s note for a closed token now says it closed.
+2. The rest of round 3's fixes are in [SKILL-AUDIT.md](../meteora/SKILL-AUDIT.md): the 0.2% seed, the migration crank,
+   the leftover receiver, the preflight's SDK and program checks, the trade compute budget, slippage ≥ 1 and progress
+   precision.
+
+### Found, not fixed here
+
+- **Crank error decoding (`@epoch/solana`).** With no fallback RPC, `ConnectionManager.withFailover` drops the
+  `SendTransactionError` logs. While the pool was paused, BuybackJob therefore logged "RPC call failed", spent its 3
+  attempts and gave up the slice for the epoch, instead of waiting (`Paused` is a "not yet" error). See SKILL-AUDIT.md.
+- **The stand-in's ledger** (`--limit-ledger-size 600000`) drops transactions after about 20 minutes, so the checker
+  read the program's events from the API's event store, and the transactions still on the ledger from the chain.
+
 ## Costs (payer, SOL)
 
 | Item                                         | Rehearsal     | Mainnet note                                                  |

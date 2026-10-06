@@ -1,5 +1,13 @@
 import { findAssociatedTokenAddress } from '@epoch/epoch-sdk';
-import { buildClaimTx, type ClaimableItem, type LaunchClaimsState, readLaunchClaims } from '@epoch/meteora';
+import {
+  buildClaimTx,
+  buildMigrateToDammV2Tx,
+  type ClaimableItem,
+  type LaunchClaimsState,
+  type MigrationReadiness,
+  migrationReadiness,
+  readLaunchClaims,
+} from '@epoch/meteora';
 import { type BeamRoute, type ConnectionManager, isExecutionFailure, TransactionSender } from '@epoch/solana';
 import {
   ComputeBudgetProgram,
@@ -44,7 +52,20 @@ export interface LaunchClaimChain {
   ): Promise<ClaimSimulation>;
   /** What the treasury's associated token account for `mint` holds (0 when it does not exist), base units. */
   treasuryTokenBalance(mint: PublicKey, treasury: PublicKey): Promise<bigint>;
+  /** Whether the launch's curve can graduate now (`migration_damm_v2`), and the DAMM v2 pool it would create. */
+  migrationReadiness(launch: ClaimLaunch): Promise<MigrationReadiness>;
+  /** Builds, signs (`payer` plus the two fresh position NFT mints) and sends the migration; resolves once confirmed. */
+  sendMigration(launch: ClaimLaunch, payer: Keypair): Promise<{ signature: string; dammPool: string }>;
+  /** Simulates the migration as `payer` without a signature (dry run). */
+  simulateMigration(launch: ClaimLaunch, payer: PublicKey): Promise<ClaimSimulation>;
 }
+
+/** DBC's `migrateToDammV2` builder asks for this much compute (it creates the pool and two positions). */
+export const MIGRATION_COMPUTE_UNITS = 600_000;
+
+/** Instructions without the builder's own compute budget (the sender sets the limit and the price once). */
+const withoutComputeBudget = (instructions: TransactionInstruction[]): TransactionInstruction[] =>
+  instructions.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId));
 
 /**
  * Claims through `@epoch/meteora` on the launch cluster, with failover and a priority fee; through Solami Beam when a
@@ -121,6 +142,45 @@ export class RpcLaunchClaimChain implements LaunchClaimChain {
         ...instructions,
       );
       tx.feePayer = cranker;
+      tx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
+      const { value } = await connection.simulateTransaction(new VersionedTransaction(tx.compileMessage()), {
+        sigVerify: false,
+        replaceRecentBlockhash: true,
+        commitment: 'confirmed',
+      });
+      return { ok: value.err === null, error: value.err === null ? null : JSON.stringify(value.err) };
+    });
+  }
+
+  migrationReadiness(launch: ClaimLaunch): Promise<MigrationReadiness> {
+    return this.connections.withFailover((connection) => migrationReadiness(connection, launch.dbcPool));
+  }
+
+  async sendMigration(launch: ClaimLaunch, payer: Keypair): Promise<{ signature: string; dammPool: string }> {
+    const built = await this.connections.withFailover((connection) =>
+      buildMigrateToDammV2Tx({ connection, dbcPool: launch.dbcPool, payer: payer.publicKey }),
+    );
+    const signature = await new TransactionSender(this.connections, payer, { beam: this.beam }).send(
+      withoutComputeBudget(built.transaction.instructions),
+      built.signers,
+      {
+        computeUnitPriceMicroLamports: this.computeUnitPriceMicroLamports,
+        computeUnitLimit: MIGRATION_COMPUTE_UNITS,
+        shouldRetry: (error) =>
+          !isExecutionFailure({ message: String(error), logs: (error as { logs?: string[] }).logs }),
+      },
+    );
+    return { signature, dammPool: built.dammPool };
+  }
+
+  async simulateMigration(launch: ClaimLaunch, payer: PublicKey): Promise<ClaimSimulation> {
+    return this.connections.withFailover(async (connection) => {
+      const built = await buildMigrateToDammV2Tx({ connection, dbcPool: launch.dbcPool, payer });
+      const tx = new Transaction().add(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: MIGRATION_COMPUTE_UNITS }),
+        ...withoutComputeBudget(built.transaction.instructions),
+      );
+      tx.feePayer = payer;
       tx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
       const { value } = await connection.simulateTransaction(new VersionedTransaction(tx.compileMessage()), {
         sigVerify: false,

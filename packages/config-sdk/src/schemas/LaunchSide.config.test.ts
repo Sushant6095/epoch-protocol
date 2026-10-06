@@ -80,6 +80,9 @@ describe('LaunchPageConfigSchema', () => {
       LAUNCH_STALE_SECONDS: 120,
       LAUNCH_TRADE_MAX_SOL: 10,
       LAUNCH_TRADE_REQUESTS_PER_MINUTE: 30,
+      LAUNCH_TRADE_PRIORITY_MICROLAMPORTS: 100_000,
+      LAUNCH_INDEXED_DATA: 'auto',
+      LAUNCH_DAMM_DATA_API_URL: 'https://damm-v2.datapi.meteora.ag',
     });
   });
 

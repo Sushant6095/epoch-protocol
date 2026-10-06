@@ -1,0 +1,517 @@
+{
+  "at": "2026-10-06T01:55:00+05:30",
+  "cluster": "local stand-in (solana-test-validator, Meteora mainnet DBC/DAMM v2/Metaplex binaries), 64-slot epochs; round-3 Epoch program",
+  "studio": {
+    "repo": "MeteoraAg/meteora-invent",
+    "commit": "dd77ef3",
+    "sdks": {
+      "@meteora-ag/dynamic-bonding-curve-sdk": "1.5.11",
+      "@meteora-ag/cp-amm-sdk": "1.4.5"
+    },
+    "wallet": "8nid7A3511zAHabJioEX9ny2B45hYgFsaUBoFRb2MGRS (throwaway localnet key)"
+  },
+  "epoch": {
+    "sdks": {
+      "@meteora-ag/dynamic-bonding-curve-sdk": "1.5.13",
+      "@meteora-ag/cp-amm-sdk": "1.5.1"
+    },
+    "launch": "rR3E (packages/meteora/scripts/launch-revenue-token.ts)"
+  },
+  "accounts": {
+    "oursConfig": "6ebZFQ68wzLDWmbLMHffZPztoZ1a6aMeJ15bPx5dzSwF",
+    "studioConfig": "RMasYVFRpEXfypg3CfRLDr5PuqAPnt7EhrDkJrf4F8D",
+    "studioMint": "7M3xZjTXnQ91V9n7VXvnoaYx7pdj69kZ4dcQ3Lh8jGV2",
+    "studioDbcPool": "EnJsEeTKsEvYVTnPK6onzRgdGGiNgKPj3vE76po1X8Uo",
+    "studioDammPool": "CYxNoLcZ4NiftnnAdXfPWhH4VL6D4QQ4FXtfZrk5tyxW",
+    "treasury": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA"
+  },
+  "signatures": {
+    "dbc-create-config": "4EntU1ASyX9KBeD5rqDFA5TnAd8qfoc6ZA3BgpSRFk653VMB2E1VnhyUw6hPAEM9tZzJyq1QmgC8Nb9bRmCoNeDT",
+    "dbc-create-pool": "28HMPApCJLpmvQUF4ujQivTFSeLFihrviTtxYsVZuB5ZDW9MwpyVsT83VLARC1f7s4u9B7wtx3PR8UGidcKjCwU1",
+    "dbc-swap 0.15 SOL": "38JrDdwvi4hcWxGbDgM9Z62qK1qnUYjbHJJJXJobRYJ8ijukAqKn4grV76Ejv4oGaAjQ2YMXiQNdrdXLdfDLmup8",
+    "dbc-swap 0.314470133 SOL (completes the curve)": "55jrKdmEEY4LccYto2Nfg6Qu7VBYhLxev1KeiPQJJhhq2RmFr1ii3LdyuHmhzMb2NR2hV6go9dXHdrz6tDipj45Q",
+    "dbc-migrate-to-damm-v2": "4skt5B62MhuA36yEMTmk4h3U6erKRi78r8DoDqa3KyuWisGeEVELtTnWuJm5F27SWFVw4xbnqhfhUtKFAFQ5Upt9",
+    "Epoch register_revenue_token (our register script on the studio config)": "5m3dNKcdKLcKfUaAUwt2Ws5e1F8MSkRyRXeP4oGwfaWr4sRzXFE88sFXKbTC3y6NqviJLLeTa5i879xQXPc9ZZah",
+    "Epoch configure_revenue_token (FLAG_REDEEM_DURING_TERM)": "58x6f9hcYYjorZWJLK7U4TRQKwx6NV7uTFDnMPtp2GTNVgQRj2XCWodV9LzfTvEbs2Vy9Bu3eYi4xTWPj8jPRKQp"
+  },
+  "dryRuns": {
+    "dbc-create-config": "simulated ok",
+    "dbc-create-pool": "simulated ok",
+    "dbc-swap overshoot (0.315470133 SOL)": "SDK swapQuote threw 'Insufficient Liquidity'; our /quote caps the curve-completing buy at 0.314470133 SOL (swapQuote2 partial fill)",
+    "dbc-swap 0.314470133": "simulated ok",
+    "dbc-migrate-to-damm-v2": "simulated ok",
+    "dbc-claim-trading-fee": "creator path simulated (0 SOL: creatorTradingFeePercentage 0); not the fee claimer"
+  },
+  "configDiff": {
+    "ours": "6ebZFQ68wzLDWmbLMHffZPztoZ1a6aMeJ15bPx5dzSwF",
+    "studio": "RMasYVFRpEXfypg3CfRLDr5PuqAPnt7EhrDkJrf4F8D",
+    "fieldsCompared": 120,
+    "identical": 118,
+    "differences": [
+      {
+        "field": "curve.0.liquidity",
+        "ours": "460982943221986947540000000000",
+        "studio": "460982943221986949040000000000"
+      },
+      {
+        "field": "sqrtStartPrice",
+        "ours": "1428878651784549120",
+        "studio": "1428878651784549121"
+      }
+    ],
+    "keyFields": {
+      "quoteMint": {
+        "ours": "So11111111111111111111111111111111111111112",
+        "studio": "So11111111111111111111111111111111111111112"
+      },
+      "feeClaimer": {
+        "ours": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+        "studio": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA"
+      },
+      "leftoverReceiver": {
+        "ours": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+        "studio": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA"
+      },
+      "collectFeeMode": {
+        "ours": 0,
+        "studio": 0
+      },
+      "migrationOption": {
+        "ours": 1,
+        "studio": 1
+      },
+      "activationType": {
+        "ours": 1,
+        "studio": 1
+      },
+      "tokenDecimal": {
+        "ours": 6,
+        "studio": 6
+      },
+      "tokenType": {
+        "ours": 0,
+        "studio": 0
+      },
+      "creatorTradingFeePercentage": {
+        "ours": 0,
+        "studio": 0
+      },
+      "migrationFeeOption": {
+        "ours": 2,
+        "studio": 2
+      },
+      "migrationFeePercentage": {
+        "ours": 70,
+        "studio": 70
+      },
+      "creatorMigrationFeePercentage": {
+        "ours": 100,
+        "studio": 100
+      },
+      "partnerPermanentLockedLiquidityPercentage": {
+        "ours": 100,
+        "studio": 100
+      },
+      "partnerLiquidityPercentage": {
+        "ours": 0,
+        "studio": 0
+      },
+      "creatorPermanentLockedLiquidityPercentage": {
+        "ours": 0,
+        "studio": 0
+      },
+      "creatorLiquidityPercentage": {
+        "ours": 0,
+        "studio": 0
+      },
+      "swapBaseAmount": {
+        "ours": "66227351178",
+        "studio": "66227351178"
+      },
+      "migrationQuoteThreshold": {
+        "ours": "500005536",
+        "studio": "500005536"
+      },
+      "migrationBaseThreshold": {
+        "ours": "15789648594",
+        "studio": "15789648594"
+      },
+      "migrationSqrtPrice": {
+        "ours": "1797966206465980980",
+        "studio": "1797966206465980980"
+      },
+      "sqrtStartPrice": {
+        "ours": "1428878651784549120",
+        "studio": "1428878651784549121"
+      },
+      "fixedTokenSupplyFlag": {
+        "ours": 1,
+        "studio": 1
+      },
+      "preMigrationTokenSupply": {
+        "ours": "1000000000000",
+        "studio": "1000000000000"
+      },
+      "postMigrationTokenSupply": {
+        "ours": "1000000000000",
+        "studio": "1000000000000"
+      },
+      "poolFees.baseFee.cliffFeeNumerator": {
+        "ours": "10000000",
+        "studio": "10000000"
+      },
+      "poolFees.dynamicFee.initialized": {
+        "ours": 0,
+        "studio": 0
+      },
+      "curve.0.sqrtPrice": {
+        "ours": "1797966208177705269",
+        "studio": "1797966208177705269"
+      },
+      "curve.0.liquidity": {
+        "ours": "460982943221986947540000000000",
+        "studio": "460982943221986949040000000000"
+      },
+      "curve.1.sqrtPrice": {
+        "ours": "0",
+        "studio": "0"
+      }
+    },
+    "epochCheck": {
+      "ours": {
+        "ok": true,
+        "feeFloorBps": 100,
+        "maxImpactBound": 200
+      },
+      "studio": {
+        "ok": true,
+        "feeFloorBps": 100,
+        "maxImpactBound": 200
+      }
+    }
+  },
+  "swaps": {
+    "first": {
+      "tokensReceivedRaw": 22986563809,
+      "feeLamports": 105600,
+      "computeUnits": 58549,
+      "apiQuote": {
+        "side": "buy",
+        "amountIn": 0.15,
+        "amountOut": 22986.563809,
+        "minimumOut": 22756.69817,
+        "priceImpactPct": 7.6716,
+        "tradingFeeSol": 0.0015,
+        "venue": "dbc"
+      }
+    },
+    "complete": {
+      "tokensReceivedRaw": 37573636893,
+      "feeLamports": 85600,
+      "computeUnits": 45791,
+      "apiQuote": {
+        "side": "buy",
+        "amountIn": 0.314470133,
+        "amountOut": 37573.636893,
+        "minimumOut": 37197.900524,
+        "priceImpactPct": 14.6548,
+        "tradingFeeSol": 0.003144702,
+        "venue": "dbc"
+      }
+    }
+  },
+  "studioStatus": {
+    "created": {
+      "Pool": "EnJsEeTKsEvYVTnPK6onzRgdGGiNgKPj3vE76po1X8Uo",
+      "Config": "RMasYVFRpEXfypg3CfRLDr5PuqAPnt7EhrDkJrf4F8D",
+      "Quote reserve": "0 (quote base units)",
+      "Migrated": "no",
+      "Graduation": "0.00%",
+      "Threshold": "500005536 (quote base units)",
+      "Creator fees unclaimed": "base=0 quote=0",
+      "Partner fees unclaimed": "base=0 quote=0"
+    },
+    "afterFirstSwap": {
+      "Quote reserve": "148500000 (quote base units)",
+      "Migrated": "no",
+      "Graduation": "29.70%",
+      "Threshold": "500005536 (quote base units)",
+      "Creator fees unclaimed": "base=0 quote=0",
+      "Partner fees unclaimed": "base=0 quote=1200000",
+      "note": "printed by dbc-get-status after the first swap (console, 01:38 IST)"
+    },
+    "complete": {
+      "Pool": "EnJsEeTKsEvYVTnPK6onzRgdGGiNgKPj3vE76po1X8Uo",
+      "Config": "RMasYVFRpEXfypg3CfRLDr5PuqAPnt7EhrDkJrf4F8D",
+      "Quote reserve": "500005537 (quote base units)",
+      "Migrated": "no",
+      "Graduation": "100.00%",
+      "Threshold": "500005536 (quote base units)",
+      "Creator fees unclaimed": "base=0 quote=0",
+      "Partner fees unclaimed": "base=0 quote=4040452"
+    }
+  },
+  "api": {
+    "afterFirstSwap": {
+      "liquiditySol": 0.1485,
+      "partnerTradingFeesSol": {
+        "accrued": 0.0012,
+        "claimed": 0,
+        "unclaimed": 0.0012
+      },
+      "creatorMigrationFeeSol": 0.350003875
+    },
+    "final": {
+      "market": {
+        "venue": "damm-v2",
+        "graduation": {
+          "state": "migrated",
+          "dammPool": "CYxNoLcZ4NiftnnAdXfPWhH4VL6D4QQ4FXtfZrk5tyxW",
+          "dammPoolUrl": "https://explorer.solana.com/address/CYxNoLcZ4NiftnnAdXfPWhH4VL6D4QQ4FXtfZrk5tyxW?cluster=custom&customUrl=http%3A%2F%2F127.0.0.1%3A38899",
+          "meteoraUrl": null,
+          "graduatedEpoch": 97,
+          "curveCompletedAt": "2026-10-06T01:41:27+05:30"
+        },
+        "liquiditySol": 0.149702
+      },
+      "fees": {
+        "partner": {
+          "address": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+          "tradingFeesSol": {
+            "accrued": 0.004040452,
+            "claimed": 0.004040452,
+            "unclaimed": 0
+          },
+          "surplusSol": 0,
+          "surplusWithdrawn": false,
+          "migrationFeeSol": 0,
+          "migrationFeeWithdrawn": false
+        },
+        "leftover": {
+          "receiver": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+          "tokens": 0,
+          "withdrawn": true,
+          "burned": true,
+          "burnedTokens": 917983.000231
+        },
+        "lp": {
+          "positions": [
+            {
+              "position": "2H7j4yxYYcRAMfJUyT9gqcTjodTKpa4cChuQF9R17DXv",
+              "owner": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+              "role": "partner",
+              "lockedPct": 100,
+              "claimedSol": 0,
+              "unclaimedSol": 0,
+              "claimedTokens": 0,
+              "unclaimedTokens": 0
+            }
+          ],
+          "claimedSol": 0,
+          "unclaimedSol": 0
+        }
+      },
+      "buybacks": {
+        "term": {
+          "shareBps": 5000,
+          "termEpochs": 10,
+          "startEpoch": 63,
+          "endEpoch": 72
+        },
+        "totals": {
+          "escrowedSol": 0.1,
+          "spentSol": 0.040585967,
+          "burned": 5667.150473,
+          "redeemed": 2298.65638,
+          "redeemedSol": 0.000182492,
+          "buybacks": 2
+        },
+        "treasury": {
+          "toLendersSol": 0.004040452,
+          "tokensBurned": 917983.000231,
+          "claims": 2
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "name": "DBC config: 118 of 120 fields identical; the 2 others are the start sqrt price (1 unit of Q64.64) and the curve liquidity derived from it",
+      "studio": 2,
+      "epoch": 2,
+      "pass": true
+    },
+    {
+      "name": "config migrationQuoteThreshold",
+      "studio": "500005536",
+      "epoch": "500005536",
+      "pass": true
+    },
+    {
+      "name": "config swapBaseAmount",
+      "studio": "66227351178",
+      "epoch": "66227351178",
+      "pass": true
+    },
+    {
+      "name": "config migrationBaseThreshold",
+      "studio": "15789648594",
+      "epoch": "15789648594",
+      "pass": true
+    },
+    {
+      "name": "config migrationSqrtPrice",
+      "studio": "1797966206465980980",
+      "epoch": "1797966206465980980",
+      "pass": true
+    },
+    {
+      "name": "config feeClaimer",
+      "studio": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "epoch": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "pass": true
+    },
+    {
+      "name": "config leftoverReceiver",
+      "studio": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "epoch": "CNZNCChW34nbLnrJy5YfQbZNytnkBNUFg3HvN7DPdXsA",
+      "pass": true
+    },
+    {
+      "name": "config migrationFeeOption",
+      "studio": 2,
+      "epoch": 2,
+      "pass": true
+    },
+    {
+      "name": "config migrationFeePercentage",
+      "studio": 70,
+      "epoch": 70,
+      "pass": true
+    },
+    {
+      "name": "config creatorMigrationFeePercentage",
+      "studio": 100,
+      "epoch": 100,
+      "pass": true
+    },
+    {
+      "name": "config partnerPermanentLockedLiquidityPercentage",
+      "studio": 100,
+      "epoch": 100,
+      "pass": true
+    },
+    {
+      "name": "config poolFees.baseFee.cliffFeeNumerator",
+      "studio": "10000000",
+      "epoch": "10000000",
+      "pass": true
+    },
+    {
+      "name": "Epoch program's check_launch_config (SDK mirror) accepts the studio config like ours",
+      "studio": {
+        "ok": true,
+        "feeFloorBps": 100,
+        "maxImpactBound": 200
+      },
+      "epoch": {
+        "ok": true,
+        "feeFloorBps": 100,
+        "maxImpactBound": 200
+      },
+      "pass": true
+    },
+    {
+      "name": "after the first swap: studio quote reserve = our /market liquiditySol (lamports)",
+      "studio": 148500000,
+      "epoch": 148500000,
+      "pass": true
+    },
+    {
+      "name": "after the first swap: studio partner fees unclaimed = our /fees partner.tradingFeesSol.unclaimed (lamports)",
+      "studio": 1200000,
+      "epoch": 1200000,
+      "pass": true
+    },
+    {
+      "name": "after the first swap: studio graduation 29.70% = our curve progress (quote reserve / threshold, parity-tested against the SDK)",
+      "studio": "29.70%",
+      "epoch": 29.6997,
+      "pass": true
+    },
+    {
+      "name": "creator migration fee (the validator upfront): our /fees creator.migrationFeeSol = 70% of the threshold",
+      "studio": null,
+      "epoch": 0.350003875,
+      "pass": true
+    },
+    {
+      "name": "buy 0.15 SOL: studio dbc-swap received = our API /quote amountOut (raw units)",
+      "studio": 22986563809,
+      "epoch": 22986563809,
+      "pass": true
+    },
+    {
+      "name": "studio threshold = our launch raise (lamports)",
+      "studio": 500005536,
+      "epoch": 500005536,
+      "pass": true
+    },
+    {
+      "name": "curve-completing buy: studio dbc-swap received = our API /quote amountOut (raw units)",
+      "studio": 37573636893,
+      "epoch": 37573636893,
+      "pass": true
+    },
+    {
+      "name": "after completion: studio quote reserve vs our /page liquiditySol (lamports, 1-lamport overshoot rounds away)",
+      "studio": 500005537,
+      "epoch": 500006000,
+      "pass": true
+    },
+    {
+      "name": "after completion: studio partner fees unclaimed = our /fees partner.tradingFeesSol.unclaimed (lamports)",
+      "studio": 4040452,
+      "epoch": 4040452,
+      "pass": true
+    },
+    {
+      "name": "after completion: studio graduation % vs our /market state",
+      "studio": "100.00%",
+      "epoch": "complete",
+      "pass": true
+    },
+    {
+      "name": "after the studio migration: DAMM v2 seed = our dammSeedSol (SOL)",
+      "studio": 0.149702,
+      "epoch": 0.149702,
+      "pass": true
+    },
+    {
+      "name": "studio damm-v2-get-positions for the creator wallet: none; our /fees: one partner position, 100% locked, owned by the treasury PDA",
+      "studio": true,
+      "epoch": [
+        100
+      ],
+      "pass": true
+    },
+    {
+      "name": "studio dbc-claim-trading-fee (dry): the creator path only; the partner's fees need the treasury PDA, so they went through the Epoch program",
+      "studio": true,
+      "epoch": {
+        "accrued": 0.004040452,
+        "claimed": 0.004040452,
+        "unclaimed": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "first studio swap paid 5x our trade priority fee (no compute-unit limit: priced on the default ~1M CU)",
+      "studio": 100600,
+      "epoch": 20000,
+      "pass": true
+    }
+  ],
+  "passed": 27,
+  "failed": 0
+}

@@ -13,8 +13,10 @@ What happens:
    share and the term are immutable, and the program enforces them. The CLI sends it as its last step when it holds the
    operator's key; otherwise it prints exactly what the operator signs.
 3. **The curve.** The token trades on the curve until the raise target is in.
-4. **Graduation.** The token moves to a DAMM v2 pool (Meteora's migrator does it). The validator receives 70% of the
-   raise; 30% seeds the DAMM v2 pool, whose LP is permanently locked with the treasury PDA.
+4. **Graduation.** The token moves to a DAMM v2 pool: Epoch's crank sends the migration (cranks_app
+   `LaunchMigrationJob`; Meteora's keepers only migrate SOL curves with a 10 SOL threshold). The validator receives 70%
+   of the raise; the other 30%, less Meteora's 0.2% protocol migration fee, seeds the DAMM v2 pool, whose LP is
+   permanently locked with the treasury PDA.
 5. **Buybacks.** Every epoch of the term, the program takes the share off the top of the validator's sweep and buys the
    token back and burns it.
 6. **Epoch's fees.** The program's permissionless treasury claims move Epoch's partner fees into the lending pool and
@@ -31,7 +33,7 @@ exact flow against the merged program.
 | The validator's operator (`ValidatorPosition.operator`) | its own key; `LAUNCH_OPERATOR_KEYPAIR_PATH` only if it lets the CLI sign | `register_revenue_token` (in the launch, or later with `pnpm register`) | 0.00732192 SOL of rent + fees (returned by `close_revenue_token` after the term) |
 | Epoch treasury PDA (DBC partner) | none: a program address | nothing; the program signs its claims (`claim_partner_trading_fee`, `claim_partner_surplus`, `claim_partner_migration_fee`, `burn_leftover`, `claim_treasury_lp_fee`), sent by the cranks | — |
 | Partner validator (pool creator) | its wallet address goes in the config (`creator`) | nothing at launch (default). It can co-sign as pool creator (`LAUNCH_CREATOR_KEYPAIR_PATH`) | only if it co-signs and makes the first buy |
-| Anyone (Meteora's migrator) | — | `migrateToDammV2` at graduation (permissionless) | ≈ 0.023 SOL if we have to do it ourselves |
+| Epoch's crank (`LaunchMigrationJob`, or anyone) | `CRANK_KEYPAIR_PATH` (else the treasury key) | `migrateToDammV2` at graduation (permissionless; Meteora's keepers skip raises under 10 SOL) | ≈ 0.023 SOL per graduation |
 
 - **The validator's 70%.** After graduation the validator withdraws it with its own key
   (`creatorWithdrawMigrationFee`). Our claim job can do it only with a key the validator chose to give us
@@ -40,8 +42,10 @@ exact flow against the merged program.
   derives both from `EPOCH_PROGRAM_ID`.
   - `EPOCH_TREASURY` is optional. If set, it must equal the PDA, or the CLI refuses to run:
     `register_revenue_token` refuses any other fee claimer.
-  - `LAUNCH_LEFTOVER_RECEIVER` (or the config's `leftoverReceiver`) can name another address, with a warning. Then the
-    program cannot burn the unsold supply.
+  - `LAUNCH_LEFTOVER_RECEIVER` (or the config's `leftoverReceiver`) may only be the treasury PDA: the preflight fails
+    on any other address, as `register_revenue_token` refuses it (`NotTreasuryLeftoverReceiver`), and so does a config
+    that does not lock all of the graduated LP or whose fee floor is under half the impact cap (`check_launch_config`,
+    which the preflight runs through the SDK).
 
 ## Decisions to make first
 
@@ -176,9 +180,12 @@ pnpm register -- --symbol rXXX --cluster mainnet --execute         # asks for th
    - Until the program on mainnet has the treasury claims, the partner fees simply accrue on Meteora under the PDA.
      Nothing is lost.
    - Set `LAUNCH_CLAIM_KINDS` as the cranks_app README says.
-4. **Graduation.** When the raise is in, the page shows "graduating"; Meteora's migrator usually migrates within
-   minutes. If nothing happens for 30 minutes, migrate it yourself (permissionless, ≈ 0.023 SOL):
-   `pnpm rehearse -- migrate --registry $LAUNCHES_PATH --symbol rXXX --rpc $LAUNCH_RPC_URL --payer <keypair> --wait 0`.
+4. **Graduation.** When the raise is in, the page shows "graduating". Meteora's mainnet keepers only migrate SOL curves
+   whose `migration_quote_threshold` is 10 SOL (docs.meteora.ag, DBC "Migration Keepers"), so Epoch's raises are
+   migrated by the cranks_app `LaunchMigrationJob`, which runs before the claims on every pass (`LAUNCH_MIGRATE_ENABLED`,
+   default on; it needs `CRANK_KEYPAIR_PATH` or the treasury key to pay ≈ 0.023 SOL). By hand (permissionless):
+   `pnpm rehearse -- migrate --registry $LAUNCHES_PATH --symbol rXXX --rpc $LAUNCH_RPC_URL --payer <keypair> --wait 0`,
+   or Meteora's manual migrator (migrator.meteora.ag).
 5. **The validator's 70%.** Tell the validator to withdraw it (or run the claim job with its key, if it gave one).
 
 ## If something goes wrong

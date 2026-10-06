@@ -47,6 +47,17 @@ export const LaunchPageConfigSchema = z.object({
   LAUNCH_TRADE_MAX_SOL: z.coerce.number().positive().max(1_000).default(10),
   /** Quote and build requests per IP per minute. */
   LAUNCH_TRADE_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(10_000).default(30),
+  /**
+   * Priority fee on the swap /build returns, micro-lamports per compute unit (0: none). The transaction caps its compute
+   * at 200,000 units, so the fee is at most 0.00002 SOL at the default.
+   */
+  LAUNCH_TRADE_PRIORITY_MICROLAMPORTS: z.coerce.number().int().min(0).max(10_000_000).default(100_000),
+  /**
+   * Meteora's DAMM v2 data API for graduated pools (indexed TVL, volume, fees, candles; `GET .../indexed` and
+   * `market.indexed`): `auto` on mainnet launches only (it indexes mainnet), `on`, `off`.
+   */
+  LAUNCH_INDEXED_DATA: z.enum(['auto', 'on', 'off']).default('auto'),
+  LAUNCH_DAMM_DATA_API_URL: z.string().url().default('https://damm-v2.datapi.meteora.ag'),
 });
 
 export type LaunchPageConfig = z.infer<typeof LaunchPageConfigSchema>;

@@ -5,6 +5,8 @@ import {
   CANDLE_INTERVAL_SECONDS,
   type CandleInterval,
   type DammPoolState,
+  type DataApiTimeframe,
+  DEFAULT_TRADE_PRIORITY_MICROLAMPORTS,
   fillCandles,
   fromBaseUnits,
   type HolderLabels,
@@ -16,6 +18,7 @@ import {
   LaunchTradeError,
   type LaunchTradeErrorCode,
   MAX_CANDLES,
+  TRADE_COMPUTE_UNIT_LIMIT,
   type TradePoolInfo,
 } from '@epoch/meteora';
 import { PublicKey } from '@solana/web3.js';
@@ -32,6 +35,8 @@ import {
   type LaunchFeeEventRow,
   type LaunchFees,
   type LaunchHolders,
+  type LaunchIndexed,
+  type LaunchIndexedSummary,
   type LaunchIngestStatus,
   type LaunchMarket,
   type LaunchPage,
@@ -41,6 +46,7 @@ import {
   type LaunchTradeList,
 } from '../../types/LaunchPage.types';
 import { type LaunchChainReader } from './LaunchChain';
+import { type LaunchIndexedSource } from './LaunchIndexedSource';
 import { type LaunchItem } from './LaunchMapper';
 import { type LaunchLiveChain } from './LaunchLiveChain';
 import { type LaunchPriceStore } from './LaunchPriceStore';
@@ -63,6 +69,8 @@ const DBC_POOL_AUTHORITY = 'FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM';
 const DAMM_V2_POOL_AUTHORITY = 'HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC';
 const DAY_MS = 86_400_000;
 const PAGE_TRADES = 50;
+/** Where `market.indexed` and `GET .../indexed` come from. */
+const INDEXED_SOURCE = "Meteora's DAMM v2 data API (damm-v2.datapi.meteora.ag): indexed, seconds behind the chain";
 /** Top holders are kept 2 minutes, or read again on request after a trade or claim (at most this often). */
 const HOLDERS_REREAD_MS = 5_000;
 
@@ -114,6 +122,11 @@ export interface LaunchPageServiceOptions {
   marketCacheMs: number;
   staleMs: number;
   maxBuySol: number;
+  /** The priority fee /build puts on the swap, micro-lamports per CU (reported as `priorityFeeSol`). Default 100,000. */
+  tradePriorityMicroLamports?: number;
+  /** Meteora's DAMM v2 data API for graduated pools; null when off, with `indexedOff` saying why. */
+  indexed?: LaunchIndexedSource | null;
+  indexedOff?: string;
   now?: () => number;
 }
 
@@ -542,6 +555,10 @@ export class LaunchPageService {
       blockhash: tx.recentBlockhash ?? '',
       lastValidBlockHeight: tx.lastValidBlockHeight ?? 0,
       explorerCluster: this.options.network === 'mainnet' ? null : this.options.network,
+      // At most the compute limit × the price; the wallet adds the 0.000005 SOL signature fee.
+      priorityFeeSol:
+        (TRADE_COMPUTE_UNIT_LIMIT * (this.options.tradePriorityMicroLamports ?? DEFAULT_TRADE_PRIORITY_MICROLAMPORTS)) /
+        1e15,
     };
   }
 
@@ -699,8 +716,128 @@ export class LaunchPageService {
             ? round(((day.lastPriceSol - day.firstPriceSol) / day.firstPriceSol) * 100, 2)
             : null,
       },
+      indexed: state === 'migrated' && dammPool ? await this.indexedSummary(dammPool) : null,
       freshness: fresh(cache.loadedAtMs || null, this.now(), this.options.staleMs),
     };
+  }
+
+  /** The graduated pool's indexed summary (cached by the source); null when off or unanswered: the chain read stands. */
+  private async indexedSummary(dammPool: string): Promise<LaunchIndexedSummary | null> {
+    if (!this.options.indexed) return null;
+    try {
+      const { value: pool, loadedAtMs } = await this.options.indexed.pool(dammPool);
+      if (!pool) return null;
+      return {
+        source: INDEXED_SOURCE,
+        tvlUsd: round(pool.tvlUsd, 2),
+        volume24hUsd: round(pool.volumeUsd['24h'], 2),
+        fees24hUsd: round(pool.feesUsd['24h'], 2),
+        lockedLiquidityUsd: round(pool.permanentLockLiquidityUsd, 2),
+        priceSol: sig6(pool.price),
+        freshness: fresh(loadedAtMs || null, this.now(), this.options.staleMs),
+      };
+    } catch (error) {
+      logger.warn('DAMM v2 data API unavailable; the chain read stands', { dammPool, error: String(error) });
+      return null;
+    }
+  }
+
+  /** GET /v1/launches/:mint/indexed — the graduated pool through Meteora's DAMM v2 data API. */
+  async indexed(key: string, options: { timeframe?: DataApiTimeframe }): Promise<LaunchIndexed> {
+    const { item } = await this.options.launches.find(key);
+    const market = await this.marketFor(item);
+    const dammPool = market.graduation.state === 'migrated' ? market.graduation.dammPool : null;
+    const timeframe = options.timeframe ?? '1h';
+    const none = (reason: string): LaunchIndexed => ({
+      ...this.meta(INDEXED_SOURCE),
+      network: this.options.network,
+      mint: item.entry.mint,
+      dammPool,
+      available: false,
+      reason,
+      pool: null,
+      candles: null,
+      volumeHistory: null,
+      protocol: null,
+      freshness: { asOf: null, ageSeconds: null, stale: true },
+    });
+    const indexed = this.options.indexed;
+    if (!indexed) return none(this.options.indexedOff ?? 'the DAMM v2 data API is off');
+    if (!dammPool) {
+      return none('the token has not graduated: the data API covers its DAMM v2 pool (see /market and /candles)');
+    }
+    try {
+      const [pool, candles, volume, protocol] = await Promise.all([
+        indexed.pool(dammPool),
+        indexed.candles(dammPool, timeframe),
+        indexed.volume(dammPool, timeframe),
+        indexed.protocolMetrics().catch(() => null),
+      ]);
+      if (!pool.value) return none('Meteora has not indexed this pool yet (it indexes mainnet pools, seconds behind)');
+      const p = pool.value;
+      const t = (seconds: number) => isoIst(new Date(seconds * 1000));
+      const loaded = Math.min(pool.loadedAtMs, candles.loadedAtMs, volume.loadedAtMs);
+      return {
+        ...this.meta(INDEXED_SOURCE),
+        network: this.options.network,
+        mint: item.entry.mint,
+        dammPool,
+        available: true,
+        reason: null,
+        pool: {
+          name: p.name,
+          tvlUsd: round(p.tvlUsd, 2),
+          priceSol: sig6(p.price),
+          tokenAmount: round(p.tokenXAmount, 6),
+          solAmount: round(p.tokenYAmount, 9),
+          holders: p.tokenX.holders,
+          volumeUsd: { ...p.volumeUsd },
+          feesUsd: { ...p.feesUsd },
+          protocolFeesUsd: { ...p.protocolFeesUsd },
+          cumulative: p.cumulative,
+          lockedLiquidityUsd: round(p.permanentLockLiquidityUsd, 2),
+          baseFeePct: p.baseFeePct,
+          dynamicFee: p.dynamicFee,
+          launchpad: p.launchpad,
+          createdAt: isoIst(new Date(p.createdAt)),
+        },
+        candles: {
+          timeframe: candles.value.timeframe,
+          candles: candles.value.points.map((c) => ({
+            t: t(c.time),
+            time: c.time,
+            open: sig6(c.open),
+            high: sig6(c.high),
+            low: sig6(c.low),
+            close: sig6(c.close),
+            volumeUsd: round(c.volumeUsd, 2),
+          })),
+        },
+        volumeHistory: {
+          timeframe: volume.value.timeframe,
+          buckets: volume.value.points.map((b) => ({
+            t: t(b.time),
+            time: b.time,
+            volumeUsd: round(b.volumeUsd, 2),
+            feesUsd: round(b.feesUsd, 2),
+            protocolFeesUsd: round(b.protocolFeesUsd, 2),
+          })),
+        },
+        protocol: protocol
+          ? {
+              tvlUsd: round(protocol.value.tvlUsd, 0),
+              volume24hUsd: round(protocol.value.volume24hUsd, 0),
+              fees24hUsd: round(protocol.value.fees24hUsd, 0),
+              pools: protocol.value.pools,
+              refreshedAt: protocol.value.refreshedAt === null ? null : t(protocol.value.refreshedAt),
+            }
+          : null,
+        freshness: fresh(loaded || null, this.now(), this.options.staleMs),
+      };
+    } catch (error) {
+      logger.warn('DAMM v2 data API unavailable', { dammPool, error: String(error) });
+      return none(`the DAMM v2 data API did not answer (${error instanceof Error ? error.message : String(error)})`);
+    }
   }
 
   private async readMarket(entry: LaunchRegistryEntry): Promise<MarketRead> {
@@ -733,6 +870,7 @@ export class LaunchPageService {
         curveCompletedAt: null,
       },
       day: { volumeSol: 0, trades: 0, buys: 0, sells: 0, priceChangePct: null },
+      indexed: null,
       freshness: { asOf: null, ageSeconds: null, stale: true },
     };
   }

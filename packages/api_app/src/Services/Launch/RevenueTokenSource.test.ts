@@ -136,6 +136,12 @@ describe('RevenueTokenSource', () => {
       registeredOnChain: false,
       note: "Not registered with the program yet: the terms are the launch record's.",
     });
+    // Registered (the record says so) and the term is over, but no account: closed after its term.
+    const closedChain = chain();
+    closedChain.epoch.mockResolvedValue(42);
+    expect(
+      await new ProgramRevenueTokenSource(PROGRAM, closedChain).get({ ...RLOC_ENTRY, registeredEpoch: 0 }),
+    ).toMatchObject({ registeredOnChain: false, note: expect.stringMatching(/^Closed after its term/) });
     // The vote account registered another mint.
     const other = await new ProgramRevenueTokenSource(PROGRAM, registered()).get({
       ...RLOC_ENTRY,

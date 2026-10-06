@@ -1,3 +1,4 @@
+import { decodeRevenueToken } from '@epoch/epoch-sdk';
 import { Logger } from '@epoch/logger';
 import {
   countTokenHolders,
@@ -44,6 +45,11 @@ export interface LaunchChainReader {
    * 0.00089088 SOL), as the program, the buyback feed and the revenue-token block count it.
    */
   escrowSol(address: string): Promise<number>;
+  /**
+   * The mint the program's `RevenueToken` account names now; null when there is no such account (never registered, or
+   * closed after its term). Optional: without it every escrow counts as the launch's own.
+   */
+  revenueTokenMint?(address: string): Promise<string | null>;
 }
 
 /** Reads through `@epoch/meteora` on the launch RPC, with failover. */
@@ -95,6 +101,13 @@ export class RpcLaunchChainReader implements LaunchChainReader {
     ]);
     return Math.max(0, lamports - rent) / LAMPORTS_PER_SOL;
   }
+
+  async revenueTokenMint(address: string): Promise<string | null> {
+    const account = await this.connections.withFailover((connection) =>
+      connection.getAccountInfo(new PublicKey(address), 'confirmed'),
+    );
+    return account ? decodeRevenueToken(account.data).mint.toBase58() : null;
+  }
 }
 
 /**
@@ -129,12 +142,17 @@ export async function readLaunchChain(
       return undefined;
     }
   };
-  const { dbcPool, escrow } = entry;
-  const [pool, mint, escrowSol] = await Promise.all([
+  const { dbcPool, escrow, revenueToken } = entry;
+  const readRegisteredMint = reader.revenueTokenMint?.bind(reader);
+  const [pool, mint, escrowRead, registeredMint] = await Promise.all([
     dbcPool ? attempt('curve pool', () => reader.launchPool(dbcPool, entry.dbcConfig ?? null)) : undefined,
     attempt('mint', () => reader.mint(entry.mint)),
     escrow ? attempt('escrow', () => reader.escrowSol(escrow)) : undefined,
+    revenueToken && readRegisteredMint ? attempt('revenue token', () => readRegisteredMint(revenueToken)) : undefined,
   ]);
+  // The escrow (`["buyback", vote]`) holds the share of whichever token the validator registered last: once this one
+  // closed after its term and another was registered, none of it is this launch's.
+  const escrowSol = registeredMint === undefined || registeredMint === entry.mint ? escrowRead : 0;
   const dammAddress = entry.dammPool ?? pool?.dammPool ?? null;
   const damm = dammAddress ? await attempt('DAMM v2 pool', () => reader.dammPool(dammAddress)) : undefined;
   const exclude: HolderExclusions = {

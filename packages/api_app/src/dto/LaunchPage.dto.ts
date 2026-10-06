@@ -16,6 +16,12 @@ export const LaunchCandlesQueryDto = z.object({
 });
 export type LaunchCandlesQuery = z.infer<typeof LaunchCandlesQueryDto>;
 
+/** `GET /v1/launches/:mint/indexed`: the candle and volume bucket (the DAMM v2 data API's timeframes). */
+export const LaunchIndexedQueryDto = z.object({
+  timeframe: z.enum(['5m', '30m', '1h', '2h', '4h', '12h', '24h']).optional(),
+});
+export type LaunchIndexedQuery = z.infer<typeof LaunchIndexedQueryDto>;
+
 const amount = z.number().positive().finite().max(1e15);
 
 /** `POST /v1/launches/:mint/quote` */
@@ -23,8 +29,8 @@ export const LaunchQuoteBodyDto = z.object({
   side: z.enum(['buy', 'sell']),
   /** SOL to spend for a buy, tokens to sell for a sell. */
   amount,
-  /** Default 100 (1%); at most 5,000. */
-  slippageBps: z.number().int().min(0).max(5_000).optional(),
+  /** Default 100 (1%); 1–5,000 (never 0 or unlimited). */
+  slippageBps: z.number().int().min(1).max(5_000).optional(),
 });
 export type LaunchQuoteBody = z.infer<typeof LaunchQuoteBodyDto>;
 

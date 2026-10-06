@@ -1,13 +1,18 @@
+import { getProtocolMigrationFee, MigrationOption } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import BN from 'bn.js';
+
 import {
   averageRevenueSol,
   backingRatio,
   curveBand,
+  dammSeedLamports,
   dammSeedSol,
   endEpochOf,
   epochsLeft,
   impliedYieldPctPerEpoch,
   launchBand,
   marketCapSol,
+  PROTOCOL_MIGRATION_FEE_BPS,
   shareRevenuePerEpochSol,
   shareValueSol,
   upfrontToValidatorSol,
@@ -84,9 +89,26 @@ describe('market cap, implied yield and backing', () => {
 });
 
 describe('graduation and revenue', () => {
-  it('pays the validator 70% of the raise and seeds DAMM v2 with the rest', () => {
+  it('pays the validator 70% of the raise and seeds DAMM v2 with the rest, less the 0.2% protocol fee', () => {
     expect(upfrontToValidatorSol(5)).toBeCloseTo(3.5, 12);
-    expect(dammSeedSol(5)).toBeCloseTo(1.5, 12);
+    expect(dammSeedSol(5)).toBeCloseTo(1.497, 12);
+    expect(PROTOCOL_MIGRATION_FEE_BPS).toBe(20);
+  });
+
+  it('matches what the DAMM v2 pool received on chain, within a lamport', () => {
+    // rREH (rehearsal fixture migrate-damm-v2): threshold 750,000,387; the pool's deposit was 224,550,116 lamports.
+    expect(dammSeedLamports(750_000_387n)).toBe(224_550_117n);
+    // rR2E (round-2 e2e): threshold 500,001,363; the DAMM v2 quote reserve started at 149,700,409.
+    expect(dammSeedLamports(500_001_363n)).toBe(149_700_409n);
+    // Meteora's own fee helper takes the same 20 bps off the deposit (rounded down).
+    const [, quoteFee] = getProtocolMigrationFee(
+      new BN(1),
+      new BN(225_000_117),
+      new BN('18446744073709551616'),
+      PROTOCOL_MIGRATION_FEE_BPS,
+      MigrationOption.MET_DAMM_V2,
+    );
+    expect(quoteFee.toString()).toBe('450000');
   });
 
   it('averages per-epoch revenue in lamports, a missing epoch counting as zero', () => {

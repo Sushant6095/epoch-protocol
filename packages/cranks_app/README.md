@@ -103,6 +103,16 @@ DRY_RUN=true node packages/cranks_app/dist/index.js --env .env.devnet     # watc
 
 ## Launch fee claims (plan F13, ADR 0006)
 
+**Graduation first.** Every pass starts with `LaunchMigrationJob` (`src/Jobs/LaunchMigrationJob.ts`): for each launch
+whose curve is complete it sends DBC `migration_damm_v2` (permissionless; the payer is the crank key, else
+`TREASURY_KEYPAIR_PATH`, ≈ 0.023 SOL; 600,000 CU at the claims' priority fee). Meteora's mainnet keepers only migrate
+SOL curves whose `migration_quote_threshold` is 10 SOL (docs.meteora.ag, DBC "Migration Keepers"), and Epoch's raises
+are 0.5–5 SOL, so without it a completed curve would stop trading until someone ran Meteora's manual migrator. It reads
+each pool first (`migrationReadiness`), so a pool on its curve, already migrated (by a keeper or anyone) or
+misconfigured is skipped; with `LAUNCH_CLAIMS_DRY_RUN` or no payer key it simulates instead. Off with
+`LAUNCH_MIGRATE_ENABLED=false`. Tests: `src/Jobs/LaunchMigrationJob.test.ts`; on the round-3 stand-in it graduated
+`rR3E` (`docs/runbooks/meteora-e2e-2026-10-06.json`).
+
 `LaunchFeeClaimJob` claims what Epoch and the launches' creators are owed from each revenue token's Meteora pools, for
 every launch in the registry (`LAUNCHES_PATH`) on `LAUNCH_CLUSTER`. It runs on its own loop, every
 `LAUNCH_CLAIM_INTERVAL_MINUTES` (30) and once at start, next to the program cranks (`index.ts`), or alone with
@@ -147,3 +157,4 @@ simulated the creators' 3; the next run found nothing to claim.
 | `LAUNCH_CLAIM_INTERVAL_MINUTES`       | 30                            | loop interval                                                       |
 | `LAUNCH_CLAIMS_DRY_RUN`               | false                         | simulate and log every claim; send nothing                          |
 | `LAUNCH_CLAIM_CU_PRICE_MICROLAMPORTS` | 10000                         | priority fee                                                        |
+| `LAUNCH_MIGRATE_ENABLED`              | true                          | graduate completed curves to DAMM v2 (`LaunchMigrationJob`), below  |

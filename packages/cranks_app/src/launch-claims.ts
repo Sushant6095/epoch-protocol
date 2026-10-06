@@ -5,7 +5,12 @@ import { Logger } from '@epoch/logger';
 import { loadKeypair } from '@epoch/solana';
 import { PublicKey } from '@solana/web3.js';
 
-import { createLaunchFeeClaimJob, type LaunchClaimsProgram, startLaunchFeeClaims } from './launchClaims';
+import {
+  createLaunchFeeClaimJob,
+  createLaunchMigrationJob,
+  type LaunchClaimsProgram,
+  startLaunchFeeClaims,
+} from './launchClaims';
 
 const logger = Logger.create('launch-claims');
 
@@ -33,10 +38,18 @@ async function main(): Promise<void> {
   const config = loadConfig(LaunchClaimsConfigSchema);
   const program = programRoute();
   if (process.argv.includes('--once')) {
+    const migration = createLaunchMigrationJob(config, program);
+    if (migration) {
+      await migration.run();
+      logger.info('migrations done', {
+        migrated: migration.last.migrated.length,
+        simulated: migration.last.simulated.length,
+      });
+    }
     const job = createLaunchFeeClaimJob(config, program);
     const outcome = await job.run();
     logger.info('one pass done', { outcome, claimed: job.last.claimed.length, simulated: job.last.simulated.length });
-    process.exitCode = job.last.failed.length > 0 ? 1 : 0;
+    process.exitCode = job.last.failed.length > 0 || (migration?.last.failed.length ?? 0) > 0 ? 1 : 0;
     return;
   }
   if (!startLaunchFeeClaims(config, program)) process.exitCode = 1;

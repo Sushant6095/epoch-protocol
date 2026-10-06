@@ -13,6 +13,7 @@ import {
   sliceDueSlot,
 } from '@epoch/epoch-sdk';
 import { BadRequestException } from '@epoch/exceptions';
+import { BUYBACK_SLICES_PER_EPOCH } from '@epoch/meteora';
 import { PublicKey } from '@solana/web3.js';
 
 import { type StoredProgramEvent } from '../../Lib/EventBus';
@@ -22,6 +23,7 @@ import { type LaunchBuyback } from '../../types/Launch.types';
 import {
   type BuybackSchedule,
   type LaunchBuybackFeed,
+  type LaunchRevenueTokenClosed,
   type LaunchTreasuryClaims,
   type TreasuryClaimKind,
   type TreasuryClaimTotals,
@@ -32,6 +34,14 @@ import { type EventReader } from '../Program/ProgramSources';
 const SLOT_SECONDS = 0.4;
 const BUYBACK_EVENTS: readonly EventName[] = ['BuybackExecuted'];
 const TREASURY_EVENTS: readonly EventName[] = ['TreasuryClaimed'];
+/** A closed token's history: everything the program said about the mint once its account is gone. */
+const CLOSED_HISTORY_EVENTS: readonly EventName[] = [
+  'RevenueTokenRegistered',
+  'RevenueTokenConfigured',
+  'BuybackExecuted',
+  'RevenueTokenRedeemed',
+  'RevenueTokenClosed',
+];
 /** Treasury totals add up the newest claims up to the event store's maximum page. */
 const TREASURY_TOTALS_LIMIT = 10_000;
 const TREASURY_CLAIM_KINDS: readonly TreasuryClaimKind[] = [
@@ -100,7 +110,19 @@ export class BuybackFeed {
     // Treasury claims need no revenue token account: any launch naming the treasury has them.
     const treasuryEvents = queryTreasuryClaims(this.deps.events, mint.toBase58());
     if (!found) {
-      const [decimals, claims] = await Promise.all([chain.decimals(mint), treasuryEvents]);
+      const [decimals, claims, history] = await Promise.all([
+        chain.decimals(mint),
+        treasuryEvents,
+        this.deps.events.query({
+          names: CLOSED_HISTORY_EVENTS,
+          where: { mint: mint.toBase58() },
+          limit: TREASURY_TOTALS_LIMIT,
+        }),
+      ]);
+      const treasury = treasuryClaims(claims, decimals, mint.toBase58(), chain.treasuryAddress(), this.limit);
+      // Closed after its term: the account is gone, the program's events still tell its story.
+      const closed = closedFeed(history, decimals, this.limit);
+      if (closed) return { ...meta, ...closed, treasury };
       return {
         ...meta,
         note: 'No validator has registered this mint as a revenue token.',
@@ -112,7 +134,8 @@ export class BuybackFeed {
         schedule: null,
         totals: { escrowedSol: 0, spentSol: 0, burned: 0, redeemed: 0, redeemedSol: 0, buybacks: 0 },
         buybacks: [],
-        treasury: treasuryClaims(claims, decimals, mint.toBase58(), chain.treasuryAddress(), this.limit),
+        treasury,
+        closed: null,
       };
     }
     const { address, account: rt } = found;
@@ -152,8 +175,75 @@ export class BuybackFeed {
       },
       buybacks: events.map((event) => toLaunchBuyback(event, rt.slicesPerEpoch, decimals)),
       treasury: treasuryClaims(claims, decimals, mint.toBase58(), chain.treasuryAddress(), this.limit),
+      closed: null,
     };
   }
+}
+
+const u64 = (value: string | number | boolean | undefined): bigint => BigInt(String(value ?? 0));
+
+/** A feed without the fields `get` adds around it (meta and the treasury section). */
+type FeedBody = Omit<LaunchBuybackFeed, 'schemaVersion' | 'kind' | 'asOf' | 'source' | 'network' | 'mint' | 'treasury'>;
+
+/**
+ * A closed revenue token's feed (pure), from its events (newest first): the term from `RevenueTokenRegistered`, the
+ * totals from `RevenueTokenClosed` (the account's last state) and the redemptions' SOL, the slices as before. Null when
+ * the mint has no `RevenueTokenClosed`. Only the last registration's history counts, should a mint have had two.
+ */
+export function closedFeed(history: readonly StoredProgramEvent[], decimals: number, limit: number): FeedBody | null {
+  const closedEvent = history.find((event) => event.name === 'RevenueTokenClosed');
+  if (!closedEvent) return null;
+  const vote = String(closedEvent.data.vote);
+  const registered = history.find(
+    (event) => event.name === 'RevenueTokenRegistered' && event.data.vote === vote && event.slot <= closedEvent.slot,
+  );
+  const ofThisTerm = (event: StoredProgramEvent) =>
+    event.data.vote === vote && event.slot <= closedEvent.slot && (!registered || event.slot >= registered.slot);
+  const configured = history.find((event) => event.name === 'RevenueTokenConfigured' && ofThisTerm(event));
+  const slices = Number(configured?.data.slicesPerEpoch ?? 0) || BUYBACK_SLICES_PER_EPOCH;
+  const buybacks = history.filter((event) => event.name === 'BuybackExecuted' && ofThisTerm(event));
+  const redeemedLamports = history
+    .filter((event) => event.name === 'RevenueTokenRedeemed' && ofThisTerm(event))
+    .reduce((sum, event) => sum + u64(event.data.lamportsOut), 0n);
+  const toPool = u64(closedEvent.data.lamportsToPool);
+  const closed: LaunchRevenueTokenClosed = {
+    epoch: closedEvent.epoch,
+    at: closedEvent.blockTime ? isoIst(new Date(closedEvent.blockTime)) : null,
+    signature: closedEvent.signature,
+    unclaimedToPoolSol: sol(toPool),
+  };
+  const when = closedEvent.epoch === null ? '' : ` (epoch ${closedEvent.epoch})`;
+  return {
+    note:
+      `Closed after its term${when}: ` +
+      (toPool > 0n
+        ? `the ${sol(toPool)} SOL holders had not redeemed went to the Epoch pool as income.`
+        : 'the escrow was spent; its rent went back to the operator.'),
+    revenueToken: registered ? String(registered.data.revenueToken) : null,
+    vote,
+    venue: null,
+    term: registered
+      ? {
+          shareBps: Number(registered.data.shareBps),
+          termEpochs: Number(registered.data.termEpochs),
+          startEpoch: Number(registered.data.startEpoch),
+          endEpoch: Number(registered.data.termEndEpoch) - 1,
+        }
+      : null,
+    // The account and its escrow are gone: nothing left to buy back or redeem.
+    escrow: { address: null, balanceSol: 0, mode: 'buyback' },
+    schedule: null,
+    totals: {
+      escrowedSol: sol(u64(closedEvent.data.totalEscrowed)),
+      spentSol: sol(u64(closedEvent.data.totalSpent)),
+      burned: ui(u64(closedEvent.data.totalBurned), decimals),
+      redeemed: ui(u64(closedEvent.data.totalRedeemed), decimals),
+      redeemedSol: sol(redeemedLamports),
+      buybacks: buybacks.length,
+    },
+    buybacks: buybacks.slice(0, limit).map((event) => toLaunchBuyback(event, slices, decimals)),
+    closed,
+  };
 }
 
 /**

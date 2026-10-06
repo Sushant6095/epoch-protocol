@@ -151,7 +151,7 @@ describe('revenueCurveConfig (Epoch partner preset)', () => {
     expect(demo.leftoverTokens).toBeGreaterThan(92_000);
     expect(demo.leftoverTokens).toBeLessThan(92_200);
     expect(demo.upfrontToValidatorSol).toBeCloseTo(3.5, 3);
-    expect(demo.dammSeedSol).toBeCloseTo(1.5, 3);
+    expect(demo.dammSeedSol).toBeCloseTo(1.497, 3);
     // One constant-product segment: tokens sold = raise ÷ √(low × high).
     expect(demo.tokensOnCurve).toBeCloseTo(
       demo.migrationThresholdSol / Math.sqrt(RKEST.bandLowSol * RKEST.bandHighSol),

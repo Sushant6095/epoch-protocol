@@ -103,9 +103,27 @@ export const upfrontToValidatorSol = (
   creatorSharePct = CREATOR_MIGRATION_FEE_SHARE_PCT,
 ): number => (raiseSol * migrationFeePct * creatorSharePct) / 10_000;
 
-/** SOL that seeds the DAMM v2 pool at graduation: the raise less the migration fee. */
+/**
+ * DBC's fixed protocol liquidity migration fee: 0.2% of the base and quote that would enter the migrated pool (separate
+ * from the configurable migration fee; docs.meteora.ag `core-products/dbc/migration-and-liquidity`).
+ */
+export const PROTOCOL_MIGRATION_FEE_BPS = 20;
+
+/**
+ * Lamports that seed the DAMM v2 pool at graduation: the threshold less the migration fee (rounded up, as DBC computes
+ * the migration quote amount), less DBC's 0.2% protocol liquidity migration fee (rounded down, as the SDK's
+ * `getProtocolMigrationFee`). DAMM v2 derives the deposit from the pool's liquidity, so the pool may hold one lamport
+ * less.
+ */
+export function dammSeedLamports(thresholdLamports: bigint, migrationFeePct = MIGRATION_FEE_PCT): bigint {
+  const keep = BigInt(100 - migrationFeePct);
+  const quoteAmount = (thresholdLamports * keep + 99n) / 100n;
+  return quoteAmount - (quoteAmount * BigInt(PROTOCOL_MIGRATION_FEE_BPS)) / 10_000n;
+}
+
+/** SOL that seeds the DAMM v2 pool at graduation: the raise less the migration fee and the 0.2% protocol fee. */
 export const dammSeedSol = (raiseSol: number, migrationFeePct = MIGRATION_FEE_PCT): number =>
-  (raiseSol * (100 - migrationFeePct)) / 100;
+  (((raiseSol * (100 - migrationFeePct)) / 100) * (10_000 - PROTOCOL_MIGRATION_FEE_BPS)) / 10_000;
 
 /**
  * The average of per-epoch revenue in lamports (e.g. `getInflationReward` amounts for a vote account), in SOL. A

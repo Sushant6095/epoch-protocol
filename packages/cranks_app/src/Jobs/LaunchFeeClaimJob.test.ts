@@ -1,5 +1,11 @@
 import { findDammPositionNftAccount, instructionNameOf } from '@epoch/epoch-sdk';
-import { type ClaimableItem, type ClaimKind, type DammPositionClaim, type LaunchClaimsState } from '@epoch/meteora';
+import {
+  type ClaimableItem,
+  type ClaimKind,
+  type DammPositionClaim,
+  type LaunchClaimsState,
+  type MigrationReadiness,
+} from '@epoch/meteora';
 import { Keypair, type PublicKey, type TransactionInstruction } from '@solana/web3.js';
 
 import { type ClaimSimulation, type LaunchClaimChain } from '../Launch/LaunchClaimChain';
@@ -104,6 +110,19 @@ class FakeClaimChain implements LaunchClaimChain {
   async readClaims(): Promise<LaunchClaimsState | null> {
     if (this.readError) throw this.readError;
     return this.state ? structuredClone(this.state) : null;
+  }
+
+  // Graduations are LaunchMigrationJob's (tested on their own).
+  async migrationReadiness(): Promise<MigrationReadiness> {
+    return { ready: false, reason: 'ALREADY_MIGRATED' };
+  }
+
+  async sendMigration(): Promise<{ signature: string; dammPool: string }> {
+    throw new Error('not used here');
+  }
+
+  async simulateMigration(): Promise<ClaimSimulation> {
+    throw new Error('not used here');
   }
 
   async sendClaim(

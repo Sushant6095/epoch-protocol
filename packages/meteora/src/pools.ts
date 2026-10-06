@@ -106,7 +106,11 @@ export interface LaunchPoolState {
   activationPoint: number;
 }
 
-const ratio = (part: bigint, whole: bigint): number => (whole === 0n ? 0 : Number((part * 1_000_000n) / whole) / 1e6);
+/**
+ * part ÷ whole as a float, as the DBC SDK's `getPoolQuoteTokenCurveProgress` divides (full precision; it used to stop
+ * at 1e-6). Lamport amounts are far below 2^53, so the conversion is exact.
+ */
+const ratio = (part: bigint, whole: bigint): number => (whole === 0n ? 0 : Number(part) / Number(whole));
 
 /**
  * The DAMM v2 pool a migrated DBC pool graduated to: derived from the DAMM v2 config of the DBC config's migration fee
