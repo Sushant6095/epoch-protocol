@@ -129,7 +129,7 @@ Before a PR: `pnpm lint && pnpm test && pnpm ccd`. Conventions: [`docs/REPO_STRU
 - [x] Monorepo scaffold, program skeleton, CI
 - [x] Program phases 1–4: pool, credit, Fee Index, fee swaps (29 instructions)
 - [x] Revenue tokens on Meteora: register, buyback at source on DBC and DAMM v2, redeem, treasury fee claims to lenders (11 more instructions, 82 unit tests; end to end on a local validator running Meteora's mainnet programs)
-- [x] Side-track backends: Live (Solami), Predict with real USDC (Panta), Launch (Meteora), India (Superteam India)
+- [x] Side tracks: Live (Solami), Predict with real USDC (Panta), Launch (Meteora): backend, program and pages
 - [ ] Mechanism proof on testnet: PDA as vote-account withdrawer
 - [ ] Credit: onboard → advance → sweep → release on devnet
 - [ ] Indexer + Terminal live on mainnet (Solami gRPC)
@@ -147,7 +147,6 @@ Full plan with checkpoints: [`docs/PLAN.md`](docs/PLAN.md) · Implementation pla
 | Meteora | Validators sell a fixed share of their revenue as a token launched on a DBC curve (Epoch is the partner); every epoch the program buys it back on the curve or its DAMM v2 pool and burns it; Epoch's partner and LP fees are claimed on-chain into the lending pool | Launch |
 | Panta | Real-money (USDC, mainnet) markets each epoch on the Solana Fee Index, created by our bot and traded from the Predict page; every trade attributed to Epoch | Predict |
 | Solami | The Fee Index computed live from mainnet through Solami's Yellowstone gRPC and RPC; the API's slot ticker and program events over Solami gRPC; every mainnet transaction we sign through Beam; a live usage report (`GET /v1/live/solami`) | Live |
-| Superteam India | SOL in ₹, validators hosted in India, and a wallet's staking rewards in ₹ per Indian financial year with a CSV | India |
 | RPC Fast | Crank transactions land through RPC Fast; failover data stream | — |
 
 Page contracts for the frontend: [`docs/pages/`](docs/pages/README.md) · What is left to go live with real money:

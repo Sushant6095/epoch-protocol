@@ -1,6 +1,6 @@
-# Go live: the four side tracks
+# Go live: the three side tracks
 
-The code for all four side tracks is built and tested (4 Oct 2026). What is left needs keys, money or a person, and
+The code for the three side tracks (Solami, Panta, Meteora) is built and tested, pages included (6 Oct 2026). What is left needs keys, money or a person, and
 this page lists it in order. Times are IST.
 
 The page contracts for the frontend are in [docs/pages](pages/README.md). The track rules are in
@@ -8,14 +8,13 @@ The page contracts for the frontend are in [docs/pages](pages/README.md). The tr
 
 ## Deadlines and prizes
 
-**Deadline:** all four side tracks and the main Colosseum submission close on **13 Oct 2026, 12:29 IST**. Each track
+**Deadline:** the side tracks and the main Colosseum submission close on **13 Oct 2026, 12:29 IST**. Each track
 needs its own Superteam Earn form, filled in by a person.
 
 | Track | Prize | Our page | Judged on | Winners by |
 | --- | --- | --- | --- | --- |
 | Meteora: best use of DBC | 20,000 USDC (10k, 5k, 3k, 1.5k, 500) | Launch | Depth of Meteora integration, execution, originality, impact, **traction and volume on mainnet** | 31 Oct |
 | Panta API | 5,000 USDG (2k, 1k, 1k, 1k) | Predict | Panta API integration, execution, product and UX, originality, impact, traction | 28 Oct |
-| Superteam India | 5,000 USDG (2.5k, 1.5k, 1k) | India | Ecosystem impact, product-market fit (clear problem, defined user, early traction), growth potential | 28 Oct |
 | Solami | 3,000 USDG | Live | Solami usage, working mainnet demo, build quality, usefulness, creativity | — |
 
 ## 1. Shared foundation (do this first)
@@ -25,7 +24,7 @@ needs its own Superteam Earn form, filled in by a person.
      pages.
 2. **Public API.**
    - Deploy `api_app` over HTTPS and set `PUBLIC_API_URL`.
-   - The frontend reads all four pages from it.
+   - The frontend reads all three pages from it.
    - Panta markets resolve from `{PUBLIC_API_URL}/v1/index/epochs/{N}`, so it must stay up through 28 Oct.
 3. **Index pipeline on mainnet.**
    - `indexer_app` (Solami) fills `epoch_index`. `publisher_app` posts it and the cranks finalize it.
@@ -45,7 +44,9 @@ needs its own Superteam Earn form, filled in by a person.
 5. **Paid RPCs.**
    - Use Solami RPC for `DATA_RPC_URL`.
    - Keep `DATA_RPC_FALLBACK_URL` on another provider such as RPC Fast. Solami caps `getProgramAccounts` per plan.
-6. **Frontend.** The collaborator builds the four pages from the contracts in [docs/pages](pages/README.md).
+6. **Frontend.** The three pages are built in `app/` (`/live`, `/predict`, `/launch`, plus `/integrations`). Set
+   `NEXT_PUBLIC_EPOCH_API_URL` and the RPC variables in `app/.env.example`, and add the frontend's host to the API's
+   `API_CORS_ORIGINS` and `SIWS_ALLOWED_DOMAINS`.
 
 ## 2. Solami: the Live page
 
@@ -150,19 +151,7 @@ The security review and its fixes are in [security/revenue-tokens-review.md](sec
 
 Public devnet was not used because its faucet refused airdrops and it runs different Meteora builds.
 
-## 5. Superteam India: the India page
-
-1. **Eligibility.** The team must be based in India. Register on Colosseum with India as the country, and submit on
-   both Colosseum and Earn. The Earn form asks for the GitHub link, a pitch deck or Loom, and whether the project is on
-   Colosseum.
-2. **Optional env:**
-   - `COINGECKO_API_KEY`, a free demo key.
-   - A paid `DATA_RPC_URL`, so a financial year of rewards loads in seconds rather than minutes.
-   - `INDIA_VALIDATOR_VOTES`, only with each operator's consent.
-3. **Pitch.** On 3 Oct 2026 Stakewiz showed no staked validator hosted in India, so the page leads with "start a
-   validator in India". That makes a clear problem and a defined user for the judges.
-
-## 6. Decisions only you can make
+## 5. Decisions only you can make
 
 1. **Where the treasury's Meteora income goes.**
    - Today: claimed SOL becomes pool income, so `accrue` pays the 10% protocol fee, then the senior coupon, and junior
@@ -181,7 +170,7 @@ Public devnet was not used because its faucet refused airdrops and it runs diffe
 7. **Unredeemed escrow.** Holders have 30 epochs after the term to redeem; after that, what they leave becomes pool
    income (as built). The alternatives are sending it to the validator or never closing the token.
 
-## 7. Money needed (approximate)
+## 6. Money needed (approximate)
 
 | Item | Cost |
 | --- | --- |
@@ -191,9 +180,9 @@ Public devnet was not used because its faucet refused airdrops and it runs diffe
 | Solami | 7-day Pro trial; then a paid plan; optional gRPC pay-as-you-go (about $21/day) |
 | RPC | a paid mainnet RPC as fallback (for example RPC Fast) |
 
-## 8. Submission checklist
+## 7. Submission checklist
 
-**Colosseum** (one project): the public repo, the demo video and the pitch, with India selected as the country.
+**Colosseum** (one project): the public repo, the demo video and the pitch.
 
 **One Earn form per track:**
 
@@ -202,6 +191,5 @@ Public devnet was not used because its faucet refused airdrops and it runs diffe
 | Meteora | Repo link, demo of a mainnet launch with trades, graduation and a buyback. The repo is public, so no `dannxbt` access is needed. |
 | Panta | Working demo, what we built, and how the Panta API is integrated: markets, trading, positions, claims, attribution |
 | Solami | 2–3 minute mainnet demo, public repo, README with setup, env vars and your own key |
-| Superteam India | GitHub link, pitch deck or Loom, and the Colosseum yes/no |
 
 Agents can't submit these forms; a team member has to.

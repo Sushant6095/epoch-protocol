@@ -1,9 +1,9 @@
-# Page contracts: the four special pages
+# Page contracts: the special pages
 
 Each side track has one page in the Terminal built for it. The contracts below are written for the frontend: every
 endpoint, example responses, WS frames, states and copy rules.
 
-Conventions shared by all four pages:
+Conventions shared by all the pages:
 
 - **Server and envelope.** Everything is served by `packages/api_app`. Responses are `{ ok: true, data }` or
   `{ ok: false, error: { code, message, details }, traceId }`.
@@ -20,7 +20,6 @@ The track details (prizes, eligibility, deadlines) are in [docs/SIDE_TRACKS.md](
 | Live | Solami | [live.md](live.md) | `GET /v1/live/summary`, `/slots`, `/leaders`, `/epochs/:epoch/distribution` | `slots`, `index:live` |
 | Predict | Panta | [predict.md](predict.md) | `/v1/predict/panta/*` (markets, positions, quote, build, submit, status, claims); resolution from `GET /v1/index/epochs/:epoch` | `predict:panta` (with `feeIndex`) |
 | Launch | Meteora | [launch.md](launch.md) | `/v1/launches/:mint/page`, `/market`, `/trades`, `/candles`, `/holders`, `/fees`, `/buybacks`; `POST /quote`, `/build` | `launch:<mint>` |
-| India | Superteam India | [india.md](india.md) | `GET /v1/india/summary`, `/price`, `/validators`, `/wallets/:address/rewards` (and `.csv`) | none (REST only) |
 
 ## Live (Solami)
 
@@ -82,20 +81,7 @@ new class of assets), and traction and volume on mainnet. What the page shows fo
   class for Solana validators.
 - **Traction.** Every number is live from the chain (`freshness` on each block), so mainnet volume shows as it happens.
 
-## India (Superteam India)
+## India (not entered)
 
-Epoch for Indian stakers and validators, in rupees, on real mainnet data: SOL in ₹, the validators hosted in India, and a
-wallet's staking rewards in ₹ per Indian financial year, with a CSV for its chartered accountant.
-
-| Routes | WS | Contract |
-| --- | --- | --- |
-| `GET /v1/india/summary` · `/price?days=` · `/validators` · `/wallets/:address/rewards?fy=` · `/wallets/:address/rewards.csv?fy=` | none: poll (prices are cached; rewards are per epoch) | [india.md](india.md) |
-
-The track is judged on ecosystem impact, product-market fit and growth potential. What the page shows for each:
-
-- **Product-market fit.** Indian taxpayers file by financial year (April to March) in rupees, while wallets show
-  staking rewards in SOL per epoch. The page converts each reward at that day's price and groups the rewards by FY.
-- **Ecosystem impact.** It shows, with live numbers, how few staked validators run in India, and what Epoch's
-  revenue-based credit means for a validator started there.
-- **Growth potential.** A rupee-first view of Solana staking, with Indian number formatting (lakh, crore) and no
-  sign-in.
+Superteam India is not entered (6 Oct 2026). The API (`/v1/india`) and its contract ([india.md](india.md)) stay
+in the code; there is no page.
