@@ -19,7 +19,12 @@ export class ConnectionManager {
     try {
       return await fn(this.primary);
     } catch (primaryError) {
-      if (!this.fallback) throw new ChainException('RPC call failed', { cause: String(primaryError) });
+      if (!this.fallback) {
+        // Keep the original error reachable as `cause`: callers decode program errors (e.g. `Paused`) from its logs,
+        // and a program error must not be mistaken for a transient RPC failure.
+        const error = new ChainException('RPC call failed', { cause: String(primaryError) });
+        throw Object.assign(error, { cause: primaryError });
+      }
       logger.warn('primary RPC failed, using fallback', { error: String(primaryError) });
       return fn(this.fallback);
     }
