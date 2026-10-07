@@ -1,0 +1,39 @@
+app/handover/07-DATA-CONTRACTS.md
+  s_ff83e2e0dccb12::t_30fd41bd1d2b5e 35
+docs/pages/predict.md
+  s_ff83e2e0dccb12::t_deab610a53ab24 345-348
+packages/api_app/README.md
+  s_ff83e2e0dccb12::t_60120af4fbaedf 98,109-117,119,334
+packages/api_app/src/Services/Program/FeeIndexEpochService.ts
+  s_ff83e2e0dccb12::t_40aa4f2a0757ec 106-107
+packages/api_app/src/Services/Program/FeeIndexService.test.ts
+  s_ff83e2e0dccb12::t_26878345febab7 12-13,113-114,139-140,150-151,163-165,172-173,193-199,210-216,223-229,236-242,245-251,260-266,280-282,284,300-303,344-350,360-361,370-372,376-466,500-526
+packages/api_app/src/Services/Program/FeeIndexService.ts
+  s_ff83e2e0dccb12::t_d271ce8b4c43bb 11,63-127,142-145,176-180,193-194,206-207,224-238,241-259
+packages/api_app/src/Services/Program/ProgramEventServices.ts
+  s_ff83e2e0dccb12::t_9a018b412bc87e 23,59-60
+packages/api_app/src/types/Activity.types.ts
+  s_ff83e2e0dccb12::t_d6005f975013bb 101-105,109-115
+packages/config-sdk/src/schemas/EpochProgram.config.ts
+  s_ff83e2e0dccb12::t_0afd81d3b239fa 9-20,39-40
+packages/config-sdk/src/schemas/Publisher.config.ts
+  s_ff83e2e0dccb12::t_c5d9c0a7ea971c 4
+scripts/devnet/devnet.env.example
+  s_ff83e2e0dccb12::t_643cbff1ff82eb 21-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bfc0a45afcefec9ee62b472e71d4bc52f215f22b",
+  "prompts": {},
+  "sessions": {
+    "s_ff83e2e0dccb12": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "23bb3397-28e1-49e5-b68b-18d9366bdf43",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Sushant6095 <Sushant6095@users.noreply.github.com>"
+    }
+  }
+}
