@@ -1,0 +1,97 @@
+docs/pages/live.md
+  s_ff83e2e0dccb12::t_6ca969e34863ab 19
+  s_ff83e2e0dccb12::t_663209fdab6091 31
+docs/PROGRAM_REFERENCE.md
+  s_ff83e2e0dccb12::t_479f0be1bcb5c7 1-206
+docs/pages/README.md
+  s_ff83e2e0dccb12::t_e1ac7b1b1c880e 75
+  s_ff83e2e0dccb12::t_2639ba1d0be9f4 61-62
+  s_ff83e2e0dccb12::t_2999c51053a82c 20-24,27-28
+  s_ff83e2e0dccb12::t_2f1d0abcb482c3 56
+  s_ff83e2e0dccb12::t_c1adbceb74fb0d 38
+docs/pages/predict.md
+  s_ff83e2e0dccb12::t_cdebe1fb68f03b 315-316,320
+  s_ff83e2e0dccb12::t_4e6836add4f481 343-345
+  s_ff83e2e0dccb12::t_4bd60d2b5f8e03 337-342
+  s_ff83e2e0dccb12::t_facb328c9cb963 362-366
+  s_ff83e2e0dccb12::t_30cf3acd54c42b 354
+docs/pages/score.md
+  s_ff83e2e0dccb12::t_a9786f5e7da1cb 57-103
+  s_ff83e2e0dccb12::t_6fd4a098173cba 22
+  s_ff83e2e0dccb12::t_61542559b36626 196-200
+  s_ff83e2e0dccb12::t_010232f2427f40 52-53
+app/handover/BACKEND-REQUESTS.md
+  s_ff83e2e0dccb12::t_5d8a9bcca1d5f2 36
+  s_ff83e2e0dccb12::t_c55f625fea7323 21
+  s_ff83e2e0dccb12::t_907b6423fb1c27 38
+  s_ff83e2e0dccb12::t_269841646badd6 22
+  s_ff83e2e0dccb12::t_5b13a25ae0f107 46
+  s_ff83e2e0dccb12::t_6492c68d2adf95 25
+  s_ff83e2e0dccb12::t_69798330a850a1 39
+  s_ff83e2e0dccb12::t_3dcf20cc483b00 15
+  s_ff83e2e0dccb12::t_b736f2eddb4ed4 14
+  s_ff83e2e0dccb12::t_5d442dc171bba0 13
+  s_ff83e2e0dccb12::t_9a5353e9cda834 31
+  s_ff83e2e0dccb12::t_cd6f96c662ad45 28
+  s_ff83e2e0dccb12::t_cff75146f583a1 37
+  s_ff83e2e0dccb12::t_66290e261dbf10 17
+  s_ff83e2e0dccb12::t_eb55ca534fe9da 35
+  s_ff83e2e0dccb12::t_696020a97f05d4 10
+  s_ff83e2e0dccb12::t_5a216592bdd936 30
+  s_ff83e2e0dccb12::t_49cf567d572275 19
+  s_ff83e2e0dccb12::t_0612c5f70d1248 41
+  s_ff83e2e0dccb12::t_74483c50d51f5b 11
+  s_ff83e2e0dccb12::t_48d495f924fcdf 20
+  s_ff83e2e0dccb12::t_61e4abf1e94cba 44
+  s_ff83e2e0dccb12::t_0695570f28c280 47
+  s_ff83e2e0dccb12::t_43c7cbd89844ef 45
+  s_ff83e2e0dccb12::t_3f25b765b9aeca 33
+  s_ff83e2e0dccb12::t_637a8a9e679099 24
+  s_ff83e2e0dccb12::t_add84a68a1c90c 16
+  s_ff83e2e0dccb12::t_8ac12bb8e0462e 18
+  s_ff83e2e0dccb12::t_7b6f6ad6d5c6d7 29
+  s_ff83e2e0dccb12::t_85cee91612e9c0 23
+  s_ff83e2e0dccb12::t_6da648712e0fd5 42
+  s_ff83e2e0dccb12::t_90905fd98b5dde 9
+  s_ff83e2e0dccb12::t_2932c06c16ef6c 26
+  s_ff83e2e0dccb12::t_fbb1dead4eab2b 32
+  s_ff83e2e0dccb12::t_f90667ccd45a6f 27
+  s_ff83e2e0dccb12::t_44e6db62915637 34
+  s_ff83e2e0dccb12::t_c06aa8e177ccd0 40
+  s_ff83e2e0dccb12::t_d2f7658cc4ff0e 12
+  s_ff83e2e0dccb12::t_262dd49b3e2bec 43
+docs/pages/launch.md
+  s_ff83e2e0dccb12::t_5004d0a81a3d59 89
+  s_ff83e2e0dccb12::t_3c864503051b38 94-95
+  s_ff83e2e0dccb12::t_2852d7b38dacb5 113
+  s_ff83e2e0dccb12::t_b3ab43364c51ac 238
+docs/pages/india.md
+  s_ff83e2e0dccb12::t_0007ebca6b04f3 289-290
+  s_ff83e2e0dccb12::t_f657efb47ec83a 291-292
+README.md
+  s_ff83e2e0dccb12::t_aed11ff9144cca 59,82,85,94-95,97-98,101-102,104,122-124,127-128,137-140
+docs/ARCHITECTURE.md
+  s_ff83e2e0dccb12::t_1bc57ac57fdbad 19,22-24,33,36-37,39,54,60,108-125,151-154,157-169
+docs/IMPLEMENTATION_PLAN.md
+  s_ff83e2e0dccb12::t_c38135106f3fc7 7-28
+packages/api_app/README.md
+  s_ff83e2e0dccb12::t_715114a60e5bd7 31,205-207
+programs/epoch/README.md
+  s_ff83e2e0dccb12::t_1530f2de48c818 9-15,22-23,25-31,33-36,46,49-50,121,123-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fb315654a649b1c01511e48a19f5b5d2ef064786",
+  "prompts": {},
+  "sessions": {
+    "s_ff83e2e0dccb12": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "23bb3397-28e1-49e5-b68b-18d9366bdf43",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Sushant6095 <Sushant6095@users.noreply.github.com>"
+    }
+  }
+}
