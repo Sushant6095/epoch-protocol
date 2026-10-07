@@ -17,6 +17,7 @@
 //! program's IDL types instead of hand-written account lists.
 
 pub mod context;
+pub mod history;
 pub mod ix;
 pub mod meteora;
 pub mod pda;

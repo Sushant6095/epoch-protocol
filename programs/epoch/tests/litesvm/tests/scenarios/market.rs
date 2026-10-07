@@ -5,7 +5,8 @@
 use anchor_lang::error::ErrorCode;
 use epoch::errors::EpochError;
 use epoch::events::{
-    IndexFinalized, IndexProposed, IndexVetoed, QuotePosted, SwapOpened, SwapSettled,
+    IndexFinalized, IndexProposed, IndexVetoed, QuotePosted, QuoteWithdrawn, SwapOpened,
+    SwapSettled,
 };
 use epoch::state::{FeeIndex, FeeQuote, Side};
 use epoch::{accounts as a, instruction as i};
@@ -348,6 +349,22 @@ fn quotes_and_swaps_settle_on_the_finalized_index() {
     settle(&mut ctx, quote, "alice").fails_with(code(EpochError::IndexMissing));
     ctx.send_as(&[ix::withdraw_quote(maker, epoch)], &["maker"])
         .fails_with(code(EpochError::QuoteHasOpenSwaps));
+    // A quote with no swap is still held until it expires or its epoch starts.
+    let later = epoch + 1;
+    ctx.send_as(
+        &[ix::post_quote(
+            maker,
+            later,
+            10_000,
+            sol(1.0),
+            2_000,
+            later * SLOTS_PER_EPOCH,
+        )],
+        &["maker"],
+    )
+    .unwrap();
+    ctx.send_as(&[ix::withdraw_quote(maker, later)], &["maker"])
+        .fails_with(code(EpochError::QuoteNotExpired));
 
     // Trading closes when the quoted epoch starts.
     ctx.warp_to_epoch(epoch);
@@ -405,10 +422,36 @@ fn quotes_and_swaps_settle_on_the_finalized_index() {
     );
     ctx.send_as(&[stolen], &["intruder"])
         .fails_with(anchor_code(ErrorCode::ConstraintSeeds));
-    ctx.send_as(&[ix::withdraw_quote(maker, epoch)], &["maker"])
+    let ok = ctx
+        .send_as(&[ix::withdraw_quote(maker, epoch)], &["maker"])
         .unwrap();
+    let withdrawn: QuoteWithdrawn = ok.event();
+    assert_eq!(
+        (
+            withdrawn.quote,
+            withdrawn.maker,
+            withdrawn.epoch,
+            withdrawn.lamports
+        ),
+        (quote, maker, epoch, quote_rent + sol(2.2))
+    );
     assert!(!ctx.exists(&quote));
-    assert_eq!(ctx.lamports(&maker), maker_before + sol(0.2));
+    // The later quote's rent and collateral are still out.
+    let later_quote = pda::quote(&maker, later);
+    let later_lamports = ctx.lamports(&later_quote);
+    assert_eq!(
+        ctx.lamports(&maker),
+        maker_before + sol(0.2) - later_lamports
+    );
     ctx.send_as(&[ix::withdraw_quote(maker2, epoch)], &["maker2"])
         .unwrap();
+    // Its epoch starts: it can go too, every lamport back.
+    ctx.send_as(&[ix::withdraw_quote(maker, later)], &["maker"])
+        .fails_with(code(EpochError::QuoteNotExpired));
+    ctx.warp_to_epoch(later);
+    let ok = ctx
+        .send_as(&[ix::withdraw_quote(maker, later)], &["maker"])
+        .unwrap();
+    assert_eq!(ok.event::<QuoteWithdrawn>().lamports, later_lamports);
+    assert_eq!(ctx.lamports(&maker), maker_before + sol(0.2));
 }

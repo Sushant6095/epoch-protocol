@@ -8,7 +8,7 @@
 //! the same with the deployed id).
 
 use anchor_lang::prelude::Pubkey;
-use anchor_lang::solana_program::instruction::Instruction;
+use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use anchor_lang::system_program;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use epoch::constants::{
@@ -16,7 +16,7 @@ use epoch::constants::{
     DBC_EVENT_AUTHORITY, DBC_POOL_AUTHORITY, DBC_PROGRAM_ID, NATIVE_MINT, TOKEN_PROGRAM_ID,
     VOTE_PROGRAM_ID,
 };
-use epoch::instructions::ScoreUpdate;
+use epoch::instructions::{ScoreUpdate, ScoringParams};
 use epoch::state::{BuybackParams, PoolParams, Side, Tranche};
 use epoch::{accounts as a, instruction as i};
 
@@ -458,6 +458,148 @@ pub fn veto_index(admin: Pubkey) -> Instruction {
     )
 }
 
+/// `post_index` by the sole operator of a one-operator registry: the registry rides in
+/// `remaining_accounts[0]`.
+pub fn post_index_as_operator(
+    operator: Pubkey,
+    epoch: u64,
+    value: u64,
+    inputs_hash: [u8; 32],
+) -> Instruction {
+    let mut ix = post_index(operator, epoch, value, inputs_hash);
+    ix.accounts
+        .push(AccountMeta::new_readonly(pda::index_operators(), false));
+    ix
+}
+
+// ── Fee Index operator consensus ────────────────────────────────────────
+
+pub fn initialize_index_operators(
+    admin: Pubkey,
+    threshold_bps: u16,
+    tolerance_bps: u16,
+) -> Instruction {
+    build(
+        a::InitializeIndexOperators {
+            admin,
+            pool: pda::pool(),
+            fee_index: pda::fee_index(),
+            index_operators: pda::index_operators(),
+            system_program: system_program::ID,
+        },
+        i::InitializeIndexOperators {
+            threshold_bps,
+            tolerance_bps,
+        },
+    )
+}
+
+fn manage_operator(admin: Pubkey, operator: Pubkey) -> a::ManageIndexOperator {
+    a::ManageIndexOperator {
+        admin,
+        pool: pda::pool(),
+        fee_index: pda::fee_index(),
+        index_operators: pda::index_operators(),
+        operator,
+    }
+}
+
+pub fn add_index_operator(admin: Pubkey, operator: Pubkey, weight: u32) -> Instruction {
+    build(
+        manage_operator(admin, operator),
+        i::AddIndexOperator { weight },
+    )
+}
+
+pub fn remove_index_operator(admin: Pubkey, operator: Pubkey) -> Instruction {
+    build(manage_operator(admin, operator), i::RemoveIndexOperator {})
+}
+
+pub fn set_index_operator_weight(admin: Pubkey, operator: Pubkey, weight: u32) -> Instruction {
+    build(
+        manage_operator(admin, operator),
+        i::SetIndexOperatorWeight { weight },
+    )
+}
+
+pub fn set_index_consensus(admin: Pubkey, threshold_bps: u16, tolerance_bps: u16) -> Instruction {
+    build(
+        a::SetIndexConsensus {
+            admin,
+            pool: pda::pool(),
+            fee_index: pda::fee_index(),
+            index_operators: pda::index_operators(),
+        },
+        i::SetIndexConsensus {
+            threshold_bps,
+            tolerance_bps,
+        },
+    )
+}
+
+/// `cast_index_vote`: `payer` pays the ballot's rent when this vote opens it.
+pub fn cast_index_vote(
+    payer: Pubkey,
+    operator: Pubkey,
+    epoch: u64,
+    value: u64,
+    inputs_hash: [u8; 32],
+) -> Instruction {
+    build(
+        a::CastIndexVote {
+            payer,
+            operator,
+            fee_index: pda::fee_index(),
+            index_operators: pda::index_operators(),
+            ballot: pda::index_ballot(epoch),
+            system_program: system_program::ID,
+        },
+        i::CastIndexVote {
+            epoch,
+            value,
+            inputs_hash,
+        },
+    )
+}
+
+pub fn submit_index_ballot(cranker: Pubkey, epoch: u64) -> Instruction {
+    build(
+        a::SubmitIndexBallot {
+            cranker,
+            fee_index: pda::fee_index(),
+            index_operators: pda::index_operators(),
+            ballot: pda::index_ballot(epoch),
+        },
+        i::SubmitIndexBallot {},
+    )
+}
+
+pub fn reset_index_ballot(admin: Pubkey, epoch: u64) -> Instruction {
+    build(
+        a::ResetIndexBallot {
+            admin,
+            pool: pda::pool(),
+            fee_index: pda::fee_index(),
+            index_operators: pda::index_operators(),
+            ballot: pda::index_ballot(epoch),
+        },
+        i::ResetIndexBallot {},
+    )
+}
+
+/// `close_index_ballot`: the rent goes to `payer`, which must be the ballot's payer.
+pub fn close_index_ballot(cranker: Pubkey, epoch: u64, payer: Pubkey) -> Instruction {
+    build(
+        a::CloseIndexBallot {
+            cranker,
+            fee_index: pda::fee_index(),
+            ballot: pda::index_ballot(epoch),
+            payer,
+        },
+        i::CloseIndexBallot {},
+    )
+}
+
 // ── Fee market (quotes and swaps) ───────────────────────────────────────
 
 pub fn post_quote(
@@ -834,5 +976,120 @@ pub fn execute_buyback(
             slice,
             min_amount_out,
         },
+    )
+}
+
+// ── Validator history and the permissionless score ──────────────────────
+
+pub fn init_validator_history(payer: Pubkey, vote: Pubkey) -> Instruction {
+    build(
+        a::InitValidatorHistory {
+            payer,
+            vote_account: vote,
+            history: pda::validator_history(&vote),
+            system_program: system_program::ID,
+        },
+        i::InitValidatorHistory {},
+    )
+}
+
+pub fn copy_vote_account(cranker: Pubkey, vote: Pubkey) -> Instruction {
+    build(
+        a::CopyVoteAccount {
+            cranker,
+            history: pda::validator_history(&vote),
+            vote_account: vote,
+            escrow: pda::escrow(&vote),
+        },
+        i::CopyVoteAccount {},
+    )
+}
+
+/// `copy_tip_distribution_account` with the account at Jito's address for (vote, epoch).
+pub fn copy_tip_distribution_account(cranker: Pubkey, vote: Pubkey, epoch: u64) -> Instruction {
+    copy_tip_distribution_account_at(cranker, vote, epoch, pda::tip_distribution(&vote, epoch))
+}
+
+pub fn copy_tip_distribution_account_at(
+    cranker: Pubkey,
+    vote: Pubkey,
+    epoch: u64,
+    tip_distribution_account: Pubkey,
+) -> Instruction {
+    build(
+        a::CopyTipDistribution {
+            cranker,
+            history: pda::validator_history(&vote),
+            tip_distribution_account,
+        },
+        i::CopyTipDistributionAccount { epoch },
+    )
+}
+
+/// `copy_priority_fee_distribution` with the account at Jito's address for (vote, epoch).
+pub fn copy_priority_fee_distribution(cranker: Pubkey, vote: Pubkey, epoch: u64) -> Instruction {
+    build(
+        a::CopyPriorityFeeDistribution {
+            cranker,
+            history: pda::validator_history(&vote),
+            distribution_account: pda::priority_fee_distribution(&vote, epoch),
+        },
+        i::CopyPriorityFeeDistribution { epoch },
+    )
+}
+
+pub fn update_stake_info(
+    scorer: Pubkey,
+    vote: Pubkey,
+    epoch: u64,
+    activated_stake_lamports: u64,
+    rank: u32,
+    superminority: bool,
+) -> Instruction {
+    build(
+        a::UpdateStakeInfo {
+            scorer,
+            pool: pda::pool(),
+            history: pda::validator_history(&vote),
+        },
+        i::UpdateStakeInfo {
+            epoch,
+            activated_stake_lamports,
+            rank,
+            superminority,
+        },
+    )
+}
+
+/// `refresh_score`; `hedges` are the remaining accounts (the operator's swap PDAs on the market
+/// maker's quotes for the next five epochs, when a market maker is configured).
+pub fn refresh_score(cranker: Pubkey, vote: Pubkey, hedges: &[Pubkey]) -> Instruction {
+    let mut ix = build(
+        a::RefreshScore {
+            cranker,
+            pool: pda::pool(),
+            score_config: pda::score_config(),
+            position: pda::position(&vote),
+            history: pda::validator_history(&vote),
+        },
+        i::RefreshScore {},
+    );
+    ix.accounts.extend(
+        hedges
+            .iter()
+            .map(|key| AccountMeta::new_readonly(*key, false)),
+    );
+    ix
+}
+
+pub fn configure_scoring(admin: Pubkey, params: ScoringParams) -> Instruction {
+    build(
+        a::ConfigureScoring {
+            admin,
+            pool: pda::pool(),
+            score_config: pda::score_config(),
+            system_program: system_program::ID,
+        },
+        i::ConfigureScoring { params },
     )
 }

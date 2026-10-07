@@ -4,9 +4,11 @@
 use anchor_lang::prelude::Pubkey;
 use epoch::constants::{
     ADVANCE_SEED, BUYBACK_SEED, BUYBACK_TOKENS_SEED, BUYBACK_WSOL_SEED, ESCROW_SEED,
-    FEE_INDEX_SEED, HISTORY_SEED, LENDER_SEED, PARTNER_TREASURY_SEED, POOL_SEED, POSITION_SEED,
-    QUOTE_SEED, REVENUE_TOKEN_SEED, SWAP_SEED, TREASURY_WSOL_SEED, VAULT_SEED, VOTE_AUTH_SEED,
-    WITHDRAW_SEED,
+    FEE_INDEX_SEED, HISTORY_SEED, INDEX_BALLOT_SEED, INDEX_OPERATORS_SEED,
+    JITO_PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID, JITO_TIP_DISTRIBUTION_PROGRAM_ID, LENDER_SEED,
+    PARTNER_TREASURY_SEED, PF_DISTRIBUTION_ACCOUNT_SEED, POOL_SEED, POSITION_SEED, QUOTE_SEED,
+    REVENUE_TOKEN_SEED, SCORE_CONFIG_SEED, SWAP_SEED, TIP_DISTRIBUTION_ACCOUNT_SEED,
+    TREASURY_WSOL_SEED, VAULT_SEED, VOTE_AUTH_SEED, WITHDRAW_SEED,
 };
 use epoch::state::Tranche;
 
@@ -97,4 +99,47 @@ pub fn partner_treasury() -> Pubkey {
 
 pub fn treasury_wsol() -> Pubkey {
     find(&[TREASURY_WSOL_SEED, pool().as_ref()]).0
+}
+
+pub fn score_config() -> Pubkey {
+    find(&[SCORE_CONFIG_SEED, pool().as_ref()]).0
+}
+
+pub fn index_operators() -> Pubkey {
+    find(&[INDEX_OPERATORS_SEED, fee_index().as_ref()]).0
+}
+
+pub fn index_ballot(epoch: u64) -> Pubkey {
+    find(&[
+        INDEX_BALLOT_SEED,
+        fee_index().as_ref(),
+        &epoch.to_le_bytes(),
+    ])
+    .0
+}
+
+/// Jito's `TipDistributionAccount` for (vote, epoch), under Jito's mainnet program id.
+pub fn tip_distribution(vote: &Pubkey, epoch: u64) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            TIP_DISTRIBUTION_ACCOUNT_SEED,
+            vote.as_ref(),
+            &epoch.to_le_bytes(),
+        ],
+        &JITO_TIP_DISTRIBUTION_PROGRAM_ID,
+    )
+    .0
+}
+
+/// Jito's `PriorityFeeDistributionAccount` for (vote, epoch).
+pub fn priority_fee_distribution(vote: &Pubkey, epoch: u64) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            PF_DISTRIBUTION_ACCOUNT_SEED,
+            vote.as_ref(),
+            &epoch.to_le_bytes(),
+        ],
+        &JITO_PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID,
+    )
+    .0
 }

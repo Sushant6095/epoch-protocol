@@ -4,12 +4,14 @@
 //! key) and once with the right key in the slot but without its signature
 //! (`AccountNotSigner`). Role checks that need more setup live next to their
 //! scenario: `configure_revenue_token` and `register_revenue_token` in
-//! `revenue.rs`, `withdraw_quote` in `market.rs`.
+//! `revenue.rs`, `withdraw_quote` in `market.rs`, `close_index_ballot`'s payer
+//! in `consensus.rs`.
 
 use anchor_lang::error::ErrorCode;
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use epoch::errors::EpochError;
+use epoch::instructions::ScoringParams;
 use epoch::state::Tranche;
 use epoch_litesvm_tests::context::{anchor_code, code, sol, TestContext};
 use epoch_litesvm_tests::setup::default_params;
@@ -229,4 +231,91 @@ fn lender_owner_role_rejects_other_signers() {
         )],
     );
     assert!(ctx.exists(&pda::withdraw_request(seq)));
+}
+
+#[test]
+fn history_and_index_consensus_roles_reject_other_signers() {
+    let (mut ctx, v) = fixture();
+    let vote = v.vote;
+    let admin = ctx.key("admin");
+    let admin_err = code(EpochError::NotAdmin);
+    let scoring = ScoringParams {
+        market_maker: Pubkey::default(),
+        credits_window_epochs: 10,
+        count_block_commission: false,
+        credits_reference_bps: 9_950,
+        max_copy_age_slots: 9_000,
+    };
+    let keeper = ctx.wallet("keeper");
+    ctx.send_as(&[ix::init_validator_history(keeper, vote)], &["keeper"])
+        .unwrap();
+    check(
+        &mut ctx,
+        vec![
+            case("configure_scoring", "admin", admin_err, move |k| {
+                ix::configure_scoring(k, scoring)
+            }),
+            case(
+                "update_stake_info",
+                "scorer",
+                code(EpochError::NotScorer),
+                move |k| ix::update_stake_info(k, vote, 800, sol(1.0), 1, false),
+            ),
+            case("initialize_index_operators", "admin", admin_err, |k| {
+                ix::initialize_index_operators(k, 6_667, 100)
+            }),
+        ],
+    );
+
+    // A registry with op1, and op1's ballot for 800 (agreed alone, queued behind the pending
+    // proposal), so the registry and ballot instructions have something to act on.
+    let op1 = ctx.wallet("op1");
+    ctx.send_as(
+        &[
+            ix::initialize_index_operators(admin, 6_667, 100),
+            ix::add_index_operator(admin, op1, 1),
+        ],
+        &["admin"],
+    )
+    .unwrap();
+    let payer = ctx.wallet("ballot-payer");
+    ctx.send_as(
+        &[ix::cast_index_vote(payer, op1, 800, 10_000, [1; 32])],
+        &["ballot-payer", "op1"],
+    )
+    .unwrap();
+    let mut vote_case = case(
+        "cast_index_vote",
+        "op1",
+        code(EpochError::NotIndexOperator),
+        move |k| ix::cast_index_vote(payer, k, 800, 10_000, [2; 32]),
+    );
+    vote_case.extra = &["ballot-payer"];
+    check(
+        &mut ctx,
+        vec![
+            case("add_index_operator", "admin", admin_err, |k| {
+                ix::add_index_operator(k, k, 1)
+            }),
+            case("remove_index_operator", "admin", admin_err, move |k| {
+                ix::remove_index_operator(k, op1)
+            }),
+            case("set_index_operator_weight", "admin", admin_err, move |k| {
+                ix::set_index_operator_weight(k, op1, 2)
+            }),
+            case("set_index_consensus", "admin", admin_err, |k| {
+                ix::set_index_consensus(k, 7_000, 100)
+            }),
+            case("reset_index_ballot", "admin", admin_err, |k| {
+                ix::reset_index_ballot(k, 800)
+            }),
+            vote_case,
+        ],
+    );
+    // The registry is as the admin left it.
+    let reg: epoch::state::IndexOperators = ctx.get(&pda::index_operators());
+    assert_eq!(
+        (reg.operator_count, reg.total_weight, reg.threshold_bps),
+        (1, 1, 6_667)
+    );
 }

@@ -7,7 +7,7 @@ request.
 | --- | --- | --- | --- |
 | Program unit tests | `programs/epoch/src/**` (`#[cfg(test)]`) | each module's logic: math worked examples, vote-state reader, CPI encoders, account sizes | `cargo test -p epoch --lib` |
 | Program property tests | `programs/epoch/tests/props.rs` | the math invariants over the whole input space (proptest): shares never leak value through rounding, waterfalls conserve lamports, credit-limit caps, score bounds, revenue-token payouts, fee-swap payoffs within the collateral, the DBC leftover | `cargo test -p epoch --test props` |
-| Program LiteSVM suite | `programs/epoch/tests/litesvm/` | every instruction except the validator-history ones (see the gaps below) end to end against the SBF build, with real vote accounts and the vote program's CPIs | see below |
+| Program LiteSVM suite | `programs/epoch/tests/litesvm/` | every instruction end to end against the SBF build, with real vote accounts and the vote program's CPIs | see below |
 | TypeScript packages | `packages/*/src/**/*.test.ts` | API, indexer, cranks, SDK (Jest; DB tests need Postgres) | `pnpm test` |
 
 `cargo test` at the repo root runs the unit and property tests.
@@ -28,7 +28,7 @@ cargo test --manifest-path programs/epoch/tests/litesvm/Cargo.toml
 
 `EPOCH_LITESVM_SO=/path/to/epoch.so` runs the suite against another build; `CARGO_TARGET_DIR` is honoured by both the
 script and the suite. `EPOCH_METEORA_SO_DIR=/dir/with/dbc.so+cp_amm.so` also runs the Meteora CPI test (below). The
-suite takes about 25 s on two cores (each test loads the program into a fresh SVM).
+suite (40 tests) takes about 25 s on two cores (each test loads the program into a fresh SVM).
 
 ### What the scenarios cover
 
@@ -38,10 +38,12 @@ suite takes about 25 s on two cores (each test loads the program into a fresh SV
 | `withdrawals.rs` | FIFO queue for both tranches: strict order, cancel (owner only), the junior lock, a junior request that would breach the floor bounces instead of blocking the queue | `request_withdraw`, `process_withdrawal`, `cancel_withdraw` |
 | `vote_cpi.rs` | the vote program's `Authorize`, `Withdraw`, `UpdateCommissionCollector`, `UpdateCommissionBps` under LiteSVM | (vote program) |
 | `credit.rs` | onboard → collectors → bond → sweeps → advance → repaying sweeps → release; double sweep; accrual over epochs (protocol fee → senior coupon → junior); late ×3 → `mark_default` (bond, then junior; senior untouched); commission and identity updates | `onboard_validator`, `set_collectors`, `post_bond`, `withdraw_bond`, `update_score`, `request_advance`, `sweep`, `accrue`, `mark_default`, `release_validator`, `update_commission`, `update_identity` |
-| `market.rs` | Fee Index: post → dispute window (to the slot) → finalize, one proposal at a time, epochs only forward, the move limit both ways, admin veto, reconfiguration, a 16-point history; quotes and swaps: validation, collateral, capacity, `IndexMissing` until final, trading closes at the quoted epoch, settlement both ways and clipped, maker-only withdrawal, lamports conserved | `initialize_index`, `configure_index`, `post_index`, `finalize_index`, `veto_index`, `post_quote`, `open_swap`, `settle_swap`, `withdraw_quote` |
+| `market.rs` | Fee Index: post → dispute window (to the slot) → finalize, one proposal at a time, epochs only forward, the move limit both ways, admin veto, reconfiguration, a 16-point history; quotes and swaps: validation, collateral, capacity, `IndexMissing` until final, trading closes at the quoted epoch, settlement both ways and clipped, maker-only withdrawal (`QuoteNotExpired` before expiry, `QuoteWithdrawn` with the lamports returned), lamports conserved | `initialize_index`, `configure_index`, `post_index`, `finalize_index`, `veto_index`, `post_quote`, `open_swap`, `settle_swap`, `withdraw_quote` |
+| `consensus.rs` | operator registry (bounds, duplicates, eight at most, removal keeps the order, weights, threshold and tolerance); three operators: a dissenter's deviation on record, two of three agree at the two-thirds threshold (and not above it), votes locked after consensus, a late vote recorded, a veto reopening the ballot as round 1, the admin's reset of a stuck round, a consensus queued behind an open window then submitted, a ballot skipped over by a later final epoch; close refused while open and to anyone but the payer, the rent back; the one-operator `post_index` shortcut; every proposal bounded by the cluster's epoch; consensus off after `configure_index` | `initialize_index_operators`, `add_index_operator`, `remove_index_operator`, `set_index_operator_weight`, `set_index_consensus`, `cast_index_vote`, `submit_index_ballot`, `reset_index_ballot`, `close_index_ballot`, `post_index` |
+| `history.rs` | init → `copy_vote_account` (a real vote account given 41 epochs of credits and a fresh vote) → Jito tip and priority-fee accounts (the mainnet fixtures' bytes at Jito's addresses) → stake info → `refresh_score` (score 9,400 from the chain) → `request_advance` on it; `update_score` refused once the history is fresh and accepted again next epoch; stale history (no copy, no stake info, an old copy), a delinquent vote, the superminority cap; the Jito copies' epoch range, address, owner, vote and layout checks; scoring bounds; the hedge rule from the operator's swaps in `remaining_accounts` (valid, a missing epoch, wrong count, order, taker, a foreign owner, another taker's or another epoch's swap planted at the address) and the hedged credit limit | `init_validator_history`, `copy_vote_account`, `copy_tip_distribution_account`, `copy_priority_fee_distribution`, `update_stake_info`, `refresh_score`, `configure_scoring`, `update_score` |
 | `revenue.rs` | launch checks (operator, share and term bounds, mint authority, crossed pool, foreign fee claimer, non-DBC owner, double registration); the share swept into the escrow first and kept out of the revenue history; missing or wrong token accounts on sweep; redeem closed during the term unless the admin opens it, one rate for every holder, burns; graduation sync accepts only the DAMM v2 pool DBC's migration created (not migrated, other curve, lookalike address, foreign config, wrong orientation; re-sync is a no-op); buyback slices follow the schedule (slice index, not due yet, outside the window, paused by the admin, minimum output, the epoch's sweep first) before the venue is checked; close after the grace period books the unclaimed escrow as pool income | `register_revenue_token`, `sweep`, `configure_revenue_token`, `redeem`, `sync_revenue_token_pool`, `execute_buyback`, `close_revenue_token` |
 | `treasury.rs` | every account check of the partner claims (PDAs, Meteora program and authorities, pool/config/vault/mint links, fee claimer and leftover receiver, owner, graduation, pause) and of the LP-fee claim (DAMM v2 pool, vaults, mint, the position's pool, the treasury owning the position NFT); with the dumps, a full trading-fee claim and a full leftover burn through the real DBC program, and the LP-fee claim reaching DAMM v2 | `claim_partner_trading_fee`, `claim_partner_surplus`, `claim_partner_migration_fee`, `burn_leftover`, `claim_treasury_lp_fee` |
-| `roles.rs` | every role with a wrong signer: an intruder in the role's slot, and the right key without its signature | all admin, scorer, publisher, operator and lender-owner instructions |
+| `roles.rs` | every role with a wrong signer: an intruder in the role's slot, and the right key without its signature | all admin, scorer, publisher, operator, index-operator and lender-owner instructions |
 
 After each state-changing step that touches the pool, `ctx.assert_ledger()` checks the pool's ledger identity and that
 the vault holds at least what the ledger says.
@@ -71,17 +73,13 @@ They are covered by the program's unit tests and the localnet end-to-end run (`s
 to create the curve through DBC itself in the test (`create_config`, `initialize_virtual_pool_with_spl_token`, swaps)
 with the dumps loaded.
 
-The seven validator-history instructions (`init_validator_history`, `copy_vote_account`,
-`copy_tip_distribution_account`, `copy_priority_fee_distribution`, `update_stake_info`, `configure_scoring`,
-`refresh_score`) landed after this suite and have no LiteSVM scenarios yet. They are covered by the program's unit
-tests and the local-validator end-to-end run `scripts/e2e/history-to-advance.mts`. The suite passes `update_score` the
-validator's `ValidatorHistory` address, which does not exist there, so the scorer's fallback applies as before.
-
 **Why a build script.** Anchor's entrypoint rejects any program id other than `declare_id!`, and the repo declares the
 placeholder `11111111111111111111111111111111` (the System Program's address) until a real id is set with
 `scripts/set-program-id.sh`. `build-sbf.sh` copies the crate into `target/litesvm/src`, sets `declare_id!` to the test
 id `7pyci4ooVzsJH6Q5whahGNFwyjqhRhhm365jQkeWQ6tg` in that copy only, and builds it with the repo's `Cargo.lock`. The
-harness deploys the binary at that id and derives every PDA from it. Rebuild after every program change.
+harness deploys the binary at that id and derives every PDA from it. Rebuild after every program change. Cargo treats
+the copy as unchanged whatever changed in it (its sources sit under the target dir), so the script deletes the `epoch`
+crate's fingerprint first and that crate always recompiles (about 15 s).
 
 **Why its own `Cargo.lock`.** `programs/epoch/tests/litesvm` is a separate workspace. Every LiteSVM release that builds
 on the repo's Rust 1.89 (0.14 to 0.16, Agave 4.1 and 4.2) is compiled against the Solana SDK crates that use `wincode`
@@ -123,6 +121,10 @@ fn senior_needs_junior_cover() {
 - `ctx.get::<T>(&key)` reads a program account; `ctx.vote_state(&vote)` decodes a vote account with the vote
   interface; `ctx.create_vote_account(name, withdrawer, inflation_bps, block_bps)` creates one through the vote program.
 - Time: `ctx.advance_epochs(n)`, `ctx.advance_slots(n)`, `ctx.warp_to_epoch(e)`.
+- Validator history: `ctx.set_vote_record(&vote, epochs, earned, last_voted_slot)` gives a real vote account credits
+  and a newest vote (the vote interface's own serializer); `ctx.set_tip_distribution` /
+  `ctx.set_priority_fee_distribution` put a Jito account (`history::TDA_1050`, `TDA_1051`, `PFDA_1048`: mainnet bytes
+  from `programs/epoch/fixtures/mainnet`) at Jito's address for (vote, epoch) with the validator's key written in.
 - Raw accounts: `ctx.set_mint`, `ctx.set_token_account`, `ctx.set_dbc_config`, `ctx.set_dbc_pool`, `ctx.set_raw` with
   `meteora::damm_config_data` / `damm_pool_data`, `ctx.patch(key, offset, bytes)`, `ctx.token_amount`, `ctx.mint_supply`.
 - A role check for a new instruction is one `case(name, role_wallet, expected_error, |signer| ix::…)` line in
