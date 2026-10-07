@@ -1,0 +1,23 @@
+packages/cranks_app/src/JobRunner.ts
+  s_ff83e2e0dccb12::t_720e5ac8c25cbf 63-65,69-72
+scripts/e2e/index-to-final.mts
+  s_ff83e2e0dccb12::t_a3f00e7b5c999b 482-484,486
+programs/epoch/tests/build-sbf.sh
+  s_ff83e2e0dccb12::t_ab33c199dd6e2b 43-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1a3c5c7e3f5a26f92aaf3cc323fe0a48d93d7238",
+  "prompts": {},
+  "sessions": {
+    "s_ff83e2e0dccb12": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "23bb3397-28e1-49e5-b68b-18d9366bdf43",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Sushant6095 <Sushant6095@users.noreply.github.com>"
+    }
+  }
+}
