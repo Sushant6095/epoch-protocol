@@ -1,0 +1,40 @@
+programs/epoch/tests/litesvm/tests/scenarios/consensus.rs
+  s_ff83e2e0dccb12::t_55b95cedfe4540 1-415
+  s_ff83e2e0dccb12::t_f58e6469263590 416-445
+programs/epoch/tests/litesvm/src/history.rs
+  s_ff83e2e0dccb12::t_f2f02a210fafbf 1-102
+  s_ff83e2e0dccb12::t_48676b9de10beb 103-104
+programs/epoch/tests/litesvm/tests/scenarios/history.rs
+  s_ff83e2e0dccb12::t_df80e14c0dc79b 1-530,532-534
+  s_ff83e2e0dccb12::t_2520e0b597a786 531,535-592
+programs/epoch/tests/litesvm/src/ix.rs
+  s_ff83e2e0dccb12::t_296d552ec14b9c 11,19,461-602,981-1095
+programs/epoch/tests/litesvm/src/lib.rs
+  s_ff83e2e0dccb12::t_89afb4322ca89a 20
+programs/epoch/tests/litesvm/src/pda.rs
+  s_ff83e2e0dccb12::t_962c02edb71296 7-11,103-145
+programs/epoch/tests/litesvm/tests/scenarios/main.rs
+  s_ff83e2e0dccb12::t_33bca4e141576a 4,6
+programs/epoch/tests/litesvm/tests/scenarios/market.rs
+  s_ff83e2e0dccb12::t_ca506be8e14291 8-9,352-367,425-426,428-437,439-445,448-456
+programs/epoch/tests/litesvm/tests/scenarios/roles.rs
+  s_ff83e2e0dccb12::t_101cc3b3570d7f 7-8,14,235-321
+tests/README.md
+  s_ff83e2e0dccb12::t_f24540ea501689 10,31,41-43,46,80-82,124-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3a8e342658840d4055c479b0519e1add5b566144",
+  "prompts": {},
+  "sessions": {
+    "s_ff83e2e0dccb12": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "23bb3397-28e1-49e5-b68b-18d9366bdf43",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Sushant6095 <Sushant6095@users.noreply.github.com>"
+    }
+  }
+}
