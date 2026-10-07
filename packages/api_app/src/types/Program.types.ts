@@ -189,10 +189,137 @@ export interface OperatorPosition {
   covenants: string[];
   /** Jito MEV commission per mainnet epoch (request #5b); null without the MEV scan (no Postgres) or a TDA. */
   mev: PositionMev | null;
+  /** Where `score` comes from and what went into it (P1, validator history); null when not onboarded. */
+  scoreBreakdown: OperatorScoreBreakdown | null;
 }
 
 /** API: the endpoint answers one position with the usual payload fields. */
 export interface OperatorPositionSnapshot extends OperatorPosition, Meta {}
+
+/**
+ * "history": `refresh_score` computed the score on chain from the validator's ValidatorHistory (permissionless).
+ * "scorer": the Pool's scorer key posted it with `update_score`, the fallback without fresh history (its inputs are
+ * not on chain, so `inputs` is null).
+ */
+export interface OperatorScoreBreakdown {
+  source: 'history' | 'scorer';
+  /** The epoch the score was last written. */
+  epoch: number;
+  inputs: ScoreBreakdown | null;
+  /** The validator's ValidatorHistory; null before `init_validator_history`. Entries: GET /v1/validators/:vote/history. */
+  history: { address: string; freshness: HistoryFreshness; lastVoteCopyEpoch: number | null } | null;
+}
+
+// ── GET /v1/validators/:vote/history ──────────────────────────────────────────────────────────────
+/**
+ * "fresh": the history holds a vote-account copy from the current epoch (`update_score` refuses it and the keepers
+ * score with `refresh_score`); "stale": the newest copy is from an earlier epoch; "empty": never copied.
+ */
+export type HistoryFreshness = 'fresh' | 'stale' | 'empty';
+
+/**
+ * What filled an entry: "vote" this epoch's vote-account copy (commissions, lamports, revenue, newest vote),
+ * "credits" the vote account's 64-epoch credit list, "tip" / "priorityFee" Jito's distribution accounts, "stake" the
+ * scorer's `update_stake_info`.
+ */
+export type HistorySource = 'vote' | 'credits' | 'tip' | 'priorityFee' | 'stake';
+
+/** One epoch of the on-chain history. `null`: the chain has not reported it (the program's all-ones sentinel). */
+export interface OnChainHistoryEntry {
+  epoch: number;
+  /** Vote credits earned in the epoch (so far, for the current one). */
+  credits: number | null;
+  /** Slots in the epoch × 16: the timely-vote-credit maximum (EpochSchedule). */
+  maxCredits: number | null;
+  /** credits ÷ maxCredits, %, 2 decimals. */
+  creditsOfMaxPct: number | null;
+  inflationCommissionPct: number | null;
+  /** Block-revenue commission (vote state V4; 100% before V4). */
+  blockCommissionPct: number | null;
+  /** Jito tip-distribution `validator_commission_bps`. */
+  mevCommissionPct: number | null;
+  /** Jito priority-fee-distribution `validator_commission_bps` (shown, not scored). */
+  priorityFeeCommissionPct: number | null;
+  /** The epoch's whole MEV tip pot: tip-distribution `merkle_root.max_total_claim` (set once the root is uploaded). */
+  mevEarnedSol: number | null;
+  /** Lamports sent to Jito's priority-fee distribution account (a running total until the epoch ends). */
+  priorityFeesSol: number | null;
+  /** Vote-account balance at the epoch's last copy. */
+  voteAccountSol: number | null;
+  /** The sweep's rule: the most seen above rent + pending delegator rewards, plus the escrow above rent. */
+  revenueSol: number | null;
+  /** Oracle (the Pool's scorer). */
+  activatedStakeSol: number | null;
+  /** Oracle: 1 = the largest stake. */
+  stakeRank: number | null;
+  /** Oracle. */
+  superminority: boolean | null;
+  /** The newest vote in the tower at the last copy. */
+  lastVotedSlot: number | null;
+  /** The slot of the last write from any source. */
+  updatedSlot: number | null;
+  sources: HistorySource[];
+}
+
+/** The inputs and result of one `refresh_score`. Percentages are the program's bps ÷ 100. */
+export interface ScoreBreakdown {
+  /** 0–100, as `OperatorPosition.score`. */
+  score: number;
+  /** Credits over the finished-epoch window as a share of the TVC maximum. */
+  creditsOfMaxPct: number;
+  /** The same against the cluster reference (the formula's input: 100 = the cluster average; may exceed 100). */
+  creditsVsClusterPct: number;
+  /** The highest of the inflation, MEV and (when counted) block commission over the window and the current epoch. */
+  commissionPct: number;
+  epochsActive: number;
+  /** The newest vote was more than 128 slots behind the copy (or the tower was empty). */
+  delinquent: boolean;
+  superminority: boolean;
+  hedged: boolean;
+  /** The receive-fixed notional each of the next 5 epochs needed: 50% of the larger revenue average. */
+  hedgeRequiredSol: number;
+}
+
+export interface OnChainHistory {
+  vote: string;
+  name: string;
+  /** The ValidatorHistory account, PDA `["history", vote]`. */
+  address: string;
+  createdEpoch: number;
+  /** The program cluster's epoch and slot when read. */
+  currentEpoch: number;
+  currentSlot: number;
+  freshness: {
+    status: HistoryFreshness;
+    /** The epoch and slot of the newest vote-account copy; null before the first. */
+    lastVoteCopyEpoch: number | null;
+    lastVoteCopySlot: number | null;
+    slotsSinceVoteCopy: number | null;
+    /** `refresh_score` accepts a vote copy at most this old (ScoreConfig); null before `configure_scoring`. */
+    maxCopyAgeSlots: number | null;
+    /** The scorer has posted this epoch's stake, rank and superminority bit. */
+    stakeInfoPosted: boolean;
+    /** `refresh_score` would accept the history now: fresh, the copy young enough, stake info posted, scoring set. */
+    refreshReady: boolean;
+  };
+  /** The last `refresh_score`; null before the first. */
+  lastRefresh: (ScoreBreakdown & { epoch: number; slot: number }) | null;
+  /** The Pool's ScoreConfig; null before `configure_scoring`. */
+  scoring: {
+    creditsWindowEpochs: number;
+    /** Share of the TVC maximum that counts as the cluster average. */
+    creditsReferencePct: number;
+    countBlockCommission: boolean;
+    maxCopyAgeSlots: number;
+    /** The quotes a hedge must be on; null = nobody counts as hedged. */
+    marketMaker: string | null;
+  } | null;
+  /** Filled epochs, oldest first (at most 64). */
+  entries: OnChainHistoryEntry[];
+}
+
+/** API: the history with the usual payload fields. */
+export interface OnChainHistorySnapshot extends OnChainHistory, Meta {}
 
 // ── GET /v1/wallets/:address/lender ───────────────────────────────────────────────────────────────
 export interface LenderPosition {

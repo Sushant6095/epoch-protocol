@@ -4,7 +4,9 @@ import {
   type FeeIndexAccount,
   type PoolAccount,
   type RevenueTokenAccount,
+  type ScoreConfigAccount,
   type SwapPositionAccount,
+  type ValidatorHistoryAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
 } from '@epoch/epoch-sdk';
@@ -22,6 +24,12 @@ export interface ChainClock {
   slot: bigint;
   /** Slots since the epoch's first slot (buyback slices are scheduled on it). */
   slotIndex: bigint;
+}
+
+/** A vote account's activated stake on the program cluster. */
+export interface VoteStake {
+  vote: string;
+  activatedStake: bigint;
 }
 
 /**
@@ -74,6 +82,12 @@ export interface EpochChain {
   swaps(taker?: PublicKey): Promise<ProgramAccount<SwapPositionAccount>[]>;
   /** Every validator revenue token (ADR 0006). */
   revenueTokens(): Promise<ProgramAccount<RevenueTokenAccount>[]>;
+  /** A vote account's `ValidatorHistory` (`["history", vote]`), or null when it has none. */
+  history(vote: PublicKey): Promise<ValidatorHistoryAccount | null>;
+  /** The pool's `ScoreConfig`, or null before `configure_scoring`. */
+  scoreConfig(): Promise<ScoreConfigAccount | null>;
+  /** Activated stake of every vote account on the program cluster (getVoteAccounts, delinquent included). */
+  voteStakes(): Promise<VoteStake[]>;
   /** An account's balance (0 when it does not exist). */
   lamports(address: PublicKey): Promise<bigint>;
   /** The rent-exempt minimum for `space` bytes. */

@@ -22,6 +22,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   INSTRUCTIONS_SYSVAR_ID,
   METEORA,
+  PROGRAM_CONSTANTS,
   NATIVE_MINT,
   SIDES,
   type Side,
@@ -43,10 +44,14 @@ import {
   findPartnerTreasuryPda,
   findPoolPda,
   findPositionPda,
+  findPriorityFeeDistributionPda,
   findQuotePda,
   findRevenueTokenPda,
+  findScoreConfigPda,
   findDammPositionNftAccount,
   findSwapPda,
+  findTipDistributionPda,
+  findValidatorHistoryPda,
   findTreasuryWsolPda,
   findVaultPda,
   findVoteAuthPda,
@@ -431,18 +436,27 @@ export interface UpdateScoreInput extends WithProgram {
   update: ScoreUpdate;
 }
 
-/** `update_score(update)`. Signer: the pool's scorer. */
+/**
+ * `update_score(update)`. Signer: the pool's scorer. The fallback for clusters without history: refused with
+ * `HistoryIsFresh` once the validator's `ValidatorHistory` holds a vote copy from the current epoch.
+ */
 export function updateScore({ programId, scorer, vote, update }: UpdateScoreInput): TransactionInstruction[] {
   const { pool } = poolKeys(programId);
   const [position] = findPositionPda(programId, vote);
-  return instruction(programId, 'update_score', [signer(scorer), readonly(pool), writable(position)], (w) =>
-    w
-      .u16(update.creditsRatioBps, 'creditsRatioBps')
-      .u16(update.commissionBps, 'commissionBps')
-      .u16(update.epochsActive, 'epochsActive')
-      .bool(update.delinquent, 'delinquent')
-      .bool(update.superminority, 'superminority')
-      .bool(update.hedged, 'hedged'),
+  // The history address is always passed: the program refuses while it holds a fresh vote copy.
+  const [history] = findValidatorHistoryPda(programId, vote);
+  return instruction(
+    programId,
+    'update_score',
+    [signer(scorer), readonly(pool), writable(position), readonly(history)],
+    (w) =>
+      w
+        .u16(update.creditsRatioBps, 'creditsRatioBps')
+        .u16(update.commissionBps, 'commissionBps')
+        .u16(update.epochsActive, 'epochsActive')
+        .bool(update.delinquent, 'delinquent')
+        .bool(update.superminority, 'superminority')
+        .bool(update.hedged, 'hedged'),
   );
 }
 
@@ -1413,4 +1427,190 @@ export function lamportsToSolString(lamports: bigint): string {
   const whole = abs / LAMPORTS_PER_SOL;
   const fraction = (abs % LAMPORTS_PER_SOL).toString().padStart(9, '0').replace(/0+$/, '');
   return `${negative ? '-' : ''}${whole}${fraction ? `.${fraction}` : ''}`;
+}
+
+// ─── Validator history and the permissionless score ───────────────────────
+
+export interface HistoryInput extends WithProgram {
+  /** Any signer: pays the fee (and the rent for `initValidatorHistory`). */
+  cranker: PublicKey;
+  vote: PublicKey;
+}
+
+/** `init_validator_history`: creates `["history", vote]` (8,352 bytes, ~0.059 SOL rent). Signer: cranker (payer). */
+export function initValidatorHistory({ programId, cranker, vote }: HistoryInput): TransactionInstruction[] {
+  const [history] = findValidatorHistoryPda(programId, vote);
+  return instruction(programId, 'init_validator_history', [
+    signerWritable(cranker),
+    readonly(vote),
+    writable(history),
+    readonly(SYSTEM_PROGRAM_ID),
+  ]);
+}
+
+/** `copy_vote_account`: credits (up to 64 epochs), commissions, newest vote, lamports and revenue. Permissionless. */
+export function copyVoteAccount({ programId, cranker, vote }: HistoryInput): TransactionInstruction[] {
+  const [history] = findValidatorHistoryPda(programId, vote);
+  const [escrow] = findEscrowPda(programId, vote);
+  return instruction(programId, 'copy_vote_account', [
+    signer(cranker),
+    writable(history),
+    readonly(vote),
+    readonly(escrow),
+  ]);
+}
+
+export interface CopyDistributionInput extends HistoryInput {
+  epoch: bigint;
+}
+
+/** `copy_tip_distribution_account(epoch)`: Jito MEV commission and tips; a no-op where the account does not exist. */
+export function copyTipDistributionAccount({
+  programId,
+  cranker,
+  vote,
+  epoch,
+}: CopyDistributionInput): TransactionInstruction[] {
+  const [history] = findValidatorHistoryPda(programId, vote);
+  const [account] = findTipDistributionPda(vote, epoch);
+  return instruction(
+    programId,
+    'copy_tip_distribution_account',
+    [signer(cranker), writable(history), readonly(account)],
+    (w) => w.u64(epoch, 'epoch'),
+  );
+}
+
+/** `copy_priority_fee_distribution(epoch)`: Jito priority-fee commission and lamports; no-op where absent. */
+export function copyPriorityFeeDistribution({
+  programId,
+  cranker,
+  vote,
+  epoch,
+}: CopyDistributionInput): TransactionInstruction[] {
+  const [history] = findValidatorHistoryPda(programId, vote);
+  const [account] = findPriorityFeeDistributionPda(vote, epoch);
+  return instruction(
+    programId,
+    'copy_priority_fee_distribution',
+    [signer(cranker), writable(history), readonly(account)],
+    (w) => w.u64(epoch, 'epoch'),
+  );
+}
+
+export interface StakeInfo {
+  epoch: bigint;
+  activatedStakeLamports: bigint;
+  /** u32, 1 = largest stake. */
+  rank: number;
+  superminority: boolean;
+}
+
+export interface UpdateStakeInfoInput extends WithProgram {
+  scorer: PublicKey;
+  vote: PublicKey;
+  info: StakeInfo;
+}
+
+/** `update_stake_info(epoch, activated_stake, rank, superminority)`: the one oracle input. Signer: the pool's scorer. */
+export function updateStakeInfo({ programId, scorer, vote, info }: UpdateStakeInfoInput): TransactionInstruction[] {
+  const { pool } = poolKeys(programId);
+  const [history] = findValidatorHistoryPda(programId, vote);
+  return instruction(programId, 'update_stake_info', [signer(scorer), readonly(pool), writable(history)], (w) =>
+    w
+      .u64(info.epoch, 'epoch')
+      .u64(info.activatedStakeLamports, 'activatedStakeLamports')
+      .u32(info.rank, 'rank')
+      .bool(info.superminority, 'superminority'),
+  );
+}
+
+export interface RefreshScoreInput extends HistoryInput {
+  /** The position's operator: the hedge counts its swaps. */
+  operator: PublicKey;
+  /** `ScoreConfig.market_maker`, or null when unset (then no swap accounts are passed). */
+  marketMaker: PublicKey | null;
+  /** The program cluster's current epoch: the hedge covers current + 1 … current + 5. */
+  currentEpoch: bigint;
+}
+
+/** The swap PDAs `refresh_score` expects, in order: the operator's swap on the maker's quote for each epoch ahead. */
+export function hedgeSwapAccounts(
+  programId: PublicKey,
+  marketMaker: PublicKey,
+  operator: PublicKey,
+  currentEpoch: bigint,
+): PublicKey[] {
+  const out: PublicKey[] = [];
+  for (let i = 1; i <= PROGRAM_CONSTANTS.HEDGE_EPOCHS_AHEAD; i++) {
+    const [quote] = findQuotePda(programId, marketMaker, currentEpoch + BigInt(i));
+    out.push(findSwapPda(programId, quote, operator)[0]);
+  }
+  return out;
+}
+
+/** `refresh_score`: the Epoch Score from on-chain history. Permissionless; refuses stale history. */
+export function refreshScore({
+  programId,
+  cranker,
+  vote,
+  operator,
+  marketMaker,
+  currentEpoch,
+}: RefreshScoreInput): TransactionInstruction[] {
+  const { pool } = poolKeys(programId);
+  const [scoreConfig] = findScoreConfigPda(programId, pool);
+  const [position] = findPositionPda(programId, vote);
+  const [history] = findValidatorHistoryPda(programId, vote);
+  const swaps = marketMaker ? hedgeSwapAccounts(programId, marketMaker, operator, currentEpoch).map(readonly) : [];
+  return instruction(programId, 'refresh_score', [
+    signer(cranker),
+    readonly(pool),
+    readonly(scoreConfig),
+    writable(position),
+    writable(history),
+    ...swaps,
+  ]);
+}
+
+export interface ScoringParams {
+  /** null: nobody is hedged. */
+  marketMaker: PublicKey | null;
+  /** u8, 1..=32. */
+  creditsWindowEpochs: number;
+  countBlockCommission: boolean;
+  /** u16, 5,000..=10,000. */
+  creditsReferenceBps: number;
+  /** u32, 150..=216,000. */
+  maxCopyAgeSlots: number;
+}
+
+export const DEFAULT_SCORING_PARAMS: Readonly<Omit<ScoringParams, 'marketMaker'>> = Object.freeze({
+  creditsWindowEpochs: PROGRAM_CONSTANTS.DEFAULT_CREDITS_WINDOW_EPOCHS,
+  countBlockCommission: false,
+  creditsReferenceBps: PROGRAM_CONSTANTS.DEFAULT_CREDITS_REFERENCE_BPS,
+  maxCopyAgeSlots: PROGRAM_CONSTANTS.DEFAULT_MAX_COPY_AGE_SLOTS,
+});
+
+export interface ConfigureScoringInput extends WithProgram {
+  admin: PublicKey;
+  params: ScoringParams;
+}
+
+/** `configure_scoring(params)`: creates or updates `["score_config", pool]`. Signer: the pool admin (payer). */
+export function configureScoring({ programId, admin, params }: ConfigureScoringInput): TransactionInstruction[] {
+  const { pool } = poolKeys(programId);
+  const [scoreConfig] = findScoreConfigPda(programId, pool);
+  return instruction(
+    programId,
+    'configure_scoring',
+    [signerWritable(admin), readonly(pool), writable(scoreConfig), readonly(SYSTEM_PROGRAM_ID)],
+    (w) =>
+      w
+        .pubkey(params.marketMaker ?? PublicKey.default, 'marketMaker')
+        .u8(params.creditsWindowEpochs, 'creditsWindowEpochs')
+        .bool(params.countBlockCommission, 'countBlockCommission')
+        .u16(params.creditsReferenceBps, 'creditsReferenceBps')
+        .u32(params.maxCopyAgeSlots, 'maxCopyAgeSlots'),
+  );
 }

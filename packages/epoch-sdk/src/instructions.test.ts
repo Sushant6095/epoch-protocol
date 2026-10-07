@@ -14,13 +14,18 @@ import {
   claimTreasuryLpFee,
   closeRevenueToken,
   configureIndex,
+  configureScoring,
   configureRevenueToken,
+  copyPriorityFeeDistribution,
+  copyTipDistributionAccount,
+  copyVoteAccount,
   deposit,
   executeBuyback,
   finalizeIndex,
   findMeteoraVaultPda,
   initializeIndex,
   initializePool,
+  initValidatorHistory,
   lamportsToSolString,
   markDefault,
   onboardValidator,
@@ -32,6 +37,7 @@ import {
   postQuote,
   processWithdrawal,
   redeem,
+  refreshScore,
   registerRevenueToken,
   releaseValidator,
   requestAdvance,
@@ -48,6 +54,7 @@ import {
   updateIdentity,
   updateParams,
   updateScore,
+  updateStakeInfo,
   vetoIndex,
   withdrawBond,
   withdrawQuote,
@@ -376,6 +383,59 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
       position: acc(v, 'position'),
       nftMint: ctxKey(v, 'nft_mint'),
     }),
+  init_validator_history: (v, programId) =>
+    initValidatorHistory({ programId, cranker: acc(v, 'payer'), vote: ctxKey(v, 'vote') }),
+  copy_vote_account: (v, programId) =>
+    copyVoteAccount({ programId, cranker: acc(v, 'cranker'), vote: ctxKey(v, 'vote') }),
+  copy_tip_distribution_account: (v, programId) =>
+    copyTipDistributionAccount({
+      programId,
+      cranker: acc(v, 'cranker'),
+      vote: ctxKey(v, 'vote'),
+      epoch: big(v.args.epoch),
+    }),
+  copy_priority_fee_distribution: (v, programId) =>
+    copyPriorityFeeDistribution({
+      programId,
+      cranker: acc(v, 'cranker'),
+      vote: ctxKey(v, 'vote'),
+      epoch: big(v.args.epoch),
+    }),
+  update_stake_info: (v, programId) =>
+    updateStakeInfo({
+      programId,
+      scorer: acc(v, 'scorer'),
+      vote: ctxKey(v, 'vote'),
+      info: {
+        epoch: big(v.args.epoch),
+        activatedStakeLamports: big(v.args.activated_stake_lamports),
+        rank: v.args.rank as number,
+        superminority: v.args.superminority as boolean,
+      },
+    }),
+  refresh_score: (v, programId) =>
+    refreshScore({
+      programId,
+      cranker: acc(v, 'cranker'),
+      vote: ctxKey(v, 'vote'),
+      operator: ctxKey(v, 'operator'),
+      marketMaker: typeof v.context.market_maker === 'string' ? key(v.context.market_maker) : null,
+      currentEpoch: big(v.context.current_epoch),
+    }),
+  configure_scoring: (v, programId) => {
+    const p = v.args.params as Args;
+    return configureScoring({
+      programId,
+      admin: acc(v, 'admin'),
+      params: {
+        marketMaker: typeof p.market_maker === 'string' ? key(p.market_maker) : null,
+        creditsWindowEpochs: p.credits_window_epochs as number,
+        countBlockCommission: p.count_block_commission as boolean,
+        creditsReferenceBps: p.credits_reference_bps as number,
+        maxCopyAgeSlots: p.max_copy_age_slots as number,
+      },
+    });
+  },
 };
 
 const metas = (ix: TransactionInstruction) =>

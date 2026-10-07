@@ -20,7 +20,7 @@ use epoch::{
     constants::*,
     errors::EpochError,
     events::*,
-    instructions::{taker_pnl, ScoreUpdate},
+    instructions::{taker_pnl, ScoreUpdate, ScoringParams},
     math::{self, u256::U256, CreditInputs, CurvePoint, ScoreInputs, SliceTiming},
     state::*,
 };
@@ -193,6 +193,24 @@ impl ToJ for Pubkey {
 impl ToJ for [u8; 32] {
     fn j(&self) -> J {
         hex(self)
+    }
+}
+impl ToJ for ScoringParams {
+    fn j(&self) -> J {
+        obj(vec![
+            (
+                "market_maker",
+                if self.market_maker == Pubkey::default() {
+                    J::Null
+                } else {
+                    self.market_maker.j()
+                },
+            ),
+            ("credits_window_epochs", self.credits_window_epochs.j()),
+            ("count_block_commission", self.count_block_commission.j()),
+            ("credits_reference_bps", self.credits_reference_bps.j()),
+            ("max_copy_age_slots", self.max_copy_age_slots.j()),
+        ])
     }
 }
 impl<T: ToJ> ToJ for Option<T> {
@@ -970,6 +988,296 @@ fn revenue_token_examples(g: &mut Gen) -> Vec<J> {
     out
 }
 
+// ─── Validator history (zero-copy) and ScoreConfig ─────────────────────────
+
+/// A zero-copy account's bytes are its `repr(C)` struct after the discriminator: no Borsh.
+fn zero_copy_bytes<T: Copy>(discriminator: &[u8], value: &T) -> Vec<u8> {
+    // SAFETY: `T` is a `#[account(zero_copy)]` struct: `repr(C)`, `Pod`, no padding (pinned by
+    // the program's own size tests), so every byte is initialized.
+    let raw = unsafe {
+        std::slice::from_raw_parts((value as *const T).cast::<u8>(), std::mem::size_of::<T>())
+    };
+    let mut out = discriminator.to_vec();
+    out.extend_from_slice(raw);
+    out
+}
+
+fn zero_copy_entry(name: &str, discriminator: &[u8], size: usize, examples: Vec<J>) -> (String, J) {
+    (
+        name.to_string(),
+        obj(vec![
+            ("discriminator", hex(discriminator)),
+            ("initSpace", J::Int((size - 8) as i64)),
+            ("size", J::Int(size as i64)),
+            ("examples", J::Arr(examples)),
+        ]),
+    )
+}
+
+fn known32(v: u32) -> Option<u32> {
+    (v != UNKNOWN_U32).then_some(v)
+}
+
+/// The SDK's view of an entry: sentinels (all ones) read as null, `superminority` as a bool.
+fn history_entry_json(e: &HistoryEntry) -> J {
+    let HistoryEntry {
+        epoch,
+        epoch_credits,
+        max_credits,
+        vote_lamports,
+        revenue_lamports,
+        mev_earned_lamports,
+        priority_fees_lamports,
+        activated_stake_lamports,
+        last_voted_slot,
+        updated_slot,
+        rank,
+        inflation_commission_bps,
+        block_commission_bps,
+        mev_commission_bps,
+        priority_fee_commission_bps,
+        superminority,
+        sources,
+        _reserved0: _,
+        _reserved: _,
+    } = *e;
+    obj(vec![
+        ("epoch", epoch.j()),
+        ("epoch_credits", known_u64(epoch_credits).j()),
+        ("max_credits", known_u64(max_credits).j()),
+        ("vote_lamports", known_u64(vote_lamports).j()),
+        ("revenue_lamports", known_u64(revenue_lamports).j()),
+        ("mev_earned_lamports", known_u64(mev_earned_lamports).j()),
+        (
+            "priority_fees_lamports",
+            known_u64(priority_fees_lamports).j(),
+        ),
+        (
+            "activated_stake_lamports",
+            known_u64(activated_stake_lamports).j(),
+        ),
+        ("last_voted_slot", known_u64(last_voted_slot).j()),
+        ("updated_slot", known_u64(updated_slot).j()),
+        ("rank", known32(rank).j()),
+        (
+            "inflation_commission_bps",
+            known_u16(inflation_commission_bps).j(),
+        ),
+        ("block_commission_bps", known_u16(block_commission_bps).j()),
+        ("mev_commission_bps", known_u16(mev_commission_bps).j()),
+        (
+            "priority_fee_commission_bps",
+            known_u16(priority_fee_commission_bps).j(),
+        ),
+        (
+            "superminority",
+            match superminority {
+                0 => J::Bool(false),
+                1 => J::Bool(true),
+                _ => J::Null,
+            },
+        ),
+        ("sources", sources.j()),
+    ])
+}
+
+/// Header fields plus the filled entries, oldest first (what `decodeValidatorHistory` returns).
+fn history_json(h: &ValidatorHistory) -> J {
+    let ValidatorHistory {
+        vote,
+        created_epoch,
+        last_vote_copy_slot,
+        refreshed_epoch,
+        refreshed_slot,
+        hedge_required_notional,
+        epochs_voted,
+        score,
+        credits_ratio_bps,
+        credits_ratio_raw_bps,
+        commission_bps,
+        epochs_active,
+        bump,
+        version,
+        score_flags,
+        _padding: _,
+        _reserved: _,
+        entries,
+    } = *h;
+    let mut filled: Vec<HistoryEntry> = entries
+        .iter()
+        .copied()
+        .filter(|e| e.epoch != UNKNOWN_U64)
+        .collect();
+    filled.sort_by_key(|e| e.epoch);
+    obj(vec![
+        ("vote", vote.j()),
+        ("created_epoch", created_epoch.j()),
+        ("last_vote_copy_slot", last_vote_copy_slot.j()),
+        ("refreshed_epoch", refreshed_epoch.j()),
+        ("refreshed_slot", refreshed_slot.j()),
+        ("hedge_required_notional", hedge_required_notional.j()),
+        ("epochs_voted", epochs_voted.j()),
+        ("score", score.j()),
+        ("credits_ratio_bps", credits_ratio_bps.j()),
+        ("credits_ratio_raw_bps", credits_ratio_raw_bps.j()),
+        ("commission_bps", commission_bps.j()),
+        ("epochs_active", epochs_active.j()),
+        ("bump", bump.j()),
+        ("version", version.j()),
+        ("score_flags", score_flags.j()),
+        (
+            "entries",
+            J::Arr(filled.iter().map(history_entry_json).collect()),
+        ),
+    ])
+}
+
+fn blank_history(vote: Pubkey, created_epoch: u64, bump: u8) -> ValidatorHistory {
+    ValidatorHistory {
+        vote,
+        created_epoch,
+        last_vote_copy_slot: 0,
+        refreshed_epoch: 0,
+        refreshed_slot: 0,
+        hedge_required_notional: 0,
+        epochs_voted: 0,
+        score: 0,
+        credits_ratio_bps: 0,
+        credits_ratio_raw_bps: 0,
+        commission_bps: 0,
+        epochs_active: 0,
+        bump,
+        version: VALIDATOR_HISTORY_VERSION,
+        score_flags: 0,
+        _padding: 0,
+        _reserved: [0; 64],
+        entries: [HistoryEntry::EMPTY; HISTORY_LEN],
+    }
+}
+
+fn history_examples(g: &mut Gen) -> Vec<J> {
+    let mut out = Vec::new();
+
+    // As `init_validator_history` leaves it: every entry unknown.
+    let fresh = blank_history(g.key(), g.u64() >> 20, g.u8());
+    let data = zero_copy_bytes(ValidatorHistory::DISCRIMINATOR, &fresh);
+    out.push(example(
+        "fresh",
+        &data,
+        data.len(),
+        history_json(&fresh),
+        vec![],
+    ));
+
+    // 70 epochs written through the program's own `entry_mut`, so the ring wraps and evicts
+    // the oldest six; some fields stay unknown, some are copied, the oracle fills a few.
+    let mut h = blank_history(g.key(), 1_000, g.u8());
+    for epoch in 1_000u64..1_070 {
+        let e = h.entry_mut(epoch).expect("entry_mut");
+        e.epoch_credits = g.sized();
+        e.max_credits = 432_000 * 16;
+        e.sources |= SOURCE_CREDITS;
+        if epoch % 3 == 0 {
+            e.vote_lamports = g.u64();
+            e.revenue_lamports = g.sized();
+            e.last_voted_slot = g.u64() >> 8;
+            e.updated_slot = g.u64() >> 8;
+            e.inflation_commission_bps = g.u16() % 10_001;
+            e.block_commission_bps = 10_000;
+            e.sources |= SOURCE_VOTE;
+        }
+        if epoch % 4 == 0 {
+            e.mev_commission_bps = g.u16() % 10_001;
+            e.mev_earned_lamports = g.u64();
+            e.sources |= SOURCE_TIP;
+        }
+        if epoch % 5 == 0 {
+            e.priority_fee_commission_bps = 5_000;
+            e.priority_fees_lamports = g.sized();
+            e.sources |= SOURCE_PRIORITY_FEE;
+        }
+        if epoch % 7 == 0 {
+            e.activated_stake_lamports = g.u64();
+            e.rank = g.u32() % 2_000 + 1;
+            e.superminority = u8::from(epoch % 2 == 0);
+            e.sources |= SOURCE_STAKE;
+        }
+    }
+    h.last_vote_copy_slot = g.u64() >> 8;
+    h.refreshed_epoch = 1_069;
+    h.refreshed_slot = g.u64() >> 8;
+    h.hedge_required_notional = g.sized();
+    h.epochs_voted = 64;
+    h.score = g.u16() % 10_001;
+    h.credits_ratio_bps = g.u16();
+    h.credits_ratio_raw_bps = g.u16() % 10_001;
+    h.commission_bps = g.u16() % 10_001;
+    h.epochs_active = g.u16();
+    h.set_flag(SCORE_FLAG_HEDGED, true);
+    h.set_flag(SCORE_FLAG_SCORED, true);
+    let data = zero_copy_bytes(ValidatorHistory::DISCRIMINATOR, &h);
+    out.push(example(
+        "wrapped",
+        &data,
+        data.len(),
+        history_json(&h),
+        vec![],
+    ));
+    out
+}
+
+fn score_config_json(a: &ScoreConfig) -> J {
+    let ScoreConfig {
+        pool,
+        market_maker,
+        credits_window_epochs,
+        count_block_commission,
+        credits_reference_bps,
+        max_copy_age_slots,
+        bump,
+        _reserved: _,
+    } = a;
+    obj(vec![
+        ("pool", pool.j()),
+        (
+            "market_maker",
+            if *market_maker == Pubkey::default() {
+                J::Null
+            } else {
+                market_maker.j()
+            },
+        ),
+        ("credits_window_epochs", credits_window_epochs.j()),
+        ("count_block_commission", count_block_commission.j()),
+        ("credits_reference_bps", credits_reference_bps.j()),
+        ("max_copy_age_slots", max_copy_age_slots.j()),
+        ("bump", bump.j()),
+    ])
+}
+
+fn score_config_examples(g: &mut Gen) -> Vec<J> {
+    [
+        ("maker_set", g.key(), true),
+        ("no_maker", Pubkey::default(), false),
+    ]
+    .into_iter()
+    .map(|(label, market_maker, count_block_commission)| {
+        let a = ScoreConfig {
+            pool: g.key(),
+            market_maker,
+            credits_window_epochs: g.u8(),
+            count_block_commission,
+            credits_reference_bps: g.u16(),
+            max_copy_age_slots: g.u32(),
+            bump: g.u8(),
+            _reserved: [0; 64],
+        };
+        let (data, len) = account_bytes(&a, None);
+        example(label, &data, len, score_config_json(&a), vec![])
+    })
+    .collect()
+}
+
 fn account_entry<T: Discriminator + Space>(name: &str, examples: Vec<J>) -> (String, J) {
     (
         name.to_string(),
@@ -982,7 +1290,7 @@ fn account_entry<T: Discriminator + Space>(name: &str, examples: Vec<J>) -> (Str
     )
 }
 
-fn accounts(g: &mut Gen, g2: &mut Gen) -> J {
+fn accounts(g: &mut Gen, g2: &mut Gen, g4: &mut Gen) -> J {
     J::Obj(vec![
         account_entry::<Pool>("Pool", pool_examples(g)),
         account_entry::<LenderShares>("LenderShares", lender_examples(g)),
@@ -993,6 +1301,13 @@ fn accounts(g: &mut Gen, g2: &mut Gen) -> J {
         account_entry::<FeeQuote>("FeeQuote", quote_examples(g)),
         account_entry::<SwapPosition>("SwapPosition", swap_examples(g)),
         account_entry::<RevenueToken>("RevenueToken", revenue_token_examples(g2)),
+        zero_copy_entry(
+            "ValidatorHistory",
+            ValidatorHistory::DISCRIMINATOR,
+            ValidatorHistory::SPACE,
+            history_examples(g4),
+        ),
+        account_entry::<ScoreConfig>("ScoreConfig", score_config_examples(g4)),
     ])
 }
 
@@ -1026,7 +1341,7 @@ macro_rules! event {
     }};
 }
 
-fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen) -> J {
+fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen, g4: &mut Gen) -> J {
     let mut out = Vec::new();
     for (label, flag) in [("a", true), ("b", false)] {
         let tranche = if flag {
@@ -1445,6 +1760,98 @@ fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen) -> J {
             }
         );
     }
+    // Validator history (a fourth sequence, so every older vector keeps its bytes).
+    for (label, flag) in [("a", true), ("b", false)] {
+        event!(
+            out,
+            label,
+            HistoryInitialized {
+                vote: g4.key(),
+                history: g4.key(),
+                payer: g4.key(),
+                epoch: g4.u64()
+            }
+        );
+        event!(
+            out,
+            label,
+            VoteAccountCopied {
+                vote: g4.key(),
+                epoch: g4.u64(),
+                slot: g4.u64(),
+                epoch_credits: g4.sized(),
+                epochs_backfilled: g4.u8(),
+                last_voted_slot: if flag { Some(g4.u64()) } else { None },
+                inflation_commission_bps: g4.u16(),
+                block_commission_bps: g4.u16(),
+                vote_lamports: g4.u64(),
+                revenue_lamports: g4.sized(),
+            }
+        );
+        event!(
+            out,
+            label,
+            TipDistributionCopied {
+                vote: g4.key(),
+                epoch: g4.u64(),
+                found: flag,
+                mev_commission_bps: if flag { Some(g4.u16()) } else { None },
+                mev_earned_lamports: if flag { Some(g4.u64()) } else { None },
+            }
+        );
+        event!(
+            out,
+            label,
+            PriorityFeeDistributionCopied {
+                vote: g4.key(),
+                epoch: g4.u64(),
+                found: flag,
+                priority_fee_commission_bps: if flag { Some(g4.u16()) } else { None },
+                priority_fees_lamports: if flag { Some(g4.sized()) } else { None },
+            }
+        );
+        event!(
+            out,
+            label,
+            StakeInfoUpdated {
+                vote: g4.key(),
+                epoch: g4.u64(),
+                activated_stake_lamports: g4.u64(),
+                rank: g4.u32(),
+                superminority: flag,
+            }
+        );
+        event!(
+            out,
+            label,
+            ScoreRefreshed {
+                pool: g4.key(),
+                vote: g4.key(),
+                epoch: g4.u64(),
+                score: g4.u16(),
+                credits_ratio_bps: g4.u16(),
+                credits_ratio_raw_bps: g4.u16(),
+                commission_bps: g4.u16(),
+                epochs_active: g4.u16(),
+                delinquent: flag,
+                superminority: !flag,
+                hedged: flag,
+                hedge_required_notional: g4.sized(),
+            }
+        );
+        event!(
+            out,
+            label,
+            ScoringConfigured {
+                pool: g4.key(),
+                market_maker: g4.key(),
+                credits_window_epochs: g4.u8(),
+                count_block_commission: flag,
+                credits_reference_bps: g4.u16(),
+                max_copy_age_slots: g4.u32(),
+            }
+        );
+    }
     J::Arr(out)
 }
 
@@ -1535,6 +1942,7 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
     let position = addr(&[POSITION_SEED, vote.as_ref()], &pid);
     let vote_auth = addr(&[VOTE_AUTH_SEED, vote.as_ref()], &pid);
     let escrow = addr(&[ESCROW_SEED, vote.as_ref()], &pid);
+    let history = addr(&[HISTORY_SEED, vote.as_ref()], &pid);
     let fee_index = addr(&[FEE_INDEX_SEED, pool.as_ref()], &pid);
     let lender = |owner: Pubkey, t: Tranche| {
         addr(
@@ -1756,7 +2164,8 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
         UpdateScore {
             scorer,
             pool,
-            position
+            position,
+            history
         },
         context { vote }
     );
@@ -1778,7 +2187,8 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
         UpdateScore {
             scorer,
             pool,
-            position
+            position,
+            history
         },
         context { vote }
     );
@@ -2112,6 +2522,186 @@ fn instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
 
 /// The same `sweep` with no advance, but derived under the declared program id, so the Rust
 /// client's `crate::ID` placeholder and the SDK's `programId` placeholder coincide.
+// ─── Validator history instructions ────────────────────────────────────────
+
+fn history_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
+    let system = anchor_lang::solana_program::system_program::ID;
+    let (admin, scorer, cranker, operator, maker) = (k(1), k(3), k(6), k(7), k(15));
+    let vote = k(9);
+    let pool = addr(&[POOL_SEED], &pid);
+    let position = addr(&[POSITION_SEED, vote.as_ref()], &pid);
+    let escrow = addr(&[ESCROW_SEED, vote.as_ref()], &pid);
+    let history = addr(&[HISTORY_SEED, vote.as_ref()], &pid);
+    let score_config = addr(&[SCORE_CONFIG_SEED, pool.as_ref()], &pid);
+    let jito = |program: Pubkey, seed: &[u8], epoch: u64| {
+        addr(&[seed, vote.as_ref(), &epoch.to_le_bytes()], &program)
+    };
+    let mut out: Vec<Ix> = Vec::new();
+
+    ix!(
+        out,
+        pid,
+        "init_validator_history",
+        "default",
+        InitValidatorHistory,
+        InitValidatorHistory {
+            payer: cranker,
+            vote_account: vote,
+            history,
+            system_program: system
+        },
+        context { vote }
+    );
+    ix!(
+        out,
+        pid,
+        "copy_vote_account",
+        "default",
+        CopyVoteAccount,
+        CopyVoteAccount {
+            cranker,
+            history,
+            vote_account: vote,
+            escrow
+        },
+        context { vote }
+    );
+    for (label, epoch) in [("small", 7u64), ("large", g.u64())] {
+        let tip_distribution_account = jito(
+            JITO_TIP_DISTRIBUTION_PROGRAM_ID,
+            TIP_DISTRIBUTION_ACCOUNT_SEED,
+            epoch,
+        );
+        ix!(
+            out,
+            pid,
+            "copy_tip_distribution_account",
+            label,
+            CopyTipDistributionAccount { epoch },
+            CopyTipDistribution {
+                cranker,
+                history,
+                tip_distribution_account
+            },
+            context { vote }
+        );
+        let distribution_account = jito(
+            JITO_PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID,
+            PF_DISTRIBUTION_ACCOUNT_SEED,
+            epoch,
+        );
+        ix!(
+            out,
+            pid,
+            "copy_priority_fee_distribution",
+            label,
+            CopyPriorityFeeDistribution { epoch },
+            CopyPriorityFeeDistribution {
+                cranker,
+                history,
+                distribution_account
+            },
+            context { vote }
+        );
+    }
+    for (label, superminority) in [("superminority", true), ("not_superminority", false)] {
+        ix!(
+            out,
+            pid,
+            "update_stake_info",
+            label,
+            UpdateStakeInfo {
+                epoch: g.u64(),
+                activated_stake_lamports: g.u64(),
+                rank: g.u32(),
+                superminority,
+            },
+            UpdateStakeInfo {
+                scorer,
+                pool,
+                history
+            },
+            context { vote }
+        );
+    }
+    for (label, params) in [
+        (
+            "maker_set",
+            ScoringParams {
+                market_maker: maker,
+                credits_window_epochs: g.u8(),
+                count_block_commission: true,
+                credits_reference_bps: g.u16(),
+                max_copy_age_slots: g.u32(),
+            },
+        ),
+        (
+            "no_maker",
+            ScoringParams {
+                market_maker: Pubkey::default(),
+                credits_window_epochs: 10,
+                count_block_commission: false,
+                credits_reference_bps: DEFAULT_CREDITS_REFERENCE_BPS,
+                max_copy_age_slots: DEFAULT_MAX_COPY_AGE_SLOTS,
+            },
+        ),
+    ] {
+        ix!(
+            out,
+            pid,
+            "configure_scoring",
+            label,
+            ConfigureScoring { params },
+            ConfigureScoring {
+                admin,
+                pool,
+                score_config,
+                system_program: system
+            },
+            context {}
+        );
+    }
+
+    // refresh_score: the program derives the operator's swap on the maker's quote for each of
+    // the next HEDGE_EPOCHS_AHEAD epochs and requires exactly those as remaining accounts.
+    for (label, market_maker, current_epoch) in [
+        ("maker_set", Some(maker), g.u64() >> 2),
+        ("no_maker", None, 1_051u64),
+    ] {
+        ix!(
+            out,
+            pid,
+            "refresh_score",
+            label,
+            RefreshScore,
+            RefreshScore {
+                cranker,
+                pool,
+                score_config,
+                position,
+                history
+            },
+            context {
+                vote,
+                operator,
+                current_epoch,
+                market_maker
+            }
+        );
+        if let (Some(m), Some(ix)) = (market_maker, out.last_mut()) {
+            for i in 1..=HEDGE_EPOCHS_AHEAD {
+                let quote = addr(
+                    &[QUOTE_SEED, m.as_ref(), &(current_epoch + i).to_le_bytes()],
+                    &pid,
+                );
+                let swap = addr(&[SWAP_SEED, quote.as_ref(), operator.as_ref()], &pid);
+                ix.metas.push(AccountMeta::new_readonly(swap, false));
+            }
+        }
+    }
+    out
+}
+
 fn sweep_declared_id() -> Ix {
     let pid = epoch::ID;
     let system = anchor_lang::solana_program::system_program::ID;
@@ -2662,6 +3252,18 @@ fn pdas(pid: &Pubkey) -> J {
         vec![("pool", pool.j())],
         &[TREASURY_WSOL_SEED, pool.as_ref()],
     );
+    for vote in [k(9), k(77)] {
+        push(
+            "history",
+            vec![("vote", vote.j())],
+            &[HISTORY_SEED, vote.as_ref()],
+        );
+    }
+    push(
+        "scoreConfig",
+        vec![("pool", pool.j())],
+        &[SCORE_CONFIG_SEED, pool.as_ref()],
+    );
     J::Arr(out)
 }
 
@@ -2777,6 +3379,14 @@ fn errors() -> J {
         LiquidityNotLocked,
         UnsupportedVenueFee,
         ImpactAboveFeeBound,
+        HistoryEpochOutOfRange,
+        HistoryVoteMismatch,
+        HistoryStale,
+        StakeInfoStale,
+        InvalidDistributionAccount,
+        InvalidHedgeAccount,
+        HistoryIsFresh,
+        InvalidScoreConfig,
     ))
 }
 
@@ -4034,6 +4644,8 @@ fn main() {
     let mut g2 = Gen(0x0e70_c4e9_5d1c_0002);
     // Treasury claims (added after that): a third sequence, for the same reason.
     let mut g3 = Gen(0x0e70_c4e9_5d1c_0003);
+    // Validator history: a fourth sequence.
+    let mut g4 = Gen(0x0e70_c4e9_5d1c_0004);
 
     let mut ixs: Vec<J> = instructions(&mut g, program_id)
         .into_iter()
@@ -4047,6 +4659,11 @@ fn main() {
     );
     ixs.extend(
         treasury_instructions(&mut g3, program_id)
+            .into_iter()
+            .map(Ix::json),
+    );
+    ixs.extend(
+        history_instructions(&mut g4, program_id)
             .into_iter()
             .map(Ix::json),
     );
@@ -4080,6 +4697,8 @@ fn main() {
                 ("buybackTokens", s(String::from_utf8_lossy(BUYBACK_TOKENS_SEED))),
                 ("partnerTreasury", s(String::from_utf8_lossy(PARTNER_TREASURY_SEED))),
                 ("treasuryWsol", s(String::from_utf8_lossy(TREASURY_WSOL_SEED))),
+                ("history", s(String::from_utf8_lossy(HISTORY_SEED))),
+                ("scoreConfig", s(String::from_utf8_lossy(SCORE_CONFIG_SEED))),
             ]),
         ),
         (
@@ -4127,11 +4746,27 @@ fn main() {
                 ("DBC_MIGRATION_PROGRESS_CREATED_POOL", DBC_MIGRATION_PROGRESS_CREATED_POOL.j()),
                 ("DBC_PARTNER_MIGRATION_FEE_MASK", DBC_PARTNER_MIGRATION_FEE_MASK.j()),
                 ("DBC_PARTNER_AND_CREATOR_SURPLUS_SHARE", J::Int(DBC_PARTNER_AND_CREATOR_SURPLUS_SHARE as i64)),
+                ("HISTORY_LEN", J::Int(HISTORY_LEN as i64)),
+                ("TVC_CREDITS_PER_SLOT", TVC_CREDITS_PER_SLOT.j()),
+                ("DELINQUENT_SLOT_DISTANCE", DELINQUENT_SLOT_DISTANCE.j()),
+                ("HEDGE_EPOCHS_AHEAD", HEDGE_EPOCHS_AHEAD.j()),
+                ("HEDGE_MIN_NOTIONAL_BPS", HEDGE_MIN_NOTIONAL_BPS.j()),
+                ("DEFAULT_CREDITS_WINDOW_EPOCHS", DEFAULT_CREDITS_WINDOW_EPOCHS.j()),
+                ("MAX_CREDITS_WINDOW_EPOCHS", MAX_CREDITS_WINDOW_EPOCHS.j()),
+                ("DEFAULT_CREDITS_REFERENCE_BPS", DEFAULT_CREDITS_REFERENCE_BPS.j()),
+                ("MIN_CREDITS_REFERENCE_BPS", MIN_CREDITS_REFERENCE_BPS.j()),
+                ("DEFAULT_MAX_COPY_AGE_SLOTS", DEFAULT_MAX_COPY_AGE_SLOTS.j()),
+                ("MIN_MAX_COPY_AGE_SLOTS", MIN_MAX_COPY_AGE_SLOTS.j()),
+                ("MAX_MAX_COPY_AGE_SLOTS", MAX_MAX_COPY_AGE_SLOTS.j()),
+                ("JITO_TIP_DISTRIBUTION_PROGRAM_ID", JITO_TIP_DISTRIBUTION_PROGRAM_ID.j()),
+                ("TIP_DISTRIBUTION_ACCOUNT_SEED", s(String::from_utf8_lossy(TIP_DISTRIBUTION_ACCOUNT_SEED))),
+                ("JITO_PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID", JITO_PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID.j()),
+                ("PF_DISTRIBUTION_ACCOUNT_SEED", s(String::from_utf8_lossy(PF_DISTRIBUTION_ACCOUNT_SEED))),
             ]),
         ),
-        ("accounts", accounts(&mut g, &mut g2)),
+        ("accounts", accounts(&mut g, &mut g2, &mut g4)),
         ("instructions", J::Arr(ixs)),
-        ("events", events(&mut g, &mut g2, &mut g3)),
+        ("events", events(&mut g, &mut g2, &mut g3, &mut g4)),
         ("pdas", pdas(&program_id)),
         ("errors", errors()),
         ("math", math(&mut g, &mut g2, &mut g3)),

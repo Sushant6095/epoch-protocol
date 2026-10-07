@@ -16,6 +16,7 @@ import { type ValidatorRow } from '../../types/Api.types';
 import { type OperatorPosition, type OperatorPositionSnapshot, type PositionMev } from '../../types/Program.types';
 import { type MevEpochRecord } from '../Validator/MevHistory';
 import { advanceStatus, averageRevenue, expectedRemit, limitRateBps } from './AdvanceView';
+import { scoreBreakdownOf } from './OnChainHistoryService';
 import { PLANNED_POOL_PARAMS } from './PoolParamsView';
 import { big, bpsText, ceilDiv, chainOrder, minBig, payload, solText, toLamports, toSol } from './ProgramFormat';
 import { type ProgramServiceDeps } from './ProgramSources';
@@ -223,6 +224,7 @@ export class OperatorPositionService {
       advance: null,
       covenants: covenants(params),
       mev: positionMev(this.deps.mev?.(vote), { mainnet: false, onboardedEpoch: null, lastSweptEpoch: null }),
+      scoreBreakdown: null,
     };
   }
 
@@ -235,13 +237,14 @@ export class OperatorPositionService {
   ): Promise<OperatorPosition> {
     const { program, events } = this.deps;
     const byVote: Record<string, string> = poolAddress ? { pool: poolAddress, vote } : { vote };
-    const [info, advances, opened, swept, repaid, defaulted] = await Promise.all([
+    const [info, advances, opened, swept, repaid, defaulted, history] = await Promise.all([
       program.epochInfo(),
       program.advances(),
       events.query({ names: ['AdvanceOpened'], where: byVote, limit: 1_000 }),
       events.query({ names: ['Swept'], where: byVote, limit: 10_000 }),
       events.query({ names: ['AdvanceRepaid'], where: { vote }, limit: 1_000 }),
       events.query({ names: ['AdvanceDefaulted'], where: byVote, limit: 1_000 }),
+      program.validatorHistory(vote),
     ]);
     const epoch = info.epoch;
     const mine = advances.filter((a) => a.account.vote.toBase58() === vote);
@@ -299,6 +302,7 @@ export class OperatorPositionService {
         onboardedEpoch: Number(position.onboardedEpoch),
         lastSweptEpoch: position.lastSweptEpoch > 0n ? Number(position.lastSweptEpoch) : null,
       }),
+      scoreBreakdown: scoreBreakdownOf(position, history, epoch),
     };
   }
 }

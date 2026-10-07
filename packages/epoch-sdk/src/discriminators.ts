@@ -14,7 +14,9 @@ export type AccountName =
   | 'FeeIndex'
   | 'FeeQuote'
   | 'SwapPosition'
-  | 'RevenueToken';
+  | 'RevenueToken'
+  | 'ValidatorHistory'
+  | 'ScoreConfig';
 
 /** Instruction names exactly as in `lib.rs` (snake_case; the discriminator preimage is `global:<name>`). */
 export type InstructionName =
@@ -57,7 +59,14 @@ export type InstructionName =
   | 'claim_partner_surplus'
   | 'claim_partner_migration_fee'
   | 'burn_leftover'
-  | 'claim_treasury_lp_fee';
+  | 'claim_treasury_lp_fee'
+  | 'init_validator_history'
+  | 'copy_vote_account'
+  | 'copy_tip_distribution_account'
+  | 'copy_priority_fee_distribution'
+  | 'update_stake_info'
+  | 'refresh_score'
+  | 'configure_scoring';
 
 export type EventName =
   | 'PoolInitialized'
@@ -93,7 +102,14 @@ export type EventName =
   | 'RevenueTokenRedeemed'
   | 'RevenueTokenConfigured'
   | 'RevenueTokenClosed'
-  | 'TreasuryClaimed';
+  | 'TreasuryClaimed'
+  | 'HistoryInitialized'
+  | 'VoteAccountCopied'
+  | 'TipDistributionCopied'
+  | 'PriorityFeeDistributionCopied'
+  | 'StakeInfoUpdated'
+  | 'ScoreRefreshed'
+  | 'ScoringConfigured';
 
 export const ACCOUNT_DISCRIMINATORS: Readonly<Record<AccountName, Uint8Array>> = Object.freeze({
   Pool: new Uint8Array([241, 154, 109, 4, 17, 177, 109, 188]),
@@ -105,6 +121,8 @@ export const ACCOUNT_DISCRIMINATORS: Readonly<Record<AccountName, Uint8Array>> =
   FeeQuote: new Uint8Array([228, 252, 197, 237, 1, 50, 181, 20]),
   SwapPosition: new Uint8Array([65, 203, 85, 175, 129, 154, 6, 152]),
   RevenueToken: new Uint8Array([123, 71, 28, 221, 233, 129, 80, 207]),
+  ValidatorHistory: new Uint8Array([205, 25, 8, 221, 253, 131, 2, 146]),
+  ScoreConfig: new Uint8Array([150, 113, 251, 218, 0, 146, 67, 39]),
 });
 
 export const INSTRUCTION_DISCRIMINATORS: Readonly<Record<InstructionName, Uint8Array>> = Object.freeze({
@@ -148,6 +166,13 @@ export const INSTRUCTION_DISCRIMINATORS: Readonly<Record<InstructionName, Uint8A
   claim_partner_migration_fee: new Uint8Array([5, 91, 233, 246, 90, 63, 86, 200]),
   burn_leftover: new Uint8Array([58, 137, 245, 55, 2, 29, 142, 89]),
   claim_treasury_lp_fee: new Uint8Array([120, 183, 249, 249, 185, 84, 122, 60]),
+  init_validator_history: new Uint8Array([15, 24, 53, 164, 220, 184, 185, 60]),
+  copy_vote_account: new Uint8Array([171, 204, 73, 59, 129, 63, 134, 61]),
+  copy_tip_distribution_account: new Uint8Array([208, 213, 185, 210, 103, 124, 128, 173]),
+  copy_priority_fee_distribution: new Uint8Array([152, 174, 178, 77, 92, 83, 93, 33]),
+  update_stake_info: new Uint8Array([25, 244, 8, 32, 250, 244, 170, 207]),
+  refresh_score: new Uint8Array([60, 234, 183, 65, 144, 1, 136, 207]),
+  configure_scoring: new Uint8Array([208, 106, 50, 176, 142, 54, 115, 55]),
 });
 
 export const EVENT_DISCRIMINATORS: Readonly<Record<EventName, Uint8Array>> = Object.freeze({
@@ -185,6 +210,13 @@ export const EVENT_DISCRIMINATORS: Readonly<Record<EventName, Uint8Array>> = Obj
   RevenueTokenConfigured: new Uint8Array([248, 253, 70, 189, 104, 149, 85, 34]),
   RevenueTokenClosed: new Uint8Array([138, 210, 233, 69, 76, 119, 152, 53]),
   TreasuryClaimed: new Uint8Array([59, 99, 64, 13, 118, 14, 251, 106]),
+  HistoryInitialized: new Uint8Array([189, 138, 180, 254, 29, 103, 17, 216]),
+  VoteAccountCopied: new Uint8Array([16, 56, 150, 242, 97, 105, 77, 75]),
+  TipDistributionCopied: new Uint8Array([34, 84, 37, 137, 218, 93, 12, 13]),
+  PriorityFeeDistributionCopied: new Uint8Array([122, 165, 146, 98, 49, 149, 120, 22]),
+  StakeInfoUpdated: new Uint8Array([181, 235, 215, 27, 252, 126, 49, 81]),
+  ScoreRefreshed: new Uint8Array([250, 182, 172, 112, 252, 188, 222, 234]),
+  ScoringConfigured: new Uint8Array([235, 216, 69, 63, 190, 216, 94, 242]),
 });
 
 export const ACCOUNT_NAMES = Object.freeze(Object.keys(ACCOUNT_DISCRIMINATORS) as AccountName[]);

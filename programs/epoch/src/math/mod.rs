@@ -4,6 +4,7 @@
 
 pub mod amm;
 pub mod credit_limit;
+pub mod history;
 pub mod revenue_token;
 pub mod score;
 pub mod shares;
@@ -13,6 +14,7 @@ pub mod waterfall;
 
 pub use amm::*;
 pub use credit_limit::*;
+pub use history::*;
 pub use revenue_token::*;
 pub use score::*;
 pub use shares::*;

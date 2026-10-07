@@ -16,8 +16,10 @@ import {
   findPositionPda,
   findQuotePda,
   findRevenueTokenPda,
+  findScoreConfigPda,
   findSwapPda,
   findTreasuryWsolPda,
+  findValidatorHistoryPda,
   findVaultPda,
   findVoteAuthPda,
   findWithdrawRequestPda,
@@ -66,6 +68,10 @@ function derive(pda: RustPda): [PublicKey, number] {
       return findPartnerTreasuryPda(programId, key(i.pool));
     case 'treasuryWsol':
       return findTreasuryWsolPda(programId, key(i.pool));
+    case 'history':
+      return findValidatorHistoryPda(programId, key(i.vote));
+    case 'scoreConfig':
+      return findScoreConfigPda(programId, key(i.pool));
     default:
       throw new Error(`unknown PDA kind ${pda.kind}`);
   }
@@ -92,6 +98,8 @@ describe('PDAs match Pubkey::find_program_address in the program crate', () => {
         'buybackTokens',
         'partnerTreasury',
         'treasuryWsol',
+        'history',
+        'scoreConfig',
       ]),
     );
   });

@@ -207,4 +207,22 @@ pub enum EpochError {
     UnsupportedVenueFee,
     #[msg("max_impact_bps may be at most twice the venue's lowest fee")]
     ImpactAboveFeeBound,
+
+    // ── Validator history and the permissionless score (appended) ────────
+    #[msg("The epoch is outside the history's 64-epoch window, or a newer epoch holds its entry")]
+    HistoryEpochOutOfRange,
+    #[msg("The validator history belongs to another vote account")]
+    HistoryVoteMismatch,
+    #[msg("The validator history has no recent vote-account copy for this epoch")]
+    HistoryStale,
+    #[msg("No stake info has been posted for this epoch")]
+    StakeInfoStale,
+    #[msg("Not the Jito distribution account for this vote account and epoch")]
+    InvalidDistributionAccount,
+    #[msg("A hedge account is not an unsettled receive-fixed swap of this operator against the market maker")]
+    InvalidHedgeAccount,
+    #[msg("This validator has fresh on-chain history: use refresh_score")]
+    HistoryIsFresh,
+    #[msg("Score configuration is out of range")]
+    InvalidScoreConfig,
 }

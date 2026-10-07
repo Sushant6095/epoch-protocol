@@ -4,7 +4,7 @@ import { join } from 'path';
 import { decodeEvent, eventToJson, hexToBytes } from '@epoch/epoch-sdk';
 
 import { type StoredProgramEvent } from '../../Lib/EventBus';
-import { ACTIVITY_EVENT_NAMES, predictCallToActivityEvent, toActivityEvent } from './ActivityMapper';
+import { ACTIVITY_EVENT_NAMES, predictCallToActivityEvent, RepeatFilter, toActivityEvent } from './ActivityMapper';
 import { EMPTY_NAMES, nameIndex } from './ValidatorNames';
 
 const VOTE = 'FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk';
@@ -215,7 +215,10 @@ describe('toActivityEvent', () => {
       expect(event?.name).toBe(vector.name);
       if (!event) continue;
       const activity = toActivityEvent(stored(event.name, eventToJson(event).data), NAMES);
-      const expectShown = shown.has(vector.name) && !(vector.name === 'WithdrawCancelled' && vector.label === 'b');
+      // A Jito copy that found no account wrote nothing: not shown.
+      const notFound = 'found' in event.data && event.data.found === false;
+      const expectShown =
+        shown.has(vector.name) && !(vector.name === 'WithdrawCancelled' && vector.label === 'b') && !notFound;
       expect([vector.name, vector.label, activity !== null]).toEqual([vector.name, vector.label, expectShown]);
       if (activity) {
         expect(activity.text).not.toMatch(/undefined|NaN/);
@@ -247,5 +250,98 @@ describe('predictCallToActivityEvent', () => {
       signature: null,
     });
     expect(predictCallToActivityEvent({ ...call, side: 'no' }).text).toBe('Fee Index above 1,500 · epoch 1045 · NO');
+  });
+});
+
+describe('validator history and the score (kind "score")', () => {
+  it('maps the seven P1 events', () => {
+    const score = { kind: 'score', unit: 'SOL', value: null };
+    expect(row('HistoryInitialized', { vote: VOTE, epoch: '1100' })).toMatchObject({
+      ...score,
+      text: 'Kestrel Nodes · on-chain history opened',
+      amountSol: null,
+    });
+    expect(row('VoteAccountCopied', { vote: VOTE, epoch: '1100', epochsBackfilled: 63 })).toMatchObject({
+      ...score,
+      text: 'Kestrel Nodes · vote account copied on chain',
+    });
+    expect(
+      row('TipDistributionCopied', {
+        vote: VOTE,
+        epoch: '1099',
+        found: true,
+        mevCommissionBps: 800,
+        mevEarnedLamports: '12500000000',
+      }),
+    ).toMatchObject({ ...score, text: 'Kestrel Nodes · Jito tips copied: 8% MEV commission', amountSol: 12.5 });
+    // The merkle root is not uploaded yet: the commission is known, the pot is not.
+    expect(
+      row('TipDistributionCopied', { vote: VOTE, epoch: '1100', found: true, mevCommissionBps: 1000 }),
+    ).toMatchObject({ text: 'Kestrel Nodes · Jito tips copied: 10% MEV commission', amountSol: null });
+    expect(
+      row('PriorityFeeDistributionCopied', {
+        vote: VOTE,
+        epoch: '1099',
+        found: true,
+        priorityFeeCommissionBps: 5000,
+        priorityFeesLamports: '250000000',
+      }),
+    ).toMatchObject({ ...score, text: 'Kestrel Nodes · Jito priority fees copied: 50% commission', amountSol: 0.25 });
+    expect(
+      row('StakeInfoUpdated', {
+        vote: OTHER_VOTE,
+        epoch: '1100',
+        activatedStakeLamports: '1',
+        rank: 12,
+        superminority: true,
+      }),
+    ).toMatchObject({ ...score, text: 'Ccnj…UYdj · stake rank #12, superminority posted by the scorer' });
+    expect(
+      row('ScoreRefreshed', {
+        vote: VOTE,
+        epoch: '1100',
+        score: 8_660,
+        delinquent: false,
+        superminority: false,
+        hedged: true,
+      }),
+    ).toMatchObject({ ...score, text: 'Kestrel Nodes · score 87 from on-chain history (hedged)' });
+    expect(
+      row('ScoreRefreshed', { vote: VOTE, score: 2_000, delinquent: true, superminority: true, hedged: false }),
+    ).toMatchObject({ text: 'Kestrel Nodes · score 20 from on-chain history (delinquent, superminority)' });
+    expect(
+      row('ScoringConfigured', { creditsWindowEpochs: 10, creditsReferenceBps: 9950, maxCopyAgeSlots: 9000 }),
+    ).toMatchObject({
+      ...score,
+      text: 'Scoring settings: 10-epoch credit window, cluster average at 99.5% of the maximum',
+    });
+  });
+
+  it('shows nothing for a Jito copy that found no account (devnet, or not created yet)', () => {
+    expect(row('TipDistributionCopied', { vote: VOTE, epoch: '1100', found: false })).toBeNull();
+    expect(row('PriorityFeeDistributionCopied', { vote: VOTE, epoch: '1100', found: false })).toBeNull();
+  });
+});
+
+describe('RepeatFilter', () => {
+  const copy = (vote: string, epoch: string) => stored('VoteAccountCopied', { vote, epoch });
+  const refresh = (vote: string, score: number, hedged = false) =>
+    stored('ScoreRefreshed', { vote, score, delinquent: false, superminority: false, hedged });
+
+  it("shows a validator's first vote copy of an epoch and a refresh only when its score or a flag changed", () => {
+    const filter = new RepeatFilter();
+    const news = [
+      copy(VOTE, '1100'),
+      refresh(VOTE, 8_700),
+      copy(VOTE, '1100'), // the next keeper pass
+      refresh(VOTE, 8_700),
+      copy(OTHER_VOTE, '1100'), // another validator
+      refresh(VOTE, 8_700, true), // the hedge flag changed
+      refresh(VOTE, 8_600), // the score changed
+      copy(VOTE, '1101'), // a new epoch
+      stored('Swept', { vote: VOTE, gross: '1', remitted: '0' }), // every other event is news
+      stored('Swept', { vote: VOTE, gross: '1', remitted: '0' }),
+    ].map((event) => filter.isNews(event));
+    expect(news).toEqual([true, true, false, false, true, true, true, true, true, true]);
   });
 });

@@ -4,7 +4,7 @@ import { type PredictCallEvent, type StoredProgramEvent } from '../../Lib/EventB
 import { isoIst } from '../../Lib/Stats';
 import { type ActivityEvent, type ActivityFeed } from '../../types/Activity.types';
 import { type ProgramEventStore } from '../Program/ProgramEventStore';
-import { ACTIVITY_EVENT_NAMES, predictCallToActivityEvent, toActivityEvent } from './ActivityMapper';
+import { ACTIVITY_EVENT_NAMES, predictCallToActivityEvent, RepeatFilter, toActivityEvent } from './ActivityMapper';
 import { type PredictCallSource } from './PredictCallSource';
 import { type NameIndex } from './ValidatorNames';
 
@@ -30,6 +30,9 @@ interface Timed {
  * rows, merged with Predict calls, newest first. The same mapping feeds the websocket's `activity` channel.
  */
 export class ActivityService {
+  /** The websocket's keeper-repeat filter: live events arrive oldest first. */
+  private readonly live = new RepeatFilter();
+
   constructor(private readonly deps: ActivityServiceDeps) {}
 
   /** True when there is anything to show: the program or the Predict database. */
@@ -57,7 +60,7 @@ export class ActivityService {
 
   /** One program event as a row (null when the feed doesn't show it), for the websocket. */
   async fromProgramEvent(event: StoredProgramEvent): Promise<ActivityEvent | null> {
-    if (!ACTIVITY_NAMES.has(event.name)) return null;
+    if (!ACTIVITY_NAMES.has(event.name) || !this.live.isNews(event)) return null;
     return toActivityEvent(event, await this.deps.names());
   }
 
@@ -78,11 +81,15 @@ export class ActivityService {
       this.deps.events.query({ names: ACTIVITY_EVENT_NAMES, limit: Math.min(10_000, limit * 2 + 20) }),
       this.deps.names(),
     ]);
+    // Keeper repeats are judged oldest first (the oldest in the window always shows).
+    const repeats = new RepeatFilter();
+    const news = new Set([...stored].reverse().filter((event) => repeats.isNews(event)));
     const rows: Timed[] = [];
     // Newest first. An event without a block time sorts with the newer event before it.
     let at = Number.MAX_SAFE_INTEGER;
     for (const event of stored) {
       if (event.blockTime) at = Date.parse(event.blockTime);
+      if (!news.has(event)) continue;
       const row = toActivityEvent(event, names);
       if (row) rows.push({ event: row, at });
     }

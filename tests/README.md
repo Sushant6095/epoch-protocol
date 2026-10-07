@@ -7,7 +7,7 @@ request.
 | --- | --- | --- | --- |
 | Program unit tests | `programs/epoch/src/**` (`#[cfg(test)]`) | each module's logic: math worked examples, vote-state reader, CPI encoders, account sizes | `cargo test -p epoch --lib` |
 | Program property tests | `programs/epoch/tests/props.rs` | the math invariants over the whole input space (proptest): shares never leak value through rounding, waterfalls conserve lamports, credit-limit caps, score bounds, revenue-token payouts, fee-swap payoffs within the collateral, the DBC leftover | `cargo test -p epoch --test props` |
-| Program LiteSVM suite | `programs/epoch/tests/litesvm/` | every instruction end to end against the SBF build, with real vote accounts and the vote program's CPIs | see below |
+| Program LiteSVM suite | `programs/epoch/tests/litesvm/` | every instruction except the validator-history ones (see the gaps below) end to end against the SBF build, with real vote accounts and the vote program's CPIs | see below |
 | TypeScript packages | `packages/*/src/**/*.test.ts` | API, indexer, cranks, SDK (Jest; DB tests need Postgres) | `pnpm test` |
 
 `cargo test` at the repo root runs the unit and property tests.
@@ -70,6 +70,12 @@ are covered, and with the dump the CPI reaches DAMM v2, which then rejects the f
 They are covered by the program's unit tests and the localnet end-to-end run (`scratchpad/localnet`). The next step is
 to create the curve through DBC itself in the test (`create_config`, `initialize_virtual_pool_with_spl_token`, swaps)
 with the dumps loaded.
+
+The seven validator-history instructions (`init_validator_history`, `copy_vote_account`,
+`copy_tip_distribution_account`, `copy_priority_fee_distribution`, `update_stake_info`, `configure_scoring`,
+`refresh_score`) landed after this suite and have no LiteSVM scenarios yet. They are covered by the program's unit
+tests and the local-validator end-to-end run `scripts/e2e/history-to-advance.mts`. The suite passes `update_score` the
+validator's `ValidatorHistory` address, which does not exist there, so the scorer's fallback applies as before.
 
 **Why a build script.** Anchor's entrypoint rejects any program id other than `declare_id!`, and the repo declares the
 placeholder `11111111111111111111111111111111` (the System Program's address) until a real id is set with

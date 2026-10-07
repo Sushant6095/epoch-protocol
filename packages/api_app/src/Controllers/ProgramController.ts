@@ -6,6 +6,7 @@ import { getProgramServices } from '../Services/Program/ProgramServices';
 import type {
   FeeMarketSnapshot,
   LenderPositionSnapshot,
+  OnChainHistorySnapshot,
   OperatorPositionSnapshot,
   VaultSnapshot,
 } from '../types/Program.types';
@@ -27,6 +28,13 @@ export class ProgramController {
     const { vote } = res.locals.params as VoteParams;
     res.setHeader('cache-control', 'public, max-age=10');
     return getProgramServices().positions.position(vote);
+  }
+
+  /** GET /v1/validators/:vote/history — the on-chain ValidatorHistory with its freshness. */
+  static async history(_req: Request, res: Response): Promise<OnChainHistorySnapshot> {
+    const { vote } = res.locals.params as VoteParams;
+    res.setHeader('cache-control', 'public, max-age=10');
+    return getProgramServices().validatorHistory.history(vote);
   }
 
   /** GET /v1/wallets/:address/lender */

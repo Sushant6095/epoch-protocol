@@ -375,3 +375,89 @@ pub struct TreasuryClaimed {
     pub pool_cash: u64,
     pub income_unallocated: u64,
 }
+
+// ── Validator history and the permissionless score ─────────────────────────
+
+#[event]
+pub struct HistoryInitialized {
+    pub vote: Pubkey,
+    pub history: Pubkey,
+    pub payer: Pubkey,
+    pub epoch: u64,
+}
+
+#[event]
+pub struct VoteAccountCopied {
+    pub vote: Pubkey,
+    pub epoch: u64,
+    pub slot: u64,
+    /// Credits earned so far in `epoch`.
+    pub epoch_credits: u64,
+    /// Epochs of credits written from the vote account's own history.
+    pub epochs_backfilled: u8,
+    /// `None` for an empty tower.
+    pub last_voted_slot: Option<u64>,
+    pub inflation_commission_bps: u16,
+    pub block_commission_bps: u16,
+    pub vote_lamports: u64,
+    /// The epoch's revenue entry after this copy (sweep rule).
+    pub revenue_lamports: u64,
+}
+
+#[event]
+pub struct TipDistributionCopied {
+    pub vote: Pubkey,
+    pub epoch: u64,
+    /// False when the account does not exist (no Jito, or not created yet).
+    pub found: bool,
+    pub mev_commission_bps: Option<u16>,
+    /// `max_total_claim` once the merkle root is uploaded.
+    pub mev_earned_lamports: Option<u64>,
+}
+
+#[event]
+pub struct PriorityFeeDistributionCopied {
+    pub vote: Pubkey,
+    pub epoch: u64,
+    pub found: bool,
+    pub priority_fee_commission_bps: Option<u16>,
+    pub priority_fees_lamports: Option<u64>,
+}
+
+#[event]
+pub struct StakeInfoUpdated {
+    pub vote: Pubkey,
+    pub epoch: u64,
+    pub activated_stake_lamports: u64,
+    pub rank: u32,
+    pub superminority: bool,
+}
+
+/// `refresh_score` also emits `ScoreUpdated`, so score consumers need no change.
+#[event]
+pub struct ScoreRefreshed {
+    pub pool: Pubkey,
+    pub vote: Pubkey,
+    pub epoch: u64,
+    pub score: u16,
+    /// Credits ratio on the score's scale (10,000 = the cluster reference).
+    pub credits_ratio_bps: u16,
+    /// Credits ÷ TVC maximum over the window, bps.
+    pub credits_ratio_raw_bps: u16,
+    pub commission_bps: u16,
+    pub epochs_active: u16,
+    pub delinquent: bool,
+    pub superminority: bool,
+    pub hedged: bool,
+    pub hedge_required_notional: u64,
+}
+
+#[event]
+pub struct ScoringConfigured {
+    pub pool: Pubkey,
+    pub market_maker: Pubkey,
+    pub credits_window_epochs: u8,
+    pub count_block_commission: bool,
+    pub credits_reference_bps: u16,
+    pub max_copy_age_slots: u32,
+}

@@ -4,16 +4,22 @@ import { dbAvailable } from '../../Lib/Db';
 import { getServices } from '../index';
 import { FeeMarketService } from './FeeMarketService';
 import { LenderPositionService } from './LenderPositionService';
+import { OnChainHistoryService } from './OnChainHistoryService';
 import { OperatorPositionService } from './OperatorPositionService';
 import { PgPoolHistory } from './PoolHistory';
 import { NO_POOL_HISTORY, type ProgramServiceDeps, readEpochRewardsActive } from './ProgramSources';
 import { VaultService } from './VaultService';
 
-/** The services behind /v1/vault, /v1/validators/:vote/position, /v1/wallets/:address/lender and /v1/market. */
+/**
+ * The services behind /v1/vault, /v1/validators/:vote/position, /v1/validators/:vote/history,
+ * /v1/wallets/:address/lender and /v1/market.
+ */
 export interface ProgramServices {
   /** Also the WS `vault` channel's payload: `vault.snapshot()` without a session. */
   vault: VaultService;
   positions: OperatorPositionService;
+  /** The on-chain ValidatorHistory (P1). */
+  validatorHistory: OnChainHistoryService;
   lenders: LenderPositionService;
   market: FeeMarketService;
 }
@@ -22,6 +28,7 @@ export function createProgramServices(deps: ProgramServiceDeps): ProgramServices
   return {
     vault: new VaultService(deps),
     positions: new OperatorPositionService(deps),
+    validatorHistory: new OnChainHistoryService(deps),
     lenders: new LenderPositionService(deps),
     market: new FeeMarketService(deps),
   };

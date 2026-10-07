@@ -7,7 +7,9 @@ pub mod fee_quote;
 pub mod lender;
 pub mod pool;
 pub mod revenue_token;
+pub mod score_config;
 pub mod swap_position;
+pub mod validator_history;
 pub mod validator_position;
 pub mod withdraw_request;
 
@@ -17,7 +19,9 @@ pub use fee_quote::*;
 pub use lender::*;
 pub use pool::*;
 pub use revenue_token::*;
+pub use score_config::*;
 pub use swap_position::*;
+pub use validator_history::*;
 pub use validator_position::*;
 pub use withdraw_request::*;
 

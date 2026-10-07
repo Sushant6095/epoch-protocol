@@ -11,7 +11,9 @@ import {
   decodeLenderShares,
   decodePool,
   decodeRevenueToken,
+  decodeScoreConfig,
   decodeSwapPosition,
+  decodeValidatorHistory,
   decodeValidatorPosition,
   decodeWithdrawRequest,
   type FeeIndexAccount,
@@ -47,6 +49,8 @@ const DECODERS: Record<AccountName, (data: Uint8Array) => unknown> = {
   FeeQuote: decodeFeeQuote,
   SwapPosition: decodeSwapPosition,
   RevenueToken: decodeRevenueToken,
+  ValidatorHistory: decodeValidatorHistory,
+  ScoreConfig: decodeScoreConfig,
 };
 
 const examples = ACCOUNT_NAMES.flatMap((name) =>
@@ -73,6 +77,8 @@ describe('account layout matches the program (8 + INIT_SPACE)', () => {
       FeeQuote: 151,
       SwapPosition: 133,
       RevenueToken: 503,
+      ValidatorHistory: 8352,
+      ScoreConfig: 145,
     });
   });
 });
@@ -196,6 +202,37 @@ describe('RevenueToken', () => {
   });
 });
 
+describe('ValidatorHistory (zero-copy ring indexed by epoch % 64)', () => {
+  const byLabel = (label: string) => vectors.accounts.ValidatorHistory.examples.find((e) => e.label === label)!;
+
+  it('reads a fresh account as no entries', () => {
+    const h = decodeValidatorHistory(fromHex(byLabel('fresh').data));
+    expect(h.entries).toEqual([]);
+    expect(h.version).toBe(1);
+  });
+
+  it('keeps the newest 64 epochs, oldest first, after the ring wrapped', () => {
+    const h = decodeValidatorHistory(fromHex(byLabel('wrapped').data));
+    expect(h.entries).toHaveLength(PROGRAM_CONSTANTS.HISTORY_LEN);
+    expect(h.entries[0].epoch).toBe(1006n);
+    expect(h.entries[63].epoch).toBe(1069n);
+    expect(h.entries.every((e, i) => i === 0 || e.epoch === h.entries[i - 1].epoch + 1n)).toBe(true);
+  });
+
+  it('reads the all-ones sentinels as null and the oracle bit as a boolean', () => {
+    const h = decodeValidatorHistory(fromHex(byLabel('wrapped').data));
+    const e1007 = h.entries.find((e) => e.epoch === 1007n)!; // copied credits only
+    expect(e1007.voteLamports).toBeNull();
+    expect(e1007.mevCommissionBps).toBeNull();
+    expect(e1007.rank).toBeNull();
+    expect(e1007.superminority).toBeNull();
+    expect(e1007.maxCredits).toBe(432_000n * 16n);
+    const e1008 = h.entries.find((e) => e.epoch === 1008n)!; // 1008 % 7 == 0: the oracle wrote it
+    expect(typeof e1008.superminority).toBe('boolean');
+    expect(e1008.rank).not.toBeNull();
+  });
+});
+
 describe('FeeIndex history', () => {
   it.each(vectors.accounts.FeeIndex.examples.map((e) => [e.label, e] as const))('%s', (_label, example) => {
     const index: FeeIndexAccount = decodeFeeIndex(fromHex(example.data));
@@ -218,6 +255,8 @@ describe('FIELD_OFFSETS', () => {
       FeeQuote: { pool: 8, maker: 40 },
       SwapPosition: { quote: 8, taker: 40 },
       RevenueToken: { pool: 8, position: 40, vote: 72, operator: 104, mint: 136, dbcPool: 200 },
+      ValidatorHistory: { vote: 8 },
+      ScoreConfig: { pool: 8 },
     });
   });
 

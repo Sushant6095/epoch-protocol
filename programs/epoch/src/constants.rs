@@ -144,3 +144,45 @@ pub const NATIVE_MINT: Pubkey = pubkey!("So1111111111111111111111111111111111111
 pub const TOKEN_ACCOUNT_LEN: usize = 165;
 /// Size of an SPL Token mint.
 pub const MINT_LEN: usize = 82;
+
+// ── Validator history and the permissionless score ─────────────────────────
+/// `ValidatorHistory`: `["history", vote]`.
+pub const HISTORY_SEED: &[u8] = b"history";
+/// `ScoreConfig`: `["score_config", pool]`.
+pub const SCORE_CONFIG_SEED: &[u8] = b"score_config";
+/// Epochs a `ValidatorHistory` keeps: the vote account's own credit history
+/// (`MAX_EPOCH_CREDITS_HISTORY`), so the first copy can fill every entry.
+pub const HISTORY_LEN: usize = 64;
+/// Timely vote credits: the most a vote can earn per slot.
+pub const TVC_CREDITS_PER_SLOT: u64 = 16;
+/// A validator whose newest vote is further than this behind the slot it was
+/// read at is delinquent (`DELINQUENT_VALIDATOR_SLOT_DISTANCE` in Agave's RPC).
+pub const DELINQUENT_SLOT_DISTANCE: u64 = 128;
+/// The hedge rule (plan F7, decision 21): receive-fixed swaps on each of the
+/// next 5 epochs, each epoch's notional at least half the average revenue.
+pub const HEDGE_EPOCHS_AHEAD: u64 = 5;
+pub const HEDGE_MIN_NOTIONAL_BPS: u16 = 5_000;
+
+/// `ScoreConfig` defaults and bounds.
+pub const DEFAULT_CREDITS_WINDOW_EPOCHS: u8 = 10;
+pub const MAX_CREDITS_WINDOW_EPOCHS: u8 = 32;
+/// The mainnet cluster's mean credits were 99.44–99.59% of the TVC maximum in
+/// epochs 1048–1050 (673 voting validators, `getVoteAccounts`, 7 Oct 2026), so
+/// 99.50% counts as "the cluster average" on the score's credit scale.
+pub const DEFAULT_CREDITS_REFERENCE_BPS: u16 = 9_950;
+pub const MIN_CREDITS_REFERENCE_BPS: u16 = 5_000;
+/// The vote copy `refresh_score` uses must be at most this old (~1 hour).
+pub const DEFAULT_MAX_COPY_AGE_SLOTS: u32 = 9_000;
+pub const MIN_MAX_COPY_AGE_SLOTS: u32 = 150;
+pub const MAX_MAX_COPY_AGE_SLOTS: u32 = 216_000;
+
+/// Jito tip distribution program (mainnet). Its `TipDistributionAccount`s are
+/// `["TIP_DISTRIBUTION_ACCOUNT", vote, epoch as u64 LE]`.
+pub const JITO_TIP_DISTRIBUTION_PROGRAM_ID: Pubkey =
+    pubkey!("4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7");
+pub const TIP_DISTRIBUTION_ACCOUNT_SEED: &[u8] = b"TIP_DISTRIBUTION_ACCOUNT";
+/// Jito priority fee distribution program (mainnet). Its
+/// `PriorityFeeDistributionAccount`s are `["PF_DISTRIBUTION_ACCOUNT", vote, epoch as u64 LE]`.
+pub const JITO_PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID: Pubkey =
+    pubkey!("Priority6weCZ5HwDn29NxLFpb7TDp2iLZ6XKc5e8d3");
+pub const PF_DISTRIBUTION_ACCOUNT_SEED: &[u8] = b"PF_DISTRIBUTION_ACCOUNT";

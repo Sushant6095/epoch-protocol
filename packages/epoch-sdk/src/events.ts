@@ -213,6 +213,66 @@ export interface EpochEventMap {
     poolCash: bigint;
     incomeUnallocated: bigint;
   };
+  HistoryInitialized: { vote: PublicKey; history: PublicKey; payer: PublicKey; epoch: bigint };
+  VoteAccountCopied: {
+    vote: PublicKey;
+    epoch: bigint;
+    slot: bigint;
+    /** Credits earned so far in `epoch`. */
+    epochCredits: bigint;
+    epochsBackfilled: number;
+    /** `null` for an empty tower. */
+    lastVotedSlot: bigint | null;
+    inflationCommissionBps: number;
+    blockCommissionBps: number;
+    voteLamports: bigint;
+    revenueLamports: bigint;
+  };
+  TipDistributionCopied: {
+    vote: PublicKey;
+    epoch: bigint;
+    /** False when the account does not exist (no Jito, or not created yet). */
+    found: boolean;
+    mevCommissionBps: number | null;
+    /** `max_total_claim` once the merkle root is uploaded. */
+    mevEarnedLamports: bigint | null;
+  };
+  PriorityFeeDistributionCopied: {
+    vote: PublicKey;
+    epoch: bigint;
+    found: boolean;
+    priorityFeeCommissionBps: number | null;
+    priorityFeesLamports: bigint | null;
+  };
+  StakeInfoUpdated: {
+    vote: PublicKey;
+    epoch: bigint;
+    activatedStakeLamports: bigint;
+    rank: number;
+    superminority: boolean;
+  };
+  ScoreRefreshed: {
+    pool: PublicKey;
+    vote: PublicKey;
+    epoch: bigint;
+    score: number;
+    creditsRatioBps: number;
+    creditsRatioRawBps: number;
+    commissionBps: number;
+    epochsActive: number;
+    delinquent: boolean;
+    superminority: boolean;
+    hedged: boolean;
+    hedgeRequiredNotional: bigint;
+  };
+  ScoringConfigured: {
+    pool: PublicKey;
+    marketMaker: PublicKey;
+    creditsWindowEpochs: number;
+    countBlockCommission: boolean;
+    creditsReferenceBps: number;
+    maxCopyAgeSlots: number;
+  };
 }
 
 /** One member per event, discriminated by `name`. */
@@ -221,6 +281,7 @@ export type EpochEvent = { [K in EventName]: { name: K; data: EpochEventMap[K] }
 /** The JSON-safe form from `eventToJson`. */
 export interface EpochEventJson {
   name: EventName;
+  /** A `None` Option field is left out. */
   data: Record<string, string | number | boolean>;
 }
 
@@ -409,6 +470,62 @@ const DECODERS: { [K in EventName]: (r: BorshReader) => EpochEventMap[K] } = {
     poolCash: r.u64(),
     incomeUnallocated: r.u64(),
   }),
+  HistoryInitialized: (r) => ({ vote: r.pubkey(), history: r.pubkey(), payer: r.pubkey(), epoch: r.u64() }),
+  VoteAccountCopied: (r) => ({
+    vote: r.pubkey(),
+    epoch: r.u64(),
+    slot: r.u64(),
+    epochCredits: r.u64(),
+    epochsBackfilled: r.u8(),
+    lastVotedSlot: r.option(() => r.u64(), 'lastVotedSlot'),
+    inflationCommissionBps: r.u16(),
+    blockCommissionBps: r.u16(),
+    voteLamports: r.u64(),
+    revenueLamports: r.u64(),
+  }),
+  TipDistributionCopied: (r) => ({
+    vote: r.pubkey(),
+    epoch: r.u64(),
+    found: r.bool('found'),
+    mevCommissionBps: r.option(() => r.u16(), 'mevCommissionBps'),
+    mevEarnedLamports: r.option(() => r.u64(), 'mevEarnedLamports'),
+  }),
+  PriorityFeeDistributionCopied: (r) => ({
+    vote: r.pubkey(),
+    epoch: r.u64(),
+    found: r.bool('found'),
+    priorityFeeCommissionBps: r.option(() => r.u16(), 'priorityFeeCommissionBps'),
+    priorityFeesLamports: r.option(() => r.u64(), 'priorityFeesLamports'),
+  }),
+  StakeInfoUpdated: (r) => ({
+    vote: r.pubkey(),
+    epoch: r.u64(),
+    activatedStakeLamports: r.u64(),
+    rank: r.u32(),
+    superminority: r.bool('superminority'),
+  }),
+  ScoreRefreshed: (r) => ({
+    pool: r.pubkey(),
+    vote: r.pubkey(),
+    epoch: r.u64(),
+    score: r.u16(),
+    creditsRatioBps: r.u16(),
+    creditsRatioRawBps: r.u16(),
+    commissionBps: r.u16(),
+    epochsActive: r.u16(),
+    delinquent: r.bool('delinquent'),
+    superminority: r.bool('superminority'),
+    hedged: r.bool('hedged'),
+    hedgeRequiredNotional: r.u64(),
+  }),
+  ScoringConfigured: (r) => ({
+    pool: r.pubkey(),
+    marketMaker: r.pubkey(),
+    creditsWindowEpochs: r.u8(),
+    countBlockCommission: r.bool('countBlockCommission'),
+    creditsReferenceBps: r.u16(),
+    maxCopyAgeSlots: r.u32(),
+  }),
 };
 
 /**
@@ -472,10 +589,14 @@ function isPublicKeyLike(value: unknown): value is PublicKey {
   );
 }
 
-/** JSON-safe copy: pubkeys → base58, bigints → decimal strings, byte arrays → hex; numbers, booleans, enums as-is. */
+/**
+ * JSON-safe copy: pubkeys → base58, bigints → decimal strings, byte arrays → hex; numbers, booleans, enums as-is;
+ * a `None` Option is left out.
+ */
 export function eventToJson(event: EpochEvent): EpochEventJson {
   const data: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(event.data) as [string, unknown][]) {
+    if (value === null) continue; // a `None` Option: left out
     if (isPublicKeyLike(value)) data[key] = value.toBase58();
     else if (typeof value === 'bigint') data[key] = value.toString();
     else if (value instanceof Uint8Array) data[key] = bytesToHex(value);

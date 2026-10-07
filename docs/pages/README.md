@@ -21,6 +21,10 @@ The track details (prizes, eligibility, deadlines) are in [docs/SIDE_TRACKS.md](
 | Predict | Panta | [predict.md](predict.md) | `/v1/predict/panta/*` (markets, positions, quote, build, submit, status, claims); resolution from `GET /v1/index/epochs/:epoch` | `predict:panta` (with `feeIndex`) |
 | Launch | Meteora | [launch.md](launch.md) | `/v1/launches/:mint/page`, `/market`, `/trades`, `/candles`, `/holders`, `/fees`, `/buybacks`; `POST /quote`, `/build` | `launch:<mint>` |
 
+The validator score's on-chain inputs (round 4) have their own contract, used by the Manage tab rather than a track
+page: [score.md](score.md) (`GET /v1/validators/:vote/history`, `scoreBreakdown` on `GET /v1/validators/:vote/position`,
+`activity` rows of kind `score`).
+
 ## Live (Solami)
 
 The Solana Fee Index computed live from mainnet: each new block's median priority fee, the epoch's running index, the

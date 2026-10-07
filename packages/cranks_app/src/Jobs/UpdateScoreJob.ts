@@ -1,4 +1,10 @@
-import { computeScore, type ScoreUpdate, type SwapPositionAccount, updateScore } from '@epoch/epoch-sdk';
+import {
+  computeScore,
+  HISTORY_SOURCES,
+  type ScoreUpdate,
+  type SwapPositionAccount,
+  updateScore,
+} from '@epoch/epoch-sdk';
 import { Logger } from '@epoch/logger';
 import { type PublicKey } from '@solana/web3.js';
 
@@ -19,7 +25,8 @@ export function stillFreshNextEpoch(lastScoredEpoch: bigint, scoreTtlEpochs: num
 }
 
 /**
- * `update_score` for every onboarded validator, signed by the scorer key. Inputs come from the data cluster
+ * `update_score` for every onboarded validator without fresh on-chain history (HistoryJob scores the others with
+ * `refresh_score`), signed by the scorer key. Inputs come from the data cluster
  * (DATA_RPC_URL, mainnet) and Jito Kobe; the hedged flag from the operator's open Receive-fixed swaps against
  * Epoch's maker (HedgeRule). Skips a position whose score and hedged flag would not change while the posted score
  * stays fresh. Any data-source failure retries on the next tick rather than posting a guess.
@@ -75,6 +82,11 @@ export class UpdateScoreJob implements Job {
     let retry = false;
     for (const { account: position } of positions) {
       const vote = position.vote.toBase58();
+      if (await this.historyIsFresh(position.vote, epoch)) {
+        // HistoryJob scores it from the chain (refresh_score); the program refuses update_score now anyway.
+        logger.debug('fresh on-chain history; scored by refresh_score', { vote });
+        continue;
+      }
       const inputs = scoreInputs(vote, stats, states.get(vote) ?? null, mev.get(vote) ?? null);
       if (!inputs) {
         this.warnOnce(
@@ -123,6 +135,12 @@ export class UpdateScoreJob implements Job {
       }
     }
     return retry ? 'retry' : 'done';
+  }
+
+  /** The validator's history holds a vote-account copy from this epoch (update_score would fail HistoryIsFresh). */
+  private async historyIsFresh(vote: PublicKey, epoch: bigint): Promise<boolean> {
+    const history = await this.chain.history(vote);
+    return !!history?.entries.some((e) => e.epoch === epoch && (e.sources & HISTORY_SOURCES.vote) !== 0);
   }
 
   private warnOnce(key: string, message: string, meta: Record<string, unknown> = {}): void {

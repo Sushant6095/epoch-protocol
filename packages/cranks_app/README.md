@@ -5,14 +5,15 @@ program cluster's epoch and runs:
 
 | Order | Job | Instruction | Signer | Runs | Gate |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `UpdateScoreJob` | `update_score` | scorer (crank pays) | each boundary until done, then every 30 min | no |
-| 2 | `ClaimMevJob` | — (reads Jito's accounts) | — | each boundary until Jito's claims land, at most `MEV_CLAIM_WAIT_MINUTES` | yes (bounded, no alert) |
-| 3 | `SweepJob` | `sweep` | crank | each boundary until done | yes |
-| 4 | `MarkDefaultJob` | `mark_default` | crank | each boundary until done | yes |
-| 5 | `AccrueJob` | `accrue` | crank | each boundary until done | yes |
-| 6 | `ProcessWithdrawalsJob` | `process_withdrawal` | crank | every tick once 3–5 are done | — |
-| 7 | `FinalizeIndexJob` | `finalize_index` | crank | every tick | — |
-| 8 | `SettleSwapsJob` | `settle_swap` | crank | every tick | — |
+| 1 | `HistoryJob` | `init_validator_history`, `copy_vote_account`, `copy_tip_distribution_account`, `copy_priority_fee_distribution`, `update_stake_info`, `refresh_score` | crank (`update_stake_info`: scorer) | each boundary until done, then every 30 min | no |
+| 2 | `UpdateScoreJob` | `update_score` | scorer (crank pays) | each boundary until done, then every 30 min; only validators without fresh history | no |
+| 3 | `ClaimMevJob` | — (reads Jito's accounts) | — | each boundary until Jito's claims land, at most `MEV_CLAIM_WAIT_MINUTES` | yes (bounded, no alert) |
+| 4 | `SweepJob` | `sweep` | crank | each boundary until done | yes |
+| 5 | `MarkDefaultJob` | `mark_default` | crank | each boundary until done | yes |
+| 6 | `AccrueJob` | `accrue` | crank | each boundary until done | yes |
+| 7 | `ProcessWithdrawalsJob` | `process_withdrawal` | crank | every tick once 3–6 are done | — |
+| 8 | `FinalizeIndexJob` | `finalize_index` | crank | every tick | — |
+| 9 | `SettleSwapsJob` | `settle_swap` | crank | every tick | — |
 
 A job answers `done` or `retry` (waiting on the chain, or a transient failure). A gate that is not done holds the
 steps after it until a later tick, so accrual always follows this epoch's sweeps and defaults, and withdrawals follow
@@ -29,6 +30,16 @@ identical simulation is repeated at most every 30 minutes). Every job is tested 
 
 ## What each job checks
 
+- **HistoryJob**: for every onboarded validator (once `configure_scoring` has run) and every `HISTORY_WATCHLIST` vote
+  account: creates the `ValidatorHistory` when missing (the crank pays ~0.059 SOL once), then `copy_vote_account` once
+  per epoch, after the epoch rewards are paid and before the sweep; Jito's tip-distribution (last and current epoch)
+  and priority-fee (last epoch) copies only while the history lacks them and the account exists (none on devnet), at
+  most 12 tries each; for onboarded validators with `SCORER_KEYPAIR_PATH`, `update_stake_info` for this epoch (rank and
+  superminority from the program cluster's `getVoteAccounts`, `Scoring/StakeRanks.ts`), then `copy_vote_account` +
+  `refresh_score` in one transaction, with the five program-derived hedge swap PDAs. Positions are left to
+  `UpdateScoreJob` until `configure_scoring` has run, because a fresh copy makes `update_score` refuse.
+- **UpdateScoreJob**: skips a validator whose history holds a vote copy from this epoch (`HistoryJob` scores it on
+  chain; the program would refuse `update_score` with `HistoryIsFresh`).
 - **SweepJob**: every position that is Active, Late or Defaulted with `last_swept_epoch < epoch` (never Released),
   with its open advance and `payout`. First waits while the EpochRewards sysvar is `active` (the program would fail
   with `RewardsInProgress`); positions without an advance are swept too, which records their revenue and late count.
@@ -58,7 +69,8 @@ identical simulation is repeated at most every 30 minutes). Every job is tested 
   validators) → done. No root yet, or no claimed ClaimStatus → `retry`: the sweep waits, at most
   `MEV_CLAIM_WAIT_MINUTES` (360) after the runner first saw the epoch (epoch 1050's claims landed 1.2 to 3.1 hours after
   the boundary), then it lets the sweep run with a warning: the commission arrives later and is swept next epoch. The
-  scorer runs before it, so scoring never waits. It has its own bounded wait, so it raises no `ALERT`.
+  history job and the scorer run before it, so scoring never waits on Jito. It has its own bounded wait, so it raises
+  no `ALERT`.
 
 ## Scores and the hedged flag
 
@@ -105,6 +117,7 @@ is what disagrees (the program does not check the flag, it trusts the scorer).
 | `CRANK_ALERT_AFTER_MINUTES` | 60 | alert on an unfinished gate |
 | `JITO_TIP_DISTRIBUTION_PROGRAM_ID` | `4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7` (mainnet) | where `ClaimMevJob` reads TDAs and ClaimStatus on the program's cluster |
 | `MEV_CLAIM_WAIT_MINUTES` | 360 | how long the sweep waits for Jito's claims after a boundary (0 = never waits) |
+| `HISTORY_WATCHLIST` | empty | comma-separated vote accounts to keep a `ValidatorHistory` for besides the onboarded ones |
 
 ```bash
 pnpm --filter @epoch/cranks_app build
@@ -128,13 +141,13 @@ every launch in the registry (`LAUNCHES_PATH`) on `LAUNCH_CLUSTER`. It runs on i
 `LAUNCH_CLAIM_INTERVAL_MINUTES` (30) and once at start, next to the program cranks (`index.ts`), or alone with
 `pnpm --filter @epoch/cranks_app start:claims` (`dist/launch-claims.js`, `--once` for one pass).
 
-| Kind                                   | From                         | Treasury PDA as fee claimer: sent as     | Default |
-| -------------------------------------- | ---------------------------- | ---------------------------------------- | ------- |
-| `partnerTradingFee`                    | DBC curve trading fees       | `claim_partner_trading_fee`: SOL → pool income, tokens burned | on |
-| `partnerSurplus`, `partnerMigrationFee` | DBC, after the raise        | `claim_partner_surplus` / `claim_partner_migration_fee`: SOL → pool income | on |
-| `lpFee`                                | the treasury's DAMM v2 LP position | `claim_treasury_lp_fee`: SOL → pool income, tokens burned | on |
-| `leftover`                             | the unsold supply after graduation | `burn_leftover`: all burned        | on      |
-| `creatorMigrationFee` (the 70%), `creatorSurplus`, `creatorTradingFee`, the creator's `lpFee` | DBC, DAMM v2 | signed by the pool creator (validator) → itself | on, if its key is configured |
+| Kind                                                                                          | From                               | Treasury PDA as fee claimer: sent as                                       | Default                      |
+| --------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ---------------------------- |
+| `partnerTradingFee`                                                                           | DBC curve trading fees             | `claim_partner_trading_fee`: SOL → pool income, tokens burned              | on                           |
+| `partnerSurplus`, `partnerMigrationFee`                                                       | DBC, after the raise               | `claim_partner_surplus` / `claim_partner_migration_fee`: SOL → pool income | on                           |
+| `lpFee`                                                                                       | the treasury's DAMM v2 LP position | `claim_treasury_lp_fee`: SOL → pool income, tokens burned                  | on                           |
+| `leftover`                                                                                    | the unsold supply after graduation | `burn_leftover`: all burned                                                | on                           |
+| `creatorMigrationFee` (the 70%), `creatorSurplus`, `creatorTradingFee`, the creator's `lpFee` | DBC, DAMM v2                       | signed by the pool creator (validator) → itself                            | on, if its key is configured |
 
 Epoch's launches name the treasury PDA `["treasury", pool]` as fee claimer and leftover receiver. A PDA cannot sign,
 so with `EPOCH_PROGRAM_ID` and the crank key (`CRANK_KEYPAIR_PATH`; `index.ts` passes its own) the job sends those
@@ -154,17 +167,17 @@ is in `docs/runbooks/meteora-devnet-rehearsal.md` (4 claims, then nothing to cla
 Meteora programs, one run with no treasury key sent 3 program claims (two DAMM v2 LP fees, one DBC trading fee) and
 simulated the creators' 3; the next run found nothing to claim.
 
-| Variable                              | Default                       | Meaning                                                             |
-| ------------------------------------- | ----------------------------- | ------------------------------------------------------------------- |
-| `LAUNCH_CLAIMS_ENABLED`               | false                         | turn the job on                                                     |
-| `LAUNCHES_PATH`                       | required when enabled         | the launch registry                                                 |
-| `LAUNCH_CLUSTER`                      | devnet                        | only these registry entries                                         |
-| `LAUNCH_RPC_URL`, `LAUNCH_RPC_FALLBACK_URL` | `EPOCH_RPC_URL`         | the pools' cluster                                                  |
-| `TREASURY_KEYPAIR_PATH`               | unset                         | keypair FILE of a fee claimer that is a plain wallet (not needed for the treasury PDA) |
-| `LAUNCH_CREATOR_KEYPAIR_PATHS`        | none                          | comma-separated keypair FILES of pool creators that let Epoch claim |
-| `LAUNCH_CLAIM_KINDS`                  | all                           | comma list of the kinds above                                       |
-| `LAUNCH_CLAIM_MIN_SOL`                | 0.001                         | smallest trading / LP fee worth a claim                             |
-| `LAUNCH_CLAIM_INTERVAL_MINUTES`       | 30                            | loop interval                                                       |
-| `LAUNCH_CLAIMS_DRY_RUN`               | false                         | simulate and log every claim; send nothing                          |
-| `LAUNCH_CLAIM_CU_PRICE_MICROLAMPORTS` | 10000                         | priority fee                                                        |
-| `LAUNCH_MIGRATE_ENABLED`              | true                          | graduate completed curves to DAMM v2 (`LaunchMigrationJob`), below  |
+| Variable                                    | Default               | Meaning                                                                                |
+| ------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------- |
+| `LAUNCH_CLAIMS_ENABLED`                     | false                 | turn the job on                                                                        |
+| `LAUNCHES_PATH`                             | required when enabled | the launch registry                                                                    |
+| `LAUNCH_CLUSTER`                            | devnet                | only these registry entries                                                            |
+| `LAUNCH_RPC_URL`, `LAUNCH_RPC_FALLBACK_URL` | `EPOCH_RPC_URL`       | the pools' cluster                                                                     |
+| `TREASURY_KEYPAIR_PATH`                     | unset                 | keypair FILE of a fee claimer that is a plain wallet (not needed for the treasury PDA) |
+| `LAUNCH_CREATOR_KEYPAIR_PATHS`              | none                  | comma-separated keypair FILES of pool creators that let Epoch claim                    |
+| `LAUNCH_CLAIM_KINDS`                        | all                   | comma list of the kinds above                                                          |
+| `LAUNCH_CLAIM_MIN_SOL`                      | 0.001                 | smallest trading / LP fee worth a claim                                                |
+| `LAUNCH_CLAIM_INTERVAL_MINUTES`             | 30                    | loop interval                                                                          |
+| `LAUNCH_CLAIMS_DRY_RUN`                     | false                 | simulate and log every claim; send nothing                                             |
+| `LAUNCH_CLAIM_CU_PRICE_MICROLAMPORTS`       | 10000                 | priority fee                                                                           |
+| `LAUNCH_MIGRATE_ENABLED`                    | true                  | graduate completed curves to DAMM v2 (`LaunchMigrationJob`), below                     |

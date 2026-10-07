@@ -5,7 +5,9 @@ import {
   instructionNameOf,
   type PoolAccount,
   type RevenueTokenAccount,
+  type ScoreConfigAccount,
   type SwapPositionAccount,
+  type ValidatorHistoryAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
 } from '@epoch/epoch-sdk';
@@ -18,6 +20,7 @@ import {
   type ExecuteResult,
   type ProgramAccount,
   type SignerRole,
+  type VoteStake,
 } from '../Chain/EpochChain';
 import { key, pool, PROGRAM_ID } from './accounts';
 
@@ -68,6 +71,10 @@ export class FakeChain implements EpochChain {
   accountData = new Map<string, Uint8Array>();
   /** How many addresses each accountsData call asked for. */
   readonly accountReads: number[] = [];
+  /** `ValidatorHistory` by vote account (base58). */
+  histories = new Map<string, ValidatorHistoryAccount>();
+  scoreConfigAccount: ScoreConfigAccount | null = null;
+  stakes: VoteStake[] = [];
   /** Rent-exempt minimum per byte count (mainnet's: (128 + space) × 6,960). */
   rentFor = (space: number): bigint => BigInt((128 + space) * 6_960);
   readonly calls: ChainCall[] = [];
@@ -105,6 +112,15 @@ export class FakeChain implements EpochChain {
   }
   async revenueTokens(): Promise<ProgramAccount<RevenueTokenAccount>[]> {
     return this.revenueTokenAccounts;
+  }
+  async history(vote: PublicKey): Promise<ValidatorHistoryAccount | null> {
+    return this.histories.get(vote.toBase58()) ?? null;
+  }
+  async scoreConfig(): Promise<ScoreConfigAccount | null> {
+    return this.scoreConfigAccount;
+  }
+  async voteStakes(): Promise<VoteStake[]> {
+    return this.stakes;
   }
   async lamports(address: PublicKey): Promise<bigint> {
     return this.balances.get(address.toBase58()) ?? 0n;

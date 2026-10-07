@@ -21,10 +21,15 @@ import {
   type FeeIndexAccount,
   type FeeQuoteAccount,
   feeIndexValueFor,
+  HISTORY_SCORE_FLAGS,
+  HISTORY_SOURCES,
+  type HistoryEntry,
   juniorRatioBps,
   type LenderSharesAccount,
   type PoolAccount,
   type PoolParams,
+  PROGRAM_CONSTANTS,
+  type ScoreConfigAccount,
   sharePriceE9,
   sharesToAssets,
   type Side,
@@ -32,6 +37,7 @@ import {
   type SwapPositionAccount,
   takerPnl,
   type Tranche,
+  type ValidatorHistoryAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
 } from '@epoch/epoch-sdk';
@@ -69,6 +75,8 @@ export class ProgramSim implements ProgramReader {
   readonly requestMap = new Map<bigint, WithdrawRequestAccount>();
   readonly quoteMap = new Map<string, FeeQuoteAccount>();
   readonly swapMap = new Map<string, SwapPositionAccount>();
+  readonly historyMap = new Map<string, ValidatorHistoryAccount>();
+  scoreConfigAccount: ScoreConfigAccount | null = null;
   readonly stored: StoredProgramEvent[] = [];
   /** Ground truth recorded at every accrual. */
   readonly accruals: { epoch: number; utilizationBps: number; couponMet: boolean; epochs: number }[] = [];
@@ -564,6 +572,225 @@ export class ProgramSim implements ProgramReader {
     this.tx(this.event('ScoreUpdated', { vote: new PublicKey(vote), epoch: BigInt(this.epoch), score, hedged }));
   }
 
+  // ── Validator history (P1) ────────────────────────────────────────────────
+
+  /** `init_validator_history`: an empty history (every entry unknown). */
+  initHistory(vote: string): void {
+    this.historyMap.set(vote, {
+      vote: new PublicKey(vote),
+      createdEpoch: BigInt(this.epoch),
+      lastVoteCopySlot: 0n,
+      refreshedEpoch: 0n,
+      refreshedSlot: 0n,
+      hedgeRequiredNotional: 0n,
+      epochsVoted: 0,
+      score: 0,
+      creditsRatioBps: 0,
+      creditsRatioRawBps: 0,
+      commissionBps: 0,
+      epochsActive: 0,
+      bump: 254,
+      version: 1,
+      scoreFlags: 0,
+      entries: [],
+    });
+    const history = new PublicKey(Buffer.alloc(32, 7));
+    this.tx(
+      this.event('HistoryInitialized', {
+        vote: new PublicKey(vote),
+        history,
+        payer: key('crank'),
+        epoch: BigInt(this.epoch),
+      }),
+    );
+  }
+
+  private historyEntry(history: ValidatorHistoryAccount, epoch: number): HistoryEntry {
+    let entry = history.entries.find((e) => e.epoch === BigInt(epoch));
+    if (!entry) {
+      entry = {
+        epoch: BigInt(epoch),
+        epochCredits: null,
+        maxCredits: null,
+        voteLamports: null,
+        revenueLamports: null,
+        mevEarnedLamports: null,
+        priorityFeesLamports: null,
+        activatedStakeLamports: null,
+        lastVotedSlot: null,
+        updatedSlot: null,
+        rank: null,
+        inflationCommissionBps: null,
+        blockCommissionBps: null,
+        mevCommissionBps: null,
+        priorityFeeCommissionBps: null,
+        superminority: null,
+        sources: 0,
+      };
+      // The ring keeps HISTORY_LEN epochs: an older epoch's slot is overwritten.
+      history.entries = history.entries.filter((e) => e.epoch > BigInt(epoch - PROGRAM_CONSTANTS.HISTORY_LEN));
+      history.entries.push(entry);
+      history.entries.sort((a, b) => Number(a.epoch - b.epoch));
+    }
+    return entry;
+  }
+
+  /**
+   * `copy_vote_account`: credits for the last `backfill` finished epochs (`creditsPerSlot` of 16 per slot) and the
+   * current epoch's commission, lamports, revenue and newest vote (`votedSlotsAgo` before this slot; null = empty tower).
+   */
+  copyVoteAccount(
+    vote: string,
+    opts: { backfill?: number; creditsPerSlot?: number; votedSlotsAgo?: number | null; revenue?: bigint } = {},
+  ): void {
+    const history = this.historyMap.get(vote);
+    if (!history) throw new Error('init the history first');
+    const perSlot = BigInt(opts.creditsPerSlot ?? 16);
+    const backfill = opts.backfill ?? 10;
+    for (let e = this.epoch - backfill; e <= this.epoch; e++) {
+      const entry = this.historyEntry(history, e);
+      entry.maxCredits = BigInt(SLOTS_PER_EPOCH) * PROGRAM_CONSTANTS.TVC_CREDITS_PER_SLOT;
+      entry.epochCredits =
+        e === this.epoch ? perSlot * BigInt(this.slot - e * SLOTS_PER_EPOCH) : perSlot * BigInt(SLOTS_PER_EPOCH);
+      entry.sources |= HISTORY_SOURCES.credits;
+    }
+    const now = this.historyEntry(history, this.epoch);
+    const position = this.positionMap.get(vote);
+    now.inflationCommissionBps = position?.inflationCommissionBps ?? 500;
+    now.blockCommissionBps = 10_000;
+    now.voteLamports = sol(1);
+    now.revenueLamports = opts.revenue ?? sol(0.5);
+    now.lastVotedSlot = opts.votedSlotsAgo === null ? null : BigInt(this.slot - (opts.votedSlotsAgo ?? 1));
+    now.updatedSlot = BigInt(this.slot);
+    now.sources |= HISTORY_SOURCES.vote;
+    history.lastVoteCopySlot = BigInt(this.slot);
+    history.epochsVoted = Math.max(history.epochsVoted, backfill + 1);
+    this.tx(
+      this.event('VoteAccountCopied', {
+        vote: new PublicKey(vote),
+        epoch: BigInt(this.epoch),
+        slot: BigInt(this.slot),
+        epochCredits: now.epochCredits ?? 0n,
+        epochsBackfilled: backfill,
+        lastVotedSlot: now.lastVotedSlot,
+        inflationCommissionBps: now.inflationCommissionBps,
+        blockCommissionBps: now.blockCommissionBps,
+        voteLamports: now.voteLamports,
+        revenueLamports: now.revenueLamports,
+      }),
+    );
+  }
+
+  /** `update_stake_info` (the scorer) for the current epoch. */
+  postStakeInfo(vote: string, rank: number, superminority: boolean, stake = sol(250_000)): void {
+    const history = this.historyMap.get(vote);
+    if (!history) throw new Error('init the history first');
+    const now = this.historyEntry(history, this.epoch);
+    now.activatedStakeLamports = stake;
+    now.rank = rank;
+    now.superminority = superminority;
+    now.sources |= HISTORY_SOURCES.stake;
+    this.tx(
+      this.event('StakeInfoUpdated', {
+        vote: new PublicKey(vote),
+        epoch: BigInt(this.epoch),
+        activatedStakeLamports: stake,
+        rank,
+        superminority,
+      }),
+    );
+  }
+
+  /** `configure_scoring` (the admin), the program's defaults unless given. */
+  configureScoring(over: Partial<ScoreConfigAccount> = {}): void {
+    this.scoreConfigAccount = {
+      pool: POOL,
+      marketMaker: this.marketMaker ?? null,
+      creditsWindowEpochs: PROGRAM_CONSTANTS.DEFAULT_CREDITS_WINDOW_EPOCHS,
+      countBlockCommission: false,
+      creditsReferenceBps: PROGRAM_CONSTANTS.DEFAULT_CREDITS_REFERENCE_BPS,
+      maxCopyAgeSlots: PROGRAM_CONSTANTS.DEFAULT_MAX_COPY_AGE_SLOTS,
+      bump: 253,
+      ...over,
+    };
+    const config = this.scoreConfigAccount;
+    this.tx(
+      this.event('ScoringConfigured', {
+        pool: POOL,
+        marketMaker: config.marketMaker ?? PublicKey.default,
+        creditsWindowEpochs: config.creditsWindowEpochs,
+        countBlockCommission: config.countBlockCommission,
+        creditsReferenceBps: config.creditsReferenceBps,
+        maxCopyAgeSlots: config.maxCopyAgeSlots,
+      }),
+    );
+  }
+
+  /**
+   * `refresh_score`'s result (the formula is the program's, tested in Rust): the position's score and hedge flag, the
+   * history's breakdown, `ScoreRefreshed` and the `ScoreUpdated` the indexer already knows.
+   */
+  refreshScore(
+    vote: string,
+    result: {
+      score: number;
+      creditsRatioBps: number;
+      creditsRatioRawBps: number;
+      commissionBps: number;
+      epochsActive: number;
+      delinquent?: boolean;
+      superminority?: boolean;
+      hedged?: boolean;
+      hedgeRequiredNotional?: bigint;
+    },
+  ): void {
+    const position = this.positionState(vote);
+    const history = this.historyMap.get(vote);
+    if (!history) throw new Error('init the history first');
+    const flags = { delinquent: false, superminority: false, hedged: false, ...result };
+    position.score = result.score;
+    position.hedged = flags.hedged;
+    position.lastScoredEpoch = BigInt(this.epoch);
+    Object.assign(history, {
+      refreshedEpoch: BigInt(this.epoch),
+      refreshedSlot: BigInt(this.slot),
+      hedgeRequiredNotional: result.hedgeRequiredNotional ?? 0n,
+      score: result.score,
+      creditsRatioBps: result.creditsRatioBps,
+      creditsRatioRawBps: result.creditsRatioRawBps,
+      commissionBps: result.commissionBps,
+      epochsActive: result.epochsActive,
+      scoreFlags:
+        HISTORY_SCORE_FLAGS.scored |
+        (flags.delinquent ? HISTORY_SCORE_FLAGS.delinquent : 0) |
+        (flags.superminority ? HISTORY_SCORE_FLAGS.superminority : 0) |
+        (flags.hedged ? HISTORY_SCORE_FLAGS.hedged : 0),
+    });
+    const voteKey = new PublicKey(vote);
+    this.tx(
+      this.event('ScoreRefreshed', {
+        pool: POOL,
+        vote: voteKey,
+        epoch: BigInt(this.epoch),
+        score: result.score,
+        creditsRatioBps: result.creditsRatioBps,
+        creditsRatioRawBps: result.creditsRatioRawBps,
+        commissionBps: result.commissionBps,
+        epochsActive: result.epochsActive,
+        delinquent: flags.delinquent,
+        superminority: flags.superminority,
+        hedged: flags.hedged,
+        hedgeRequiredNotional: result.hedgeRequiredNotional ?? 0n,
+      }),
+      this.event('ScoreUpdated', {
+        vote: voteKey,
+        epoch: BigInt(this.epoch),
+        score: result.score,
+        hedged: flags.hedged,
+      }),
+    );
+  }
+
   // ── Fee index and market ──────────────────────────────────────────────────
 
   initializeIndex(disputeWindowSlots = 1_000n): void {
@@ -801,6 +1028,18 @@ export class ProgramSim implements ProgramReader {
 
   async swaps(): Promise<ProgramAccount<SwapPositionAccount>[]> {
     return [...this.swapMap.entries()].map(([address, account]) => ({ address, account }));
+  }
+
+  async validatorHistory(vote: string): Promise<ProgramAccount<ValidatorHistoryAccount> | null> {
+    if (!this.configured) throw new ServiceUnavailableException('not configured', 'PROGRAM_NOT_CONFIGURED');
+    const account = this.historyMap.get(vote);
+    return account ? { address: `history:${vote}`, account } : null;
+  }
+
+  async scoreConfig(): Promise<ProgramAccount<ScoreConfigAccount> | null> {
+    return this.scoreConfigAccount
+      ? { address: key('score_config').toBase58(), account: this.scoreConfigAccount }
+      : null;
   }
 
   async epochInfo(): Promise<ProgramEpochInfo> {

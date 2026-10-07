@@ -27,6 +27,8 @@ export type ProgramReader = Pick<
   | 'withdrawRequests'
   | 'quotes'
   | 'swaps'
+  | 'validatorHistory'
+  | 'scoreConfig'
   | 'epochInfo'
   | 'firstSlotOfEpoch'
   | 'epochOfSlot'

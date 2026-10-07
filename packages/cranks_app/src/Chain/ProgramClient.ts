@@ -6,18 +6,24 @@ import {
   decodeFeeIndex,
   decodePool,
   decodeRevenueToken,
+  decodeScoreConfig,
   decodeSwapPosition,
+  decodeValidatorHistory,
   decodeValidatorPosition,
   decodeWithdrawRequest,
   type FeeIndexAccount,
   fieldFilter,
   findFeeIndexPda,
   findPoolPda,
+  findScoreConfigPda,
+  findValidatorHistoryPda,
   findWithdrawRequestPda,
   parseEpochError,
   type PoolAccount,
   type RevenueTokenAccount,
+  type ScoreConfigAccount,
   type SwapPositionAccount,
+  type ValidatorHistoryAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
 } from '@epoch/epoch-sdk';
@@ -44,6 +50,7 @@ import {
   type ExecuteResult,
   type ProgramAccount,
   type SignerRole,
+  type VoteStake,
 } from './EpochChain';
 
 const logger = Logger.create('ProgramClient');
@@ -135,6 +142,23 @@ export class ProgramClient implements EpochChain {
 
   revenueTokens(): Promise<ProgramAccount<RevenueTokenAccount>[]> {
     return this.loadAll('RevenueToken', decodeRevenueToken);
+  }
+
+  async history(vote: PublicKey): Promise<ValidatorHistoryAccount | null> {
+    const [address] = findValidatorHistoryPda(this.programId, vote);
+    return (await this.loadOne(address, decodeValidatorHistory))?.account ?? null;
+  }
+
+  async scoreConfig(): Promise<ScoreConfigAccount | null> {
+    const [pool] = findPoolPda(this.programId);
+    return (await this.loadOne(findScoreConfigPda(this.programId, pool)[0], decodeScoreConfig))?.account ?? null;
+  }
+
+  async voteStakes(): Promise<VoteStake[]> {
+    const { current, delinquent } = await this.connections.withFailover((c) => c.getVoteAccounts('confirmed'));
+    // getVoteAccounts' JSON numbers lose precision above 2^53 lamports (9M SOL); ranks and the superminority
+    // set are unaffected, and the posted stake is off by at most a few lamports.
+    return [...current, ...delinquent].map((v) => ({ vote: v.votePubkey, activatedStake: BigInt(v.activatedStake) }));
   }
 
   async lamports(address: PublicKey): Promise<bigint> {

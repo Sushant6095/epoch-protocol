@@ -22,6 +22,7 @@ known yet" and the app shows "—".
 | `WS /v1/stream`                                                                            | channels, see below             | —     | mainnet RPC (`slot`), the bus, the providers                  |
 | `GET /v1/vault`                                                                            | `VaultSnapshot`                 | 5 s   | the Epoch program (see below)                                 |
 | `GET /v1/validators/:vote/position`                                                        | `OperatorPositionSnapshot`      | 10 s  | the Epoch program; mainnet rows for the estimate              |
+| `GET /v1/validators/:vote/history`                                                         | `OnChainHistorySnapshot`        | 10 s  | the Epoch program's `ValidatorHistory` account (P1)           |
 | `GET /v1/wallets/:address/lender`                                                          | `LenderPositionSnapshot`        | 5 s   | the Epoch program                                             |
 | `GET /v1/market`                                                                           | `FeeMarketSnapshot`             | 5 s   | the Epoch program                                             |
 | `GET /v1/launches`                                                                         | `LaunchList`                    | 60 s  | launch registry, DBC and DAMM v2 pools on devnet (see Launch) |
@@ -118,9 +119,20 @@ by vote key, else by short key (`FzUN…AmMk`). `503 PROGRAM_NOT_CONFIGURED` wit
 | `SwapSettled`                                      | `swap` · "Swap settled · epoch 1042" · the taker's P&L (negative when the taker lost)                                      |
 | `RevenueTokenRegistered`, `RevenueShareSwept`, `BuybackExecuted`, `RevenueTokenPoolSynced`, `RevenueTokenRedeemed`, `RevenueTokenClosed` | `buyback` · "Kestrel Nodes · bought back and burned on the curve" (and the lifecycle's other steps) · the SOL moved |
 | `TreasuryClaimed`                                  | `buyback` · "EUdJ…iDs1 · treasury: curve trading fees to lenders" (surplus, migration fee, DAMM v2 LP fees; "unsold supply burned" for the leftover; ", tokens burned" when it burned some) · `lamportsToPool` |
+| `HistoryInitialized`                               | `score` · "Kestrel Nodes · on-chain history opened" · —                                                                    |
+| `VoteAccountCopied`                                | `score` · "Kestrel Nodes · vote account copied on chain" · — (a validator's first copy of each epoch only, see below)      |
+| `TipDistributionCopied` / `PriorityFeeDistributionCopied` | `score` · "Kestrel Nodes · Jito tips copied: 8% MEV commission" (priority fees: "· Jito priority fees copied: 50% commission") · `mevEarnedLamports` / `priorityFeesLamports` (— before the merkle root); not shown when `found` is false (no Jito account: devnet) |
+| `StakeInfoUpdated`                                 | `score` · "Kestrel Nodes · stake rank #12, superminority posted by the scorer" · —                                       |
+| `ScoreRefreshed`                                   | `score` · "Kestrel Nodes · score 87 from on-chain history (hedged)" (flags: delinquent, superminority, hedged) · — (only when the score or a flag changed, see below) |
+| `ScoringConfigured`                                | `score` · "Scoring settings: 10-epoch credit window, cluster average at 99.5% of the maximum" · —                          |
 | a Predict call                                     | `predict` · "<market label> · YES" · `value` = points, `unit: "points"`, no signature                                      |
 
-Other events (accruals, scores, bonds, quotes, admin) are not shown.
+Other events (accruals, `update_score`'s `ScoreUpdated`, bonds, quotes, admin) are not shown. The keepers' HistoryJob
+copies the vote account and refreshes every score on each pass (every 30 minutes), so the `score` rows drop repeats
+(`RepeatFilter` in `ActivityMapper.ts`): a validator's `VoteAccountCopied` shows once per epoch and its
+`ScoreRefreshed` only when the score, delinquency, superminority or hedge flag changed from its previous refresh. The
+feed judges this oldest first over the events it read (the oldest in that window always shows); the websocket over
+the events it has pushed since the API started.
 
 **Revenue-token buybacks and treasury claims** (`GET /v1/launches/:mint/buybacks`, `Services/Launch/BuybackFeed.ts`,
 from the program's cluster). The mint's `RevenueToken` account (escrow, schedule, term, totals), its `BuybackExecuted`
@@ -238,6 +250,40 @@ in-memory program that applies each instruction's ledger math with epoch-sdk.
   `remit_bps` of the average swept revenue (all of it once defaulted) until repaid. `epochsLeft` = the due and
   upcoming rows; with no revenue in the window, the epochs until the advance may be written off for age.
 
+- `scoreBreakdown` (P1, validator history; null when not onboarded): `source: "history"` when `refresh_score` wrote
+  the score from the on-chain history (the history's last refresh is from the position's `last_scored_epoch`;
+  `update_score` refuses once the epoch's vote copy exists, so it cannot have written later in that epoch), with the
+  `inputs` it used (credits as a share of the TVC maximum and against the cluster reference, the highest commission,
+  epochs active, delinquent, superminority, hedged, the hedge requirement); `source: "scorer"` when the Pool's scorer
+  posted it with `update_score` (the fallback without fresh history; its inputs are not on chain, so `inputs` is
+  null). `history` names the `ValidatorHistory` address, its freshness and the epoch of its newest vote copy, or is
+  null before `init_validator_history`.
+
+**`GET /v1/validators/:vote/history`** (P1): the validator's `ValidatorHistory` account (PDA `["history", vote]`,
+read directly, not cached), decoded by epoch-sdk, plus the Pool's `ScoreConfig`. 404 before anyone ran
+`init_validator_history` for the vote account (it is permissionless and not tied to onboarding: watch-list validators
+have one too). Every number comes from the account; nothing is computed off chain except unit conversions.
+
+- `entries`: the filled epochs, oldest first (at most 64; the ring holds epoch `e` at `e % 64`). Each field is null
+  while the chain has not reported it (the program's all-ones "unknown" sentinel): `credits` / `maxCredits`
+  (slots in the epoch × 16, the timely-vote-credit maximum) and `creditsOfMaxPct`; the inflation and block-revenue
+  commissions (vote account), the MEV commission and `mevEarnedSol` (Jito tip-distribution
+  `validator_commission_bps` and `merkle_root.max_total_claim`, the epoch's whole tip pot, once the root is
+  uploaded), the priority-fee commission and `priorityFeesSol` (Jito priority-fee distribution
+  `validator_commission_bps` and `total_lamports_transferred`); `voteAccountSol` and `revenueSol` (the sweep's rule:
+  the most seen above rent + pending delegator rewards, plus the escrow above rent); `activatedStakeSol`,
+  `stakeRank` and `superminority` (oracle: the Pool's scorer); `lastVotedSlot`, `updatedSlot`; `sources` (`vote`,
+  `credits`, `tip`, `priorityFee`, `stake`: what filled the entry).
+- `freshness`: `status` is `fresh` when the history holds a vote copy from the program cluster's current epoch (then
+  `update_score` refuses and the keepers score with `refresh_score`), `stale` when the newest copy is older, `empty`
+  before the first. `lastVoteCopyEpoch`, `lastVoteCopySlot`, `slotsSinceVoteCopy`; `maxCopyAgeSlots` (ScoreConfig);
+  `stakeInfoPosted` (this epoch's `update_stake_info`); `refreshReady` = fresh, the copy at most `maxCopyAgeSlots`
+  old, stake info posted and scoring configured: what `refresh_score` checks before it computes.
+- `lastRefresh`: the last `refresh_score` from the account header (epoch, slot, score 0–100, credits of max and vs the
+  cluster reference, commission, epochs active, the three flags, `hedgeRequiredSol`); null before the first.
+- `scoring`: the Pool's ScoreConfig (credit window, cluster reference, whether block commission counts, max copy
+  age, market maker); null before `configure_scoring`.
+
 **`GET /v1/wallets/:address/lender`** (request #8d): the wallet's Lender PDAs (shares it can still request, their
 value, the junior lock), its open requests (`queued`) and requests the crank bounced at the junior floor in the last
 30 epochs (`WithdrawCancelled` reason 1, shares and epoch from the request's event: `bounced`).
@@ -350,6 +396,9 @@ mainnet epoch in bulk, and the ClaimStatus of each validator's commission node (
   boundary); `expired` = the TDA closed (10 epochs after its epoch) unclaimed.
 
 ## Validator history (`validator_epoch_stats`)
+
+Not the on-chain `ValidatorHistory` (that one is `GET /v1/validators/:vote/history`, above): this is the API's own
+mainnet record behind the validator table and the profile.
 
 `ValidatorHistoryRecorder` runs only with `DATABASE_URL`: once at start, then hourly. Each run upserts, for every
 validator with stake, this epoch's inflation commission, MEV commission, active stake and credits so far, and the final

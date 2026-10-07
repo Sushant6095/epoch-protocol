@@ -7,11 +7,9 @@ import { AddressParamsDto, VoteParamsDto } from '../dto/Program.dto';
 export const vaultRouter: HttpRouter = createRouter().get('/', handle(ProgramController.vault));
 
 /** Mounted at /v1/validators next to validatorsRouter (`/` and `/:vote` there); Express falls through between them. */
-export const validatorPositionRouter: HttpRouter = createRouter().get(
-  '/:vote/position',
-  validate(VoteParamsDto, 'params'),
-  handle(ProgramController.position),
-);
+export const validatorPositionRouter: HttpRouter = createRouter()
+  .get('/:vote/position', validate(VoteParamsDto, 'params'), handle(ProgramController.position))
+  .get('/:vote/history', validate(VoteParamsDto, 'params'), handle(ProgramController.history));
 
 /** Mounted at /v1/wallets; `/:address/stake` lives on its own router. */
 export const lenderRouter: HttpRouter = createRouter().get(

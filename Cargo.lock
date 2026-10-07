@@ -569,6 +569,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "bincode",
+ "bytemuck",
  "proptest",
  "solana-pubkey 4.4.0",
  "solana-sysvar",

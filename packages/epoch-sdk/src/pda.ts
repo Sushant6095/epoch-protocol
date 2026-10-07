@@ -9,6 +9,7 @@ import { u64ToLeBytes } from './borsh';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   CP_AMM_POSITION_NFT_ACCOUNT_SEED,
+  JITO,
   METEORA,
   NATIVE_MINT,
   SEEDS,
@@ -37,6 +38,10 @@ const SEED = {
   buybackTokens: ascii(SEEDS.buybackTokens),
   partnerTreasury: ascii(SEEDS.partnerTreasury),
   treasuryWsol: ascii(SEEDS.treasuryWsol),
+  history: ascii(SEEDS.history),
+  scoreConfig: ascii(SEEDS.scoreConfig),
+  tipDistribution: ascii(JITO.TIP_DISTRIBUTION_ACCOUNT_SEED),
+  priorityFeeDistribution: ascii(JITO.PF_DISTRIBUTION_ACCOUNT_SEED),
 };
 
 function trancheSeed(tranche: Tranche): Uint8Array {
@@ -110,6 +115,32 @@ export function findQuotePda(programId: PublicKey, maker: PublicKey, epoch: bigi
 /** `["swap", quote, taker]`: a taker's position against one quote. */
 export function findSwapPda(programId: PublicKey, quote: PublicKey, taker: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([SEED.swap, quote.toBytes(), taker.toBytes()], programId);
+}
+
+/** `["history", vote]`: a validator's on-chain history (any vote account, onboarded or not). */
+export function findValidatorHistoryPda(programId: PublicKey, vote: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([SEED.history, vote.toBytes()], programId);
+}
+
+/** `["score_config", pool]`: the pool's settings for `refresh_score`. */
+export function findScoreConfigPda(programId: PublicKey, pool: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([SEED.scoreConfig, pool.toBytes()], programId);
+}
+
+/** Jito's `["TIP_DISTRIBUTION_ACCOUNT", vote, epoch_le_u64]` under the tip distribution program. */
+export function findTipDistributionPda(vote: PublicKey, epoch: bigint | number): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [SEED.tipDistribution, vote.toBytes(), u64ToLeBytes(epoch, 'epoch')],
+    JITO.TIP_DISTRIBUTION_PROGRAM_ID,
+  );
+}
+
+/** Jito's `["PF_DISTRIBUTION_ACCOUNT", vote, epoch_le_u64]` under the priority fee distribution program. */
+export function findPriorityFeeDistributionPda(vote: PublicKey, epoch: bigint | number): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [SEED.priorityFeeDistribution, vote.toBytes(), u64ToLeBytes(epoch, 'epoch')],
+    JITO.PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID,
+  );
 }
 
 /** `["revenue_token", vote]`: a validator's revenue token. */

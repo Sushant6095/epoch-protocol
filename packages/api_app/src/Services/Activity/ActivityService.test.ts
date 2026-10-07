@@ -103,6 +103,35 @@ describe('ActivityService', () => {
     expect(service.fromPredictCall(call(5, '2026-10-03T00:00:00.000Z')).id).toBe('predict:5');
   });
 
+  it('drops keeper repeats of vote copies and unchanged refreshes, in the feed and on the websocket', async () => {
+    const events = new MemoryEventStore();
+    const copy = (slot: number) => event(slot, 0, null, 'VoteAccountCopied', { vote: VOTE, epoch: '9' });
+    const refresh = (slot: number, score: number) =>
+      event(slot, 1, null, 'ScoreRefreshed', {
+        vote: VOTE,
+        score,
+        delinquent: false,
+        superminority: false,
+        hedged: false,
+      });
+    // Three keeper passes in one epoch: the score changes on the third.
+    const passes = [copy(30), refresh(30, 8_700), copy(40), refresh(40, 8_700), copy(50), refresh(50, 8_600)];
+    await events.insert(passes);
+    const service = new ActivityService({
+      program: { configured: true, cluster: 'devnet' },
+      events,
+      predict: null,
+      names: async () => nameIndex([{ name: 'Kestrel Nodes', vote: VOTE, identity: 'id' }]),
+    });
+    expect((await service.feed(50)).events.map((e) => [e.id, e.text])).toEqual([
+      ['sig50:1', 'Kestrel Nodes · score 86 from on-chain history'],
+      ['sig30:1', 'Kestrel Nodes · score 87 from on-chain history'],
+      ['sig30:0', 'Kestrel Nodes · vote account copied on chain'],
+    ]);
+    const live = await Promise.all(passes.map((e) => service.fromProgramEvent(e)));
+    expect(live.map((row) => row?.id ?? null)).toEqual(['sig30:0', 'sig30:1', null, null, null, 'sig50:1']);
+  });
+
   it('names validators by short key when the name lookup has nothing', async () => {
     const service = new ActivityService({
       program: { configured: true, cluster: 'devnet' },

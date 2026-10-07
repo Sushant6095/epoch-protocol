@@ -1310,6 +1310,279 @@
       ]
     },
     {
+      "name": "configure_scoring",
+      "discriminator": [
+        208,
+        106,
+        50,
+        176,
+        142,
+        54,
+        115,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "score_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "ScoringParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "copy_priority_fee_distribution",
+      "discriminator": [
+        152,
+        174,
+        178,
+        77,
+        92,
+        83,
+        93,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone."
+          ],
+          "signer": true
+        },
+        {
+          "name": "history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "history"
+              }
+            ]
+          }
+        },
+        {
+          "name": "distribution_account",
+          "docs": [
+            "priority fee distribution program (checked in the handler); may not exist."
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "copy_tip_distribution_account",
+      "discriminator": [
+        208,
+        213,
+        185,
+        210,
+        103,
+        124,
+        128,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone."
+          ],
+          "signer": true
+        },
+        {
+          "name": "history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "history"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tip_distribution_account",
+          "docs": [
+            "tip distribution program (checked in the handler); may not exist."
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "copy_vote_account",
+      "discriminator": [
+        171,
+        204,
+        73,
+        59,
+        129,
+        63,
+        134,
+        61
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone; the keeper does it every epoch, before `sweep`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "read (zero when the validator is not onboarded)."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "deposit",
       "discriminator": [
         242,
@@ -1653,6 +1926,61 @@
               }
             ]
           }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_validator_history",
+      "discriminator": [
+        15,
+        24,
+        53,
+        164,
+        220,
+        184,
+        185,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone; pays the rent (8,352 bytes, ~0.059 SOL)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -2717,6 +3045,128 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "refresh_score",
+      "discriminator": [
+        60,
+        234,
+        183,
+        65,
+        144,
+        1,
+        136,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone; the keeper does it every epoch after the copies."
+          ],
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "score_config",
+            "position"
+          ]
+        },
+        {
+          "name": "score_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
+        },
+        {
+          "name": "history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
     },
     {
       "name": "register_revenue_token",
@@ -4228,6 +4678,34 @@
               }
             ]
           }
+        },
+        {
+          "name": "history",
+          "docs": [
+            "which may not exist. While it holds a vote copy from this epoch the",
+            "chain can compute the score itself, so the scorer may not post one."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.vote",
+                "account": "ValidatorPosition"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -4238,6 +4716,86 @@
               "name": "ScoreUpdate"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "update_stake_info",
+      "discriminator": [
+        25,
+        244,
+        8,
+        32,
+        250,
+        244,
+        170,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "scorer",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "history"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "activated_stake_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "rank",
+          "type": "u32"
+        },
+        {
+          "name": "superminority",
+          "type": "bool"
         }
       ]
     },
@@ -4568,6 +5126,19 @@
       ]
     },
     {
+      "name": "ScoreConfig",
+      "discriminator": [
+        150,
+        113,
+        251,
+        218,
+        0,
+        146,
+        67,
+        39
+      ]
+    },
+    {
       "name": "SwapPosition",
       "discriminator": [
         65,
@@ -4578,6 +5149,19 @@
         154,
         6,
         152
+      ]
+    },
+    {
+      "name": "ValidatorHistory",
+      "discriminator": [
+        205,
+        25,
+        8,
+        221,
+        253,
+        131,
+        2,
+        146
       ]
     },
     {
@@ -4739,6 +5323,19 @@
       ]
     },
     {
+      "name": "HistoryInitialized",
+      "discriminator": [
+        189,
+        138,
+        180,
+        254,
+        29,
+        103,
+        17,
+        216
+      ]
+    },
+    {
       "name": "IdentityUpdated",
       "discriminator": [
         93,
@@ -4827,6 +5424,19 @@
         198,
         254,
         229
+      ]
+    },
+    {
+      "name": "PriorityFeeDistributionCopied",
+      "discriminator": [
+        122,
+        165,
+        146,
+        98,
+        49,
+        149,
+        120,
+        22
       ]
     },
     {
@@ -4921,6 +5531,19 @@
       ]
     },
     {
+      "name": "ScoreRefreshed",
+      "discriminator": [
+        250,
+        182,
+        172,
+        112,
+        252,
+        188,
+        222,
+        234
+      ]
+    },
+    {
       "name": "ScoreUpdated",
       "discriminator": [
         175,
@@ -4931,6 +5554,32 @@
         213,
         230,
         183
+      ]
+    },
+    {
+      "name": "ScoringConfigured",
+      "discriminator": [
+        235,
+        216,
+        69,
+        63,
+        190,
+        216,
+        94,
+        242
+      ]
+    },
+    {
+      "name": "StakeInfoUpdated",
+      "discriminator": [
+        181,
+        235,
+        215,
+        27,
+        252,
+        126,
+        49,
+        81
       ]
     },
     {
@@ -4973,6 +5622,19 @@
       ]
     },
     {
+      "name": "TipDistributionCopied",
+      "discriminator": [
+        34,
+        84,
+        37,
+        137,
+        218,
+        93,
+        12,
+        13
+      ]
+    },
+    {
       "name": "TreasuryClaimed",
       "discriminator": [
         59,
@@ -5009,6 +5671,19 @@
         240,
         96,
         159
+      ]
+    },
+    {
+      "name": "VoteAccountCopied",
+      "discriminator": [
+        16,
+        56,
+        150,
+        242,
+        97,
+        105,
+        77,
+        75
       ]
     },
     {
@@ -5516,6 +6191,46 @@
       "code": 6092,
       "name": "ImpactAboveFeeBound",
       "msg": "max_impact_bps may be at most twice the venue's lowest fee"
+    },
+    {
+      "code": 6093,
+      "name": "HistoryEpochOutOfRange",
+      "msg": "The epoch is outside the history's 64-epoch window, or a newer epoch holds its entry"
+    },
+    {
+      "code": 6094,
+      "name": "HistoryVoteMismatch",
+      "msg": "The validator history belongs to another vote account"
+    },
+    {
+      "code": 6095,
+      "name": "HistoryStale",
+      "msg": "The validator history has no recent vote-account copy for this epoch"
+    },
+    {
+      "code": 6096,
+      "name": "StakeInfoStale",
+      "msg": "No stake info has been posted for this epoch"
+    },
+    {
+      "code": 6097,
+      "name": "InvalidDistributionAccount",
+      "msg": "Not the Jito distribution account for this vote account and epoch"
+    },
+    {
+      "code": 6098,
+      "name": "InvalidHedgeAccount",
+      "msg": "A hedge account is not an unsettled receive-fixed swap of this operator against the market maker"
+    },
+    {
+      "code": 6099,
+      "name": "HistoryIsFresh",
+      "msg": "This validator has fresh on-chain history: use refresh_score"
+    },
+    {
+      "code": 6100,
+      "name": "InvalidScoreConfig",
+      "msg": "Score configuration is out of range"
     }
   ],
   "types": [
@@ -6186,6 +6901,175 @@
       }
     },
     {
+      "name": "HistoryEntry",
+      "docs": [
+        "One epoch of a validator's record. 128 bytes, every field naturally",
+        "aligned. A field still at its type's maximum is unknown."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "docs": [
+              "The epoch this entry describes; `UNKNOWN_U64` for an empty slot."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "epoch_credits",
+            "docs": [
+              "Vote credits earned in the epoch (final once the epoch is over)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_credits",
+            "docs": [
+              "Slots in the epoch × 16: the timely-vote-credit maximum."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "vote_lamports",
+            "docs": [
+              "Vote-account lamports at the latest copy in the epoch."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "revenue_lamports",
+            "docs": [
+              "Revenue by the sweep rule: the most seen above the sweep floor (rent +",
+              "pending delegator rewards) in the vote account plus the escrow above",
+              "rent, over the epoch's copies. It includes rewards for the previous",
+              "epoch that land early in this one."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "mev_earned_lamports",
+            "docs": [
+              "The tip-distribution merkle root's `max_total_claim`: every lamport of",
+              "MEV tips the epoch pays out (stakers plus the validator's commission)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "priority_fees_lamports",
+            "docs": [
+              "Lamports the validator sent to its priority-fee distribution account."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "activated_stake_lamports",
+            "docs": [
+              "Oracle: activated stake."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_voted_slot",
+            "docs": [
+              "Slot of the newest vote in the tower at the latest copy."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "updated_slot",
+            "docs": [
+              "Slot of the latest write from any source."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rank",
+            "docs": [
+              "Oracle: rank by activated stake (1 = largest)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "inflation_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "block_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "mev_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "priority_fee_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "superminority",
+            "docs": [
+              "Oracle: 1 when in the superminority, 0 when not."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "sources",
+            "docs": [
+              "`SOURCE_*` bits."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_reserved0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "HistoryInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "history",
+            "type": "pubkey"
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "IdentityUpdated",
       "type": {
         "kind": "struct",
@@ -6729,6 +7613,38 @@
           },
           {
             "name": "Released"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriorityFeeDistributionCopied",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "found",
+            "type": "bool"
+          },
+          {
+            "name": "priority_fee_commission_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "priority_fees_lamports",
+            "type": {
+              "option": "u64"
+            }
           }
         ]
       }
@@ -7282,10 +8198,143 @@
       }
     },
     {
+      "name": "ScoreConfig",
+      "docs": [
+        "Governance settings for `refresh_score` (seeds: `[\"score_config\", pool]`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_maker",
+            "docs": [
+              "Epoch's market maker: only swaps against its quotes count as a hedge",
+              "(`post_quote` is open to any key). Default: nobody is hedged."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "credits_window_epochs",
+            "docs": [
+              "Finished epochs the credits ratio and the commission look back over."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "count_block_commission",
+            "docs": [
+              "Count the vote account's block-revenue commission (turn on once",
+              "SIMD-0123 makes it binding)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "credits_reference_bps",
+            "docs": [
+              "Credits ÷ TVC maximum, bps, that scores as the cluster average."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_copy_age_slots",
+            "docs": [
+              "The vote copy `refresh_score` uses must be at most this many slots old."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreRefreshed",
+      "docs": [
+        "`refresh_score` also emits `ScoreUpdated`, so score consumers need no change."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "score",
+            "type": "u16"
+          },
+          {
+            "name": "credits_ratio_bps",
+            "docs": [
+              "Credits ratio on the score's scale (10,000 = the cluster reference)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "credits_ratio_raw_bps",
+            "docs": [
+              "Credits ÷ TVC maximum over the window, bps."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "epochs_active",
+            "type": "u16"
+          },
+          {
+            "name": "delinquent",
+            "type": "bool"
+          },
+          {
+            "name": "superminority",
+            "type": "bool"
+          },
+          {
+            "name": "hedged",
+            "type": "bool"
+          },
+          {
+            "name": "hedge_required_notional",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ScoreUpdate",
       "docs": [
         "Inputs the scorer posts each epoch. The formula is on-chain",
-        "(`math::score`), so the score is reproducible from these numbers."
+        "(`math::score`), so the score is reproducible from these numbers. This is",
+        "the fallback for clusters without validator history: once a validator's",
+        "history is fresh, `refresh_score` computes the inputs on chain and this",
+        "instruction refuses (`HistoryIsFresh`)."
       ],
       "type": {
         "kind": "struct",
@@ -7351,6 +8400,69 @@
       }
     },
     {
+      "name": "ScoringConfigured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_maker",
+            "type": "pubkey"
+          },
+          {
+            "name": "credits_window_epochs",
+            "type": "u8"
+          },
+          {
+            "name": "count_block_commission",
+            "type": "bool"
+          },
+          {
+            "name": "credits_reference_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_copy_age_slots",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoringParams",
+      "docs": [
+        "Settings for `refresh_score`; see `ScoreConfig`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_maker",
+            "type": "pubkey"
+          },
+          {
+            "name": "credits_window_epochs",
+            "type": "u8"
+          },
+          {
+            "name": "count_block_commission",
+            "type": "bool"
+          },
+          {
+            "name": "credits_reference_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_copy_age_slots",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "Side",
       "type": {
         "kind": "enum",
@@ -7360,6 +8472,34 @@
           },
           {
             "name": "ReceiveFixed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeInfoUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "activated_stake_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "rank",
+            "type": "u32"
+          },
+          {
+            "name": "superminority",
+            "type": "bool"
           }
         ]
       }
@@ -7547,6 +8687,44 @@
       }
     },
     {
+      "name": "TipDistributionCopied",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "found",
+            "docs": [
+              "False when the account does not exist (no Jito, or not created yet)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "mev_commission_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "mev_earned_lamports",
+            "docs": [
+              "`max_total_claim` once the merkle root is uploaded."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "Tranche",
       "docs": [
         "The two lender tranches. Senior is paid first and takes losses last."
@@ -7676,6 +8854,134 @@
           {
             "name": "income_unallocated",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorHistory",
+      "docs": [
+        "A validator's on-chain record (seeds: `[\"history\", vote]`). Anyone may",
+        "create it and copy chain state into it; only `update_stake_info` (the",
+        "pool's scorer) writes oracle fields."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "last_vote_copy_slot",
+            "docs": [
+              "Slot of the latest `copy_vote_account`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "refreshed_epoch",
+            "docs": [
+              "Epoch and slot of the latest `refresh_score` (0 = never)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "refreshed_slot",
+            "type": "u64"
+          },
+          {
+            "name": "hedge_required_notional",
+            "docs": [
+              "Receive-fixed notional the hedge rule required at the last refresh."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "epochs_voted",
+            "docs": [
+              "Epochs with credits in the vote account's own history (≤ 64) at the",
+              "latest copy."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "score",
+            "type": "u16"
+          },
+          {
+            "name": "credits_ratio_bps",
+            "docs": [
+              "Credits ratio on the score's scale (10,000 = the cluster reference)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "credits_ratio_raw_bps",
+            "docs": [
+              "Credits earned ÷ the TVC maximum over the window, bps."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "epochs_active",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "score_flags",
+            "docs": [
+              "`SCORE_FLAG_*` bits."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "entries",
+            "docs": [
+              "Entry for epoch `e` lives at `e % HISTORY_LEN`."
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "HistoryEntry"
+                  }
+                },
+                64
+              ]
+            }
           }
         ]
       }
@@ -7903,6 +9209,68 @@
           },
           {
             "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteAccountCopied",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "epoch_credits",
+            "docs": [
+              "Credits earned so far in `epoch`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "epochs_backfilled",
+            "docs": [
+              "Epochs of credits written from the vote account's own history."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "last_voted_slot",
+            "docs": [
+              "`None` for an empty tower."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "inflation_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "block_commission_bps",
+            "type": "u16"
+          },
+          {
+            "name": "vote_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "revenue_lamports",
+            "docs": [
+              "The epoch's revenue entry after this copy (sweep rule)."
+            ],
             "type": "u64"
           }
         ]

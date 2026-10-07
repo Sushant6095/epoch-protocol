@@ -27,6 +27,7 @@ pub mod cpi;
 pub mod errors;
 pub mod events;
 pub mod instructions;
+pub mod jito_account;
 pub mod math;
 pub mod meteora_account;
 pub mod state;
@@ -251,5 +252,46 @@ pub mod epoch {
 
     pub fn claim_treasury_lp_fee(ctx: Context<ClaimTreasuryLpFee>) -> Result<()> {
         instructions::claim_treasury_lp_fee(ctx)
+    }
+
+    // ── Validator history and the permissionless score ──
+    pub fn init_validator_history(ctx: Context<InitValidatorHistory>) -> Result<()> {
+        instructions::init_validator_history(ctx)
+    }
+
+    pub fn copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
+        instructions::copy_vote_account(ctx)
+    }
+
+    pub fn copy_tip_distribution_account(
+        ctx: Context<CopyTipDistribution>,
+        epoch: u64,
+    ) -> Result<()> {
+        instructions::copy_tip_distribution_account(ctx, epoch)
+    }
+
+    pub fn copy_priority_fee_distribution(
+        ctx: Context<CopyPriorityFeeDistribution>,
+        epoch: u64,
+    ) -> Result<()> {
+        instructions::copy_priority_fee_distribution(ctx, epoch)
+    }
+
+    pub fn update_stake_info(
+        ctx: Context<UpdateStakeInfo>,
+        epoch: u64,
+        activated_stake_lamports: u64,
+        rank: u32,
+        superminority: bool,
+    ) -> Result<()> {
+        instructions::update_stake_info(ctx, epoch, activated_stake_lamports, rank, superminority)
+    }
+
+    pub fn refresh_score<'info>(ctx: Context<'info, RefreshScore<'info>>) -> Result<()> {
+        instructions::refresh_score(ctx)
+    }
+
+    pub fn configure_scoring(ctx: Context<ConfigureScoring>, params: ScoringParams) -> Result<()> {
+        instructions::configure_scoring(ctx, params)
     }
 }

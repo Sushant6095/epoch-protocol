@@ -30,7 +30,46 @@ export const ACTIVITY_EVENT_NAMES: readonly EventName[] = [
   'RevenueTokenClosed',
   // Epoch's partner treasury claiming its Meteora fees for lenders (kind "buyback": the revenue-token family).
   'TreasuryClaimed',
+  // Validator history and the permissionless score (P1): kind "score".
+  'HistoryInitialized',
+  'VoteAccountCopied',
+  'TipDistributionCopied',
+  'PriorityFeeDistributionCopied',
+  'StakeInfoUpdated',
+  'ScoreRefreshed',
+  'ScoringConfigured',
 ];
+
+/**
+ * What makes a repeat of a keeper event no news: HistoryJob copies the vote account and refreshes every score on each
+ * pass (every 30 minutes), so the feed shows a validator's first copy of an epoch and a refresh only when its score
+ * or a flag changed.
+ */
+const repeatKey = (stored: StoredProgramEvent): string | null => {
+  const { data } = stored;
+  switch (stored.name) {
+    case 'VoteAccountCopied':
+      return `epoch ${data.epoch}`;
+    case 'ScoreRefreshed':
+      return [data.score, data.delinquent, data.superminority, data.hedged].join(':');
+    default:
+      return null;
+  }
+};
+
+/** Drops keeper repeats (see `repeatKey`); feed it events oldest first. Every other event is news. */
+export class RepeatFilter {
+  private readonly last = new Map<string, string>();
+
+  isNews(stored: StoredProgramEvent): boolean {
+    const key = repeatKey(stored);
+    if (key === null) return true;
+    const slot = `${stored.name}:${String(stored.data.vote ?? '')}`;
+    if (this.last.get(slot) === key) return false;
+    this.last.set(slot, key);
+    return true;
+  }
+}
 
 /** `TreasuryClaimed.kind` in the feed's words. */
 const TREASURY_CLAIM_TEXT: Record<string, string> = {
@@ -65,6 +104,9 @@ const validatorName = (data: Data, names: NameIndex): string => {
   const vote = String(data.vote ?? '');
   return names.byVote.get(vote) ?? shortKey(vote);
 };
+
+/** bps (number or decimal string) → "12.5%". */
+const pctText = (value: Data[string] | undefined): string => `${(num(value) ?? 0) / 100}%`;
 
 const solRow = (kind: ActivityEvent['kind'], text: string, amountSol: number | null) => ({
   kind,
@@ -172,6 +214,50 @@ function rowFor(stored: StoredProgramEvent, names: NameIndex): Omit<ActivityEven
         lamports > 0 ? lamports / LAMPORTS_PER_SOL : null,
       );
     }
+    case 'HistoryInitialized':
+      return solRow('score', `${validatorName(data, names)} · on-chain history opened`, null);
+    case 'VoteAccountCopied':
+      return solRow('score', `${validatorName(data, names)} · vote account copied on chain`, null);
+    case 'TipDistributionCopied':
+      // Not found: no Jito account for the epoch (devnet, or not created yet), nothing was written.
+      if (data.found !== true) return null;
+      return solRow(
+        'score',
+        `${validatorName(data, names)} · Jito tips copied: ${pctText(data.mevCommissionBps)} MEV commission`,
+        sol(data.mevEarnedLamports),
+      );
+    case 'PriorityFeeDistributionCopied':
+      if (data.found !== true) return null;
+      return solRow(
+        'score',
+        `${validatorName(data, names)} · Jito priority fees copied: ${pctText(data.priorityFeeCommissionBps)} commission`,
+        sol(data.priorityFeesLamports),
+      );
+    case 'StakeInfoUpdated':
+      return solRow(
+        'score',
+        `${validatorName(data, names)} · stake rank #${data.rank}${data.superminority === true ? ', superminority' : ''} posted by the scorer`,
+        null,
+      );
+    case 'ScoreRefreshed': {
+      const flags = [
+        data.delinquent === true ? 'delinquent' : null,
+        data.superminority === true ? 'superminority' : null,
+        data.hedged === true ? 'hedged' : null,
+      ].filter((flag) => flag !== null);
+      const score = Math.round((num(data.score) ?? 0) / 100);
+      return solRow(
+        'score',
+        `${validatorName(data, names)} · score ${score} from on-chain history${flags.length ? ` (${flags.join(', ')})` : ''}`,
+        null,
+      );
+    }
+    case 'ScoringConfigured':
+      return solRow(
+        'score',
+        `Scoring settings: ${data.creditsWindowEpochs}-epoch credit window, cluster average at ${pctText(data.creditsReferenceBps)} of the maximum`,
+        null,
+      );
     default:
       return null;
   }

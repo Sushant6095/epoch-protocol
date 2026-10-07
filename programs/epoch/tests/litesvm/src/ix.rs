@@ -218,6 +218,7 @@ pub fn update_score(scorer: Pubkey, vote: Pubkey, update: ScoreUpdate) -> Instru
             scorer,
             pool: pda::pool(),
             position: pda::position(&vote),
+            history: pda::validator_history(&vote),
         },
         i::UpdateScore { update },
     )

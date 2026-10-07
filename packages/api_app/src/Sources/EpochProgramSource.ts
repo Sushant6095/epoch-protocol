@@ -8,7 +8,9 @@ import {
   decodeFeeQuote,
   decodeLenderShares,
   decodePool,
+  decodeScoreConfig,
   decodeSwapPosition,
+  decodeValidatorHistory,
   decodeValidatorPosition,
   decodeWithdrawRequest,
   type EventName,
@@ -19,10 +21,14 @@ import {
   findLenderPda,
   findPoolPda,
   findPositionPda,
+  findScoreConfigPda,
+  findValidatorHistoryPda,
   type LenderSharesAccount,
   type PoolAccount,
+  type ScoreConfigAccount,
   type SwapPositionAccount,
   type Tranche,
+  type ValidatorHistoryAccount,
   type ValidatorPositionAccount,
   type WithdrawRequestAccount,
 } from '@epoch/epoch-sdk';
@@ -48,7 +54,8 @@ export interface ProgramEpochInfo {
   absoluteSlot: number;
 }
 
-type CacheKey = 'pool' | 'feeIndex' | 'positions' | 'advances' | 'lenders' | 'withdrawRequests' | 'quotes' | 'swaps';
+type CacheKey =
+  'pool' | 'feeIndex' | 'positions' | 'advances' | 'lenders' | 'withdrawRequests' | 'quotes' | 'swaps' | 'scoreConfig';
 
 /** Which cached reads a program event makes stale. */
 const STALE_AFTER: Partial<Record<EventName, CacheKey[]>> = {
@@ -80,6 +87,9 @@ const STALE_AFTER: Partial<Record<EventName, CacheKey[]>> = {
   SwapSettled: ['quotes', 'swaps'],
   // A treasury claim adds to the pool's cash and undistributed income.
   TreasuryClaimed: ['pool'],
+  // Validator history (P1): refresh_score writes the position's score and hedge flag; histories are read fresh.
+  ScoreRefreshed: ['positions'],
+  ScoringConfigured: ['scoreConfig'],
 };
 
 /** `https://[<region>.]rpc.solami.dev/sol[?api_key=…]`: Solami's JSON-RPC endpoint, global or region-pinned. */
@@ -120,6 +130,7 @@ export class EpochProgramSource {
   private readonly withdrawCache: SnapshotCache<ProgramAccount<WithdrawRequestAccount>[]>;
   private readonly quotesCache: SnapshotCache<ProgramAccount<FeeQuoteAccount>[]>;
   private readonly swapsCache: SnapshotCache<ProgramAccount<SwapPositionAccount>[]>;
+  private readonly scoreConfigCache: SnapshotCache<ProgramAccount<ScoreConfigAccount> | null>;
   private readonly epochCache: SnapshotCache<ProgramEpochInfo>;
   private schedule?: Promise<EpochSchedule>;
 
@@ -150,6 +161,7 @@ export class EpochProgramSource {
     this.swapsCache = new SnapshotCache('program.swaps', 15_000, () =>
       this.loadAll('SwapPosition', decodeSwapPosition),
     );
+    this.scoreConfigCache = new SnapshotCache('program.scoreConfig', 60_000, () => this.loadScoreConfig());
     this.epochCache = new SnapshotCache('program.epochInfo', 5_000, async () => {
       const info = await this.connections.withFailover((c) => c.getEpochInfo('confirmed'));
       return {
@@ -269,6 +281,21 @@ export class EpochProgramSource {
     return this.swapsCache.get();
   }
 
+  /** A vote account's `ValidatorHistory` (`["history", vote]`), read directly (fresh); null before it is created. */
+  async validatorHistory(vote: string): Promise<ProgramAccount<ValidatorHistoryAccount> | null> {
+    const programId = this.requireProgramId();
+    const address = findValidatorHistoryPda(programId, new PublicKey(vote))[0];
+    const info = await this.connections.withFailover((c) => c.getAccountInfo(address, 'confirmed'));
+    if (!info || !info.owner.equals(programId)) return null;
+    return { address: address.toBase58(), account: decodeValidatorHistory(info.data) };
+  }
+
+  /** The Pool's `ScoreConfig` (`["score_config", pool]`), or null before `configure_scoring` (cached 60 s). */
+  async scoreConfig(): Promise<ProgramAccount<ScoreConfigAccount> | null> {
+    this.requireProgramId();
+    return this.scoreConfigCache.get();
+  }
+
   /** The program cluster's epoch and slot (cached 5 s). */
   async epochInfo(): Promise<ProgramEpochInfo> {
     return this.epochCache.get();
@@ -310,6 +337,7 @@ export class EpochProgramSource {
       withdrawRequests: this.withdrawCache,
       quotes: this.quotesCache,
       swaps: this.swapsCache,
+      scoreConfig: this.scoreConfigCache,
     };
     if (key === 'all') Object.values(caches).forEach((cache) => cache.invalidate());
     else caches[key].invalidate();
@@ -329,6 +357,14 @@ export class EpochProgramSource {
     const info = await this.connections.withFailover((c) => c.getAccountInfo(address, 'confirmed'));
     if (!info || !info.owner.equals(programId)) return null;
     return { address: address.toBase58(), account: decodeFeeIndex(info.data) };
+  }
+
+  private async loadScoreConfig(): Promise<ProgramAccount<ScoreConfigAccount> | null> {
+    const programId = this.requireProgramId();
+    const address = findScoreConfigPda(programId, findPoolPda(programId)[0])[0];
+    const info = await this.connections.withFailover((c) => c.getAccountInfo(address, 'confirmed'));
+    if (!info || !info.owner.equals(programId)) return null;
+    return { address: address.toBase58(), account: decodeScoreConfig(info.data) };
   }
 
   private async loadAll<T>(

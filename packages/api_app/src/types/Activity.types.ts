@@ -5,8 +5,13 @@
 import type { FeeIndexPoint as ComputedFeeIndexPoint, Meta } from './Api.types';
 
 // ── GET /v1/activity · WS /v1/stream channel `activity` ─────────────────────────────────────────────
-/** "swap": a Fee Market swap opened or settled (request #19). "buyback": a revenue-token buyback slice (request #22). */
-export type ActivityKind = 'sweep' | 'deposit' | 'predict' | 'advance' | 'index' | 'withdraw' | 'swap' | 'buyback';
+/**
+ * "swap": a Fee Market swap opened or settled (request #19). "buyback": a revenue-token buyback slice (request #22).
+ * "score": the on-chain score (P1): a validator history opened or copied, the scorer's stake post, a refresh, the
+ * scoring settings.
+ */
+export type ActivityKind =
+  'sweep' | 'deposit' | 'predict' | 'advance' | 'index' | 'withdraw' | 'swap' | 'buyback' | 'score';
 
 export interface ActivityEvent {
   /** `<signature>:<ix>` for a program event (ix = its position among the transaction's events), `predict:<id>` for a call. */

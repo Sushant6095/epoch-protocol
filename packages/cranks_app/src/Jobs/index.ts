@@ -2,6 +2,7 @@ export * from './AccrueJob';
 export * from './BuybackJob';
 export * from './ClaimMevJob';
 export * from './FinalizeIndexJob';
+export * from './HistoryJob';
 export * from './Job';
 export * from './LaunchFeeClaimJob';
 export * from './MarkDefaultJob';

@@ -259,6 +259,74 @@ export interface RevenueTokenAccount {
   feeFloorBps: number;
 }
 
+/** One epoch of a `ValidatorHistory`; `null` marks a field the chain has not reported (stakenet-style sentinel). */
+export interface HistoryEntry {
+  epoch: bigint;
+  /** Vote credits earned in the epoch (final once the epoch is over). */
+  epochCredits: bigint | null;
+  /** Slots in the epoch × 16: the timely-vote-credit maximum. */
+  maxCredits: bigint | null;
+  voteLamports: bigint | null;
+  /** Sweep rule: the most seen above rent + pending delegator rewards (vote account) plus the escrow above rent. */
+  revenueLamports: bigint | null;
+  /** Jito tip-distribution `merkle_root.max_total_claim`: the epoch's whole MEV tip pot, lamports. */
+  mevEarnedLamports: bigint | null;
+  /** Lamports sent to Jito's priority fee distribution account. */
+  priorityFeesLamports: bigint | null;
+  /** Oracle (the pool's scorer). */
+  activatedStakeLamports: bigint | null;
+  lastVotedSlot: bigint | null;
+  updatedSlot: bigint | null;
+  /** Oracle: 1 = largest stake. */
+  rank: number | null;
+  inflationCommissionBps: number | null;
+  blockCommissionBps: number | null;
+  mevCommissionBps: number | null;
+  priorityFeeCommissionBps: number | null;
+  /** Oracle. */
+  superminority: boolean | null;
+  /** `HISTORY_SOURCES` bits: what has been copied into the entry. */
+  sources: number;
+}
+
+/** `["history", vote]`: a validator's on-chain history; `entries` holds only the filled epochs, oldest first. */
+export interface ValidatorHistoryAccount {
+  vote: PublicKey;
+  createdEpoch: bigint;
+  lastVoteCopySlot: bigint;
+  refreshedEpoch: bigint;
+  refreshedSlot: bigint;
+  hedgeRequiredNotional: bigint;
+  epochsVoted: number;
+  score: number;
+  creditsRatioBps: number;
+  creditsRatioRawBps: number;
+  commissionBps: number;
+  epochsActive: number;
+  bump: number;
+  version: number;
+  /** `HISTORY_SCORE_FLAGS` bits of the last `refresh_score`. */
+  scoreFlags: number;
+  entries: HistoryEntry[];
+}
+
+/** `["score_config", pool]`: settings for `refresh_score`. */
+export interface ScoreConfigAccount {
+  pool: PublicKey;
+  /** `null` when unset: nobody is hedged. */
+  marketMaker: PublicKey | null;
+  creditsWindowEpochs: number;
+  countBlockCommission: boolean;
+  creditsReferenceBps: number;
+  maxCopyAgeSlots: number;
+  bump: number;
+}
+
+/** `HistoryEntry.sources` bits. */
+export const HISTORY_SOURCES = Object.freeze({ vote: 1, tip: 2, priorityFee: 4, stake: 8, credits: 16 });
+/** `ValidatorHistory.scoreFlags` bits. */
+export const HISTORY_SCORE_FLAGS = Object.freeze({ delinquent: 1, superminority: 2, hedged: 4, scored: 8 });
+
 /** Account name → decoded type. */
 export interface EpochAccountMap {
   Pool: PoolAccount;
@@ -270,6 +338,8 @@ export interface EpochAccountMap {
   FeeQuote: FeeQuoteAccount;
   SwapPosition: SwapPositionAccount;
   RevenueToken: RevenueTokenAccount;
+  ValidatorHistory: ValidatorHistoryAccount;
+  ScoreConfig: ScoreConfigAccount;
 }
 
 /** A decoded account of any type, discriminated by `name`. */
@@ -286,6 +356,9 @@ export const ACCOUNT_SIZES: Readonly<Record<AccountName, number>> = Object.freez
   FeeQuote: 151,
   SwapPosition: 133,
   RevenueToken: 503,
+  // Zero-copy: 8 + 152-byte header + 64 × 128-byte entries.
+  ValidatorHistory: 8352,
+  ScoreConfig: 145,
 });
 
 /** Byte offsets of the fixed-position pubkey fields used in getProgramAccounts memcmp filters. */
@@ -297,6 +370,8 @@ export const FIELD_OFFSETS = Object.freeze({
   FeeQuote: Object.freeze({ pool: 8, maker: 40 }),
   SwapPosition: Object.freeze({ quote: 8, taker: 40 }),
   RevenueToken: Object.freeze({ pool: 8, position: 40, vote: 72, operator: 104, mint: 136, dbcPool: 200 }),
+  ValidatorHistory: Object.freeze({ vote: 8 }),
+  ScoreConfig: Object.freeze({ pool: 8 }),
 });
 
 /** Length of each account's trailing `_reserved: [u8; N]`: read past (Borsh requires the bytes), never exposed. */
@@ -312,6 +387,9 @@ const RESERVED: Readonly<Record<AccountName, number>> = {
   SwapPosition: 16,
   // Its first 2 reserved bytes are `fee_floor_bps` now.
   RevenueToken: 62,
+  // Header reserve; each entry also carries 34 reserved bytes.
+  ValidatorHistory: 64,
+  ScoreConfig: 64,
 };
 
 // ─── Field codecs ──────────────────────────────────────────────────────────
@@ -649,6 +727,87 @@ export function decodeSwapPosition(data: Uint8Array): SwapPositionAccount {
   return account;
 }
 
+const U64_UNKNOWN = U64_MAX;
+const U32_UNKNOWN = 0xffff_ffff;
+const U16_UNKNOWN = 0xffff;
+const known64 = (v: bigint): bigint | null => (v === U64_UNKNOWN ? null : v);
+const known32 = (v: number): number | null => (v === U32_UNKNOWN ? null : v);
+const known16 = (v: number): number | null => (v === U16_UNKNOWN ? null : v);
+
+function readHistoryEntry(r: BorshReader): HistoryEntry | null {
+  const epoch = r.u64('epoch');
+  const entry: HistoryEntry = {
+    epoch,
+    epochCredits: known64(r.u64('epochCredits')),
+    maxCredits: known64(r.u64('maxCredits')),
+    voteLamports: known64(r.u64('voteLamports')),
+    revenueLamports: known64(r.u64('revenueLamports')),
+    mevEarnedLamports: known64(r.u64('mevEarnedLamports')),
+    priorityFeesLamports: known64(r.u64('priorityFeesLamports')),
+    activatedStakeLamports: known64(r.u64('activatedStakeLamports')),
+    lastVotedSlot: known64(r.u64('lastVotedSlot')),
+    updatedSlot: known64(r.u64('updatedSlot')),
+    rank: known32(r.u32('rank')),
+    inflationCommissionBps: known16(r.u16('inflationCommissionBps')),
+    blockCommissionBps: known16(r.u16('blockCommissionBps')),
+    mevCommissionBps: known16(r.u16('mevCommissionBps')),
+    priorityFeeCommissionBps: known16(r.u16('priorityFeeCommissionBps')),
+    superminority: null,
+    sources: 0,
+  };
+  const superminority = r.u8('superminority');
+  entry.superminority = superminority === 0 ? false : superminority === 1 ? true : null;
+  entry.sources = r.u8('sources');
+  r.skip(34, 'entry _reserved');
+  return epoch === U64_UNKNOWN ? null : entry;
+}
+
+/** Zero-copy `ValidatorHistory`: `repr(C)` with no padding, so the fields read in order like Borsh. */
+export function decodeValidatorHistory(data: Uint8Array): ValidatorHistoryAccount {
+  const r = open('ValidatorHistory', data);
+  const account: ValidatorHistoryAccount = {
+    vote: r.pubkey('vote'),
+    createdEpoch: r.u64('createdEpoch'),
+    lastVoteCopySlot: r.u64('lastVoteCopySlot'),
+    refreshedEpoch: r.u64('refreshedEpoch'),
+    refreshedSlot: r.u64('refreshedSlot'),
+    hedgeRequiredNotional: r.u64('hedgeRequiredNotional'),
+    epochsVoted: r.u16('epochsVoted'),
+    score: r.u16('score'),
+    creditsRatioBps: r.u16('creditsRatioBps'),
+    creditsRatioRawBps: r.u16('creditsRatioRawBps'),
+    commissionBps: r.u16('commissionBps'),
+    epochsActive: r.u16('epochsActive'),
+    bump: r.u8('bump'),
+    version: r.u8('version'),
+    scoreFlags: r.u8('scoreFlags'),
+    entries: [],
+  };
+  r.skip(1, '_padding');
+  r.skip(RESERVED.ValidatorHistory, '_reserved');
+  for (let i = 0; i < PROGRAM_CONSTANTS.HISTORY_LEN; i++) {
+    const entry = readHistoryEntry(r);
+    if (entry) account.entries.push(entry);
+  }
+  account.entries.sort((a, b) => (a.epoch < b.epoch ? -1 : a.epoch > b.epoch ? 1 : 0));
+  return account;
+}
+
+export function decodeScoreConfig(data: Uint8Array): ScoreConfigAccount {
+  const r = open('ScoreConfig', data);
+  const account: ScoreConfigAccount = {
+    pool: r.pubkey('pool'),
+    marketMaker: optionalKey(r.pubkey('marketMaker')),
+    creditsWindowEpochs: r.u8('creditsWindowEpochs'),
+    countBlockCommission: r.bool('countBlockCommission'),
+    creditsReferenceBps: r.u16('creditsReferenceBps'),
+    maxCopyAgeSlots: r.u32('maxCopyAgeSlots'),
+    bump: r.u8('bump'),
+  };
+  r.skip(RESERVED.ScoreConfig, '_reserved');
+  return account;
+}
+
 const DECODERS: { [K in AccountName]: (data: Uint8Array) => EpochAccountMap[K] } = {
   Pool: decodePool,
   LenderShares: decodeLenderShares,
@@ -659,6 +818,8 @@ const DECODERS: { [K in AccountName]: (data: Uint8Array) => EpochAccountMap[K] }
   FeeQuote: decodeFeeQuote,
   SwapPosition: decodeSwapPosition,
   RevenueToken: decodeRevenueToken,
+  ValidatorHistory: decodeValidatorHistory,
+  ScoreConfig: decodeScoreConfig,
 };
 
 /**

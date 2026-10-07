@@ -4,8 +4,9 @@
 use anchor_lang::prelude::Pubkey;
 use epoch::constants::{
     ADVANCE_SEED, BUYBACK_SEED, BUYBACK_TOKENS_SEED, BUYBACK_WSOL_SEED, ESCROW_SEED,
-    FEE_INDEX_SEED, LENDER_SEED, PARTNER_TREASURY_SEED, POOL_SEED, POSITION_SEED, QUOTE_SEED,
-    REVENUE_TOKEN_SEED, SWAP_SEED, TREASURY_WSOL_SEED, VAULT_SEED, VOTE_AUTH_SEED, WITHDRAW_SEED,
+    FEE_INDEX_SEED, HISTORY_SEED, LENDER_SEED, PARTNER_TREASURY_SEED, POOL_SEED, POSITION_SEED,
+    QUOTE_SEED, REVENUE_TOKEN_SEED, SWAP_SEED, TREASURY_WSOL_SEED, VAULT_SEED, VOTE_AUTH_SEED,
+    WITHDRAW_SEED,
 };
 use epoch::state::Tranche;
 
@@ -47,6 +48,11 @@ pub fn position(vote: &Pubkey) -> Pubkey {
 
 pub fn vote_auth(vote: &Pubkey) -> Pubkey {
     find(&[VOTE_AUTH_SEED, vote.as_ref()]).0
+}
+
+/// The validator's `ValidatorHistory` (`["history", vote]`); `update_score` takes it, existing or not.
+pub fn validator_history(vote: &Pubkey) -> Pubkey {
+    find(&[HISTORY_SEED, vote.as_ref()]).0
 }
 
 pub fn escrow(vote: &Pubkey) -> Pubkey {

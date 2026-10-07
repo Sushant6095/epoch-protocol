@@ -486,6 +486,7 @@ name = "epoch"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "bytemuck",
  "solana-sysvar",
 ]
 

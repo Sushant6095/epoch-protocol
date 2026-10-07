@@ -25,6 +25,8 @@ describe('Program routers', () => {
     sim.initializeIndex();
     sim.deposit(LENDER, 'junior', sol(100));
     sim.onboard(VOTE, OPERATOR, { bond: sol(5) });
+    sim.initHistory(VOTE);
+    sim.copyVoteAccount(VOTE);
     setProgramServices(
       createProgramServices(
         fakeDeps(sim, await sim.store(), { rows: [validatorRow({ name: 'Mainnet One', vote: W('mainnet') })] }),
@@ -88,6 +90,30 @@ describe('Program routers', () => {
     expect(badVote.body.error).toMatchObject({ code: 'BAD_REQUEST' });
     expect((await get('/v1/wallets/0OIl/lender')).status).toBe(400);
     expect((await get(`/v1/validators/${W('nobody')}/position`)).status).toBe(404);
+  });
+
+  it('serves the on-chain history with its freshness and cache header; 400 for a bad key, 404 without a history', async () => {
+    const res = await fetch(`${base}/v1/validators/${VOTE}/history`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('public, max-age=10');
+    const body = (await res.json()) as Reply<{ entries: unknown[] }>['body'];
+    expect(body).toMatchObject({
+      ok: true,
+      data: {
+        vote: VOTE,
+        currentEpoch: 1100,
+        freshness: { status: 'fresh', lastVoteCopyEpoch: 1100, refreshReady: false },
+        lastRefresh: null,
+      },
+    });
+    expect(body.data.entries).toHaveLength(11);
+    expect((await get(`/v1/validators/${VOTE}/position`)).body.data).toMatchObject({
+      scoreBreakdown: { source: 'scorer', history: { freshness: 'fresh' } },
+    });
+    const bad = await get('/v1/validators/not-a-key/history');
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toMatchObject({ code: 'BAD_REQUEST' });
+    expect((await get(`/v1/validators/${W('nobody')}/history`)).status).toBe(404);
   });
 
   it('uses the session for isMine and myHedge', async () => {

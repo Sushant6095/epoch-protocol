@@ -80,6 +80,18 @@ describe('eventToJson', () => {
   });
 });
 
+describe('eventToJson with None options (validator history)', () => {
+  it('leaves a None field out and keeps the rest', () => {
+    const rust = vectors.events.find((e) => e.name === 'TipDistributionCopied' && e.label === 'b')!;
+    const event = decodeEvent(fromHex(rust.data))!;
+    expect(event.name).toBe('TipDistributionCopied');
+    const json = eventToJson(event);
+    expect(json.data).toEqual({ vote: rust.fields.vote, epoch: rust.fields.epoch, found: false });
+    const copied = vectors.events.find((e) => e.name === 'VoteAccountCopied' && e.label === 'b')!;
+    expect('lastVotedSlot' in eventToJson(decodeEvent(fromHex(copied.data))!).data).toBe(false);
+  });
+});
+
 describe('parseEventsFromLogs', () => {
   const swept = rustEvent('Swept');
   const repaid = rustEvent('AdvanceRepaid');

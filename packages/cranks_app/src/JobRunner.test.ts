@@ -1,7 +1,9 @@
 import { Logger } from '@epoch/logger';
+import { PublicKey } from '@solana/web3.js';
 
 import { pool, position, SOL, withdrawRequest } from './__fixtures__/accounts';
 import { atAddress, FakeChain } from './__fixtures__/FakeChain';
+import jitoClaims from './__fixtures__/jito-claims.json';
 import { type Job, type JobOutcome } from './Jobs';
 import { JobRunner } from './JobRunner';
 
@@ -206,5 +208,48 @@ describe('JobRunner.create', () => {
     await runner.tick();
     expect(chain.executed()).toEqual(['sweep', 'accrue', 'process_withdrawal']);
     expect(data.voters).not.toHaveBeenCalled();
+    // History first (it scores validators from the chain), then the scorer for the rest, then the bounded MEV claim
+    // gate, the first step that can block, then the sweep and the steps after it.
+    expect(runner.doneSteps()).toEqual([
+      'HistoryJob',
+      'UpdateScoreJob',
+      'ClaimMevJob',
+      'SweepJob',
+      'MarkDefaultJob',
+      'AccrueJob',
+    ]);
+  });
+
+  it("finishes history and scores before Jito's MEV claim gate, which then holds the sweep until the claim lands", async () => {
+    // Real mainnet accounts: a 700-bps validator's epoch 1050 TDA with its merkle root, and its claimed commission node.
+    const { tda700, claimStatus700 } = jitoClaims.accounts;
+    const chain = new FakeChain();
+    chain.epoch = 1051n;
+    chain.scorer = undefined; // scores off
+    chain.positionAccounts = [
+      atAddress(position({ vote: new PublicKey(tda700.vote), status: 'active', lastSweptEpoch: 1050n }), 120),
+    ];
+    chain.poolAccount = pool({ lastAccruedEpoch: 1050n });
+    chain.accountData.set(tda700.address, Buffer.from(tda700.data, 'base64'));
+    const data = { voters: jest.fn(), voteStates: jest.fn(), mevCommissions: jest.fn() };
+    const runner = JobRunner.create(chain, data, [], { pollMs: 60_000, alertAfterMs: 3_600_000 });
+
+    // Not claimed yet: history and the scorer are done for the epoch (they never wait on Jito), the sweep waits.
+    await runner.tick();
+    expect(runner.doneSteps()).toEqual(['HistoryJob', 'UpdateScoreJob']);
+    expect(chain.executed()).toEqual([]);
+
+    // Jito's crank claims the commission node into the vote account: the gate opens and the sweep collects it.
+    chain.accountData.set(claimStatus700.address, Buffer.from(claimStatus700.data, 'base64'));
+    await runner.tick();
+    expect(runner.doneSteps()).toEqual([
+      'HistoryJob',
+      'UpdateScoreJob',
+      'ClaimMevJob',
+      'SweepJob',
+      'MarkDefaultJob',
+      'AccrueJob',
+    ]);
+    expect(chain.executed()).toEqual(['sweep', 'accrue']);
   });
 });

@@ -181,6 +181,30 @@ export const EPOCH_ERRORS: readonly EpochErrorInfo[] = Object.freeze(
       message: "The venue's fee is too low, or can fall too low, for sandwich-proof buybacks",
     },
     { code: 6092, name: 'ImpactAboveFeeBound', message: "max_impact_bps may be at most twice the venue's lowest fee" },
+    {
+      code: 6093,
+      name: 'HistoryEpochOutOfRange',
+      message: "The epoch is outside the history's 64-epoch window, or a newer epoch holds its entry",
+    },
+    { code: 6094, name: 'HistoryVoteMismatch', message: 'The validator history belongs to another vote account' },
+    {
+      code: 6095,
+      name: 'HistoryStale',
+      message: 'The validator history has no recent vote-account copy for this epoch',
+    },
+    { code: 6096, name: 'StakeInfoStale', message: 'No stake info has been posted for this epoch' },
+    {
+      code: 6097,
+      name: 'InvalidDistributionAccount',
+      message: 'Not the Jito distribution account for this vote account and epoch',
+    },
+    {
+      code: 6098,
+      name: 'InvalidHedgeAccount',
+      message: 'A hedge account is not an unsettled receive-fixed swap of this operator against the market maker',
+    },
+    { code: 6099, name: 'HistoryIsFresh', message: 'This validator has fresh on-chain history: use refresh_score' },
+    { code: 6100, name: 'InvalidScoreConfig', message: 'Score configuration is out of range' },
   ].map((e) => Object.freeze(e)),
 );
 

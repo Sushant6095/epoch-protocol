@@ -44,6 +44,20 @@ export const CranksConfigSchema = z.object({
   JITO_TIP_DISTRIBUTION_PROGRAM_ID: z.string().min(32).max(44).default('4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7'),
   /** The sweep waits at most this long after the boundary for Jito to claim each validator's MEV commission. */
   MEV_CLAIM_WAIT_MINUTES: z.coerce.number().int().min(0).max(1_440).default(360),
+  /**
+   * Vote accounts HistoryJob keeps an on-chain ValidatorHistory for besides the onboarded ones, comma separated
+   * (validators that may onboard soon: their history is ready when they do). Empty: onboarded validators only.
+   */
+  HISTORY_WATCHLIST: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(address).max(500)),
 });
 
 export type CranksConfig = z.infer<typeof CranksConfigSchema>;

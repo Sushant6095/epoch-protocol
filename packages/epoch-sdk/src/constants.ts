@@ -23,6 +23,8 @@ export const SEEDS = {
   buybackTokens: 'buyback_tokens',
   partnerTreasury: 'treasury',
   treasuryWsol: 'treasury_wsol',
+  history: 'history',
+  scoreConfig: 'score_config',
 } as const;
 
 export const VOTE_PROGRAM_ID = new PublicKey('Vote111111111111111111111111111111111111111');
@@ -60,7 +62,29 @@ export const PROGRAM_CONSTANTS = {
   DBC_PARTNER_MIGRATION_FEE_MASK: 0b100,
   /** Percent of a completed curve's surplus that partner and creator share (the protocol keeps the rest). */
   DBC_PARTNER_AND_CREATOR_SURPLUS_SHARE: 80,
+  // Validator history and the permissionless score
+  /** Epochs a `ValidatorHistory` keeps; the entry for epoch `e` is at `e % HISTORY_LEN`. */
+  HISTORY_LEN: 64,
+  TVC_CREDITS_PER_SLOT: 16n,
+  DELINQUENT_SLOT_DISTANCE: 128n,
+  HEDGE_EPOCHS_AHEAD: 5,
+  HEDGE_MIN_NOTIONAL_BPS: 5000,
+  DEFAULT_CREDITS_WINDOW_EPOCHS: 10,
+  MAX_CREDITS_WINDOW_EPOCHS: 32,
+  DEFAULT_CREDITS_REFERENCE_BPS: 9950,
+  MIN_CREDITS_REFERENCE_BPS: 5000,
+  DEFAULT_MAX_COPY_AGE_SLOTS: 9000,
+  MIN_MAX_COPY_AGE_SLOTS: 150,
+  MAX_MAX_COPY_AGE_SLOTS: 216_000,
 } as const;
+
+/** Jito's per-epoch distribution programs and seeds (mainnet; absent on devnet). */
+export const JITO = Object.freeze({
+  TIP_DISTRIBUTION_PROGRAM_ID: new PublicKey('4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7'),
+  TIP_DISTRIBUTION_ACCOUNT_SEED: 'TIP_DISTRIBUTION_ACCOUNT',
+  PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID: new PublicKey('Priority6weCZ5HwDn29NxLFpb7TDp2iLZ6XKc5e8d3'),
+  PF_DISTRIBUTION_ACCOUNT_SEED: 'PF_DISTRIBUTION_ACCOUNT',
+});
 
 /**
  * The Meteora programs and fixed PDAs revenue tokens use (verified against the deployed programs and mainnet swaps;
