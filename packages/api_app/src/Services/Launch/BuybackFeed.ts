@@ -1,6 +1,7 @@
 import {
   accountFilters,
   decodeRevenueToken,
+  type EventJsonValue,
   type EventName,
   fieldFilter,
   findBuybackEscrowPda,
@@ -183,7 +184,11 @@ export class BuybackFeed {
   }
 }
 
-const u64 = (value: string | number | boolean | undefined): bigint => BigInt(String(value ?? 0));
+/** A u64 event field (a decimal string); 0 when absent. Event fields here are always scalars. */
+const u64 = (value: EventJsonValue | undefined): bigint => {
+  if (Array.isArray(value)) throw new TypeError('expected a u64 event field, got a list');
+  return BigInt(String(value ?? 0));
+};
 
 /** A feed without the fields `get` adds around it (meta and the treasury section). */
 type FeedBody = Omit<
@@ -278,7 +283,7 @@ export function treasuryClaims(
     ReturnType<typeof raw>
   >;
   const total = raw();
-  const units = (value: string | number | boolean | undefined): bigint =>
+  const units = (value: EventJsonValue | undefined): bigint =>
     typeof value === 'string' || typeof value === 'number' ? BigInt(value) : 0n;
   const claims = events.map((event) => {
     const { data } = event;

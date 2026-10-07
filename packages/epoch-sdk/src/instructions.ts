@@ -1,5 +1,5 @@
 /**
- * Instruction builders for all 40 instructions in `programs/epoch/src/lib.rs`.
+ * Instruction builders for all 56 instructions in `programs/epoch/src/lib.rs`.
  *
  * Accounts are listed in the exact order of each Rust `#[derive(Accounts)]` struct, with its signer and `mut`
  * flags; PDAs are derived from `programId`. Data is `discriminator ++ borsh(args)` in `lib.rs` argument order.
@@ -40,6 +40,8 @@ import {
   findBuybackWsolPda,
   findEscrowPda,
   findFeeIndexPda,
+  findIndexBallotPda,
+  findIndexOperatorsPda,
   findLenderPda,
   findPartnerTreasuryPda,
   findPoolPda,
@@ -738,18 +740,29 @@ export interface PostIndexInput extends WithProgram {
   value: bigint;
   /** 32-byte commitment to the per-slot inputs. */
   inputsHash: Uint8Array;
+  /**
+   * The signer is the sole operator of a one-operator registry (consensus on, `FeeIndex.publisher` is the registry
+   * PDA): appends the registry as `remaining_accounts[0]`, which the program needs to accept the shortcut.
+   */
+  soleOperator?: boolean;
 }
 
-/** `post_index(epoch, value, inputs_hash)`: the fee index PDA is derived from the pool PDA. Signer: publisher. */
+/**
+ * `post_index(epoch, value, inputs_hash)`: the fee index PDA is derived from the pool PDA. Signer: publisher, or
+ * with `soleOperator` the only registered operator (the registry PDA rides in `remaining_accounts`).
+ */
 export function postIndex({
   programId,
   publisher,
   epoch,
   value,
   inputsHash,
+  soleOperator = false,
 }: PostIndexInput): TransactionInstruction[] {
   const { feeIndex } = poolKeys(programId);
-  return instruction(programId, 'post_index', [signer(publisher), writable(feeIndex)], (w) =>
+  const keys = [signer(publisher), writable(feeIndex)];
+  if (soleOperator) keys.push(readonly(findIndexOperatorsPda(programId, feeIndex)[0]));
+  return instruction(programId, 'post_index', keys, (w) =>
     w.u64(epoch, 'epoch').u64(value, 'value').fixedBytes(inputsHash, 32, 'inputsHash'),
   );
 }
@@ -772,6 +785,203 @@ export interface VetoIndexInput extends WithProgram {
 export function vetoIndex({ programId, admin }: VetoIndexInput): TransactionInstruction[] {
   const { pool, feeIndex } = poolKeys(programId);
   return instruction(programId, 'veto_index', [signer(admin), readonly(pool), writable(feeIndex)]);
+}
+
+// ─── Fee Index: operator consensus ─────────────────────────────────────────
+
+/** The pool, fee index and operator registry PDAs every consensus instruction names. */
+function consensusKeys(programId: PublicKey): { pool: PublicKey; feeIndex: PublicKey; indexOperators: PublicKey } {
+  const { pool, feeIndex } = poolKeys(programId);
+  return { pool, feeIndex, indexOperators: findIndexOperatorsPda(programId, feeIndex)[0] };
+}
+
+export interface InitializeIndexOperatorsInput extends WithProgram {
+  admin: PublicKey;
+  /** u16, bps of the total registered weight that must agree (5,001 to 10,000; the program's default is 6,667). */
+  thresholdBps: number;
+  /** u16, bps: a vote agrees when it is within this of the weighted median (0 to 1,000). */
+  toleranceBps: number;
+}
+
+/**
+ * `initialize_index_operators(threshold_bps, tolerance_bps)`: creates the empty registry and turns consensus on
+ * (`FeeIndex.publisher` becomes the registry PDA). Add the operators in the same transaction. Signer: admin (payer).
+ */
+export function initializeIndexOperators({
+  programId,
+  admin,
+  thresholdBps,
+  toleranceBps,
+}: InitializeIndexOperatorsInput): TransactionInstruction[] {
+  const { pool, feeIndex, indexOperators } = consensusKeys(programId);
+  return instruction(
+    programId,
+    'initialize_index_operators',
+    [signerWritable(admin), readonly(pool), writable(feeIndex), writable(indexOperators), readonly(SYSTEM_PROGRAM_ID)],
+    (w) => w.u16(thresholdBps, 'thresholdBps').u16(toleranceBps, 'toleranceBps'),
+  );
+}
+
+export interface IndexOperatorInput extends WithProgram {
+  admin: PublicKey;
+  /** The operator's voting key. */
+  operator: PublicKey;
+}
+
+export interface IndexOperatorWeightInput extends IndexOperatorInput {
+  /** u32, above zero; the registry's total weight stays at most 10,000. */
+  weight: number;
+}
+
+function manageIndexOperator(
+  name: 'add_index_operator' | 'remove_index_operator' | 'set_index_operator_weight',
+  { programId, admin, operator }: IndexOperatorInput,
+  args?: (w: BorshWriter) => void,
+): TransactionInstruction[] {
+  const { pool, feeIndex, indexOperators } = consensusKeys(programId);
+  return instruction(
+    programId,
+    name,
+    [signer(admin), readonly(pool), readonly(feeIndex), writable(indexOperators), readonly(operator)],
+    args,
+  );
+}
+
+/** `add_index_operator(weight)`: registers a voting key (at most 8). Applies from the next ballot round. Signer: admin. */
+export function addIndexOperator(input: IndexOperatorWeightInput): TransactionInstruction[] {
+  return manageIndexOperator('add_index_operator', input, (w) => w.u32(input.weight, 'weight'));
+}
+
+/** `remove_index_operator()`: open rounds keep it in their snapshot. Signer: admin. */
+export function removeIndexOperator(input: IndexOperatorInput): TransactionInstruction[] {
+  return manageIndexOperator('remove_index_operator', input);
+}
+
+/** `set_index_operator_weight(weight)`. Signer: admin. */
+export function setIndexOperatorWeight(input: IndexOperatorWeightInput): TransactionInstruction[] {
+  return manageIndexOperator('set_index_operator_weight', input, (w) => w.u32(input.weight, 'weight'));
+}
+
+export type SetIndexConsensusInput = InitializeIndexOperatorsInput;
+
+/** `set_index_consensus(threshold_bps, tolerance_bps)`: same ranges as at initialization. Signer: admin. */
+export function setIndexConsensus({
+  programId,
+  admin,
+  thresholdBps,
+  toleranceBps,
+}: SetIndexConsensusInput): TransactionInstruction[] {
+  const { pool, feeIndex, indexOperators } = consensusKeys(programId);
+  return instruction(
+    programId,
+    'set_index_consensus',
+    [signer(admin), readonly(pool), readonly(feeIndex), writable(indexOperators)],
+    (w) => w.u16(thresholdBps, 'thresholdBps').u16(toleranceBps, 'toleranceBps'),
+  );
+}
+
+export interface CastIndexVoteInput extends WithProgram {
+  /** A registered operator's voting key. */
+  operator: PublicKey;
+  /** Pays the ballot's rent when this vote opens it (refunded by `close_index_ballot`). Defaults to `operator`. */
+  payer?: PublicKey;
+  /** Program epoch voted on (the `post_index` numbering). */
+  epoch: bigint;
+  /** Stake-weighted median priority fee, micro-lamports per CU. */
+  value: bigint;
+  /** 32-byte commitment to the per-slot inputs. */
+  inputsHash: Uint8Array;
+}
+
+/**
+ * `cast_index_vote(epoch, value, inputs_hash)`: records or replaces the operator's vote in the epoch's ballot
+ * (created by the first vote), and writes the proposal into `FeeIndex` once agreeing weight reaches the threshold.
+ * Signers: operator and payer (one transaction signature when they are the same key).
+ */
+export function castIndexVote({
+  programId,
+  operator,
+  payer = operator,
+  epoch,
+  value,
+  inputsHash,
+}: CastIndexVoteInput): TransactionInstruction[] {
+  const { feeIndex, indexOperators } = consensusKeys(programId);
+  const [ballot] = findIndexBallotPda(programId, feeIndex, epoch);
+  return instruction(
+    programId,
+    'cast_index_vote',
+    [
+      signerWritable(payer),
+      signer(operator),
+      writable(feeIndex),
+      readonly(indexOperators),
+      writable(ballot),
+      readonly(SYSTEM_PROGRAM_ID),
+    ],
+    (w) => w.u64(epoch, 'epoch').u64(value, 'value').fixedBytes(inputsHash, 32, 'inputsHash'),
+  );
+}
+
+export interface IndexBallotInput extends WithProgram {
+  /** Program epoch of the ballot (its PDA seed). */
+  epoch: bigint;
+}
+
+/** `submit_index_ballot()`: writes a queued consensus into `FeeIndex` once it is free. Anyone may crank. */
+export function submitIndexBallot({
+  programId,
+  cranker,
+  epoch,
+}: IndexBallotInput & { cranker: PublicKey }): TransactionInstruction[] {
+  const { feeIndex, indexOperators } = consensusKeys(programId);
+  const [ballot] = findIndexBallotPda(programId, feeIndex, epoch);
+  return instruction(programId, 'submit_index_ballot', [
+    signer(cranker),
+    writable(feeIndex),
+    readonly(indexOperators),
+    writable(ballot),
+  ]);
+}
+
+/** `reset_index_ballot()`: opens the next round with a fresh registry snapshot (no live consensus). Signer: admin. */
+export function resetIndexBallot({
+  programId,
+  admin,
+  epoch,
+}: IndexBallotInput & { admin: PublicKey }): TransactionInstruction[] {
+  const { pool, feeIndex, indexOperators } = consensusKeys(programId);
+  const [ballot] = findIndexBallotPda(programId, feeIndex, epoch);
+  return instruction(programId, 'reset_index_ballot', [
+    signer(admin),
+    readonly(pool),
+    readonly(feeIndex),
+    readonly(indexOperators),
+    writable(ballot),
+  ]);
+}
+
+export interface CloseIndexBallotInput extends IndexBallotInput {
+  cranker: PublicKey;
+  /** `IndexBallot.payer`: receives the rent. */
+  payer: PublicKey;
+}
+
+/** `close_index_ballot()`: once `FeeIndex.epoch ≥ epoch`, closes the ballot and refunds its payer. Anyone may crank. */
+export function closeIndexBallot({
+  programId,
+  cranker,
+  epoch,
+  payer,
+}: CloseIndexBallotInput): TransactionInstruction[] {
+  const { feeIndex } = poolKeys(programId);
+  const [ballot] = findIndexBallotPda(programId, feeIndex, epoch);
+  return instruction(programId, 'close_index_ballot', [
+    signer(cranker),
+    readonly(feeIndex),
+    writable(ballot),
+    writable(payer),
+  ]);
 }
 
 // ─── Fee Market ────────────────────────────────────────────────────────────

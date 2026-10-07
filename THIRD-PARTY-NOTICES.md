@@ -12,6 +12,8 @@ comment. Crates and npm packages keep their own licences.
 | `programs/epoch/src/math/history.rs` | stakenet `programs/steward/src/score.rs` | Apache-2.0 | Integer bps instead of `f64`; TVC maximum from the EpochSchedule; delinquency from the newest vote; rescaled onto Epoch's score; Epoch's hedge rule |
 | `programs/epoch/src/instructions/history/common.rs` | stakenet `programs/validator-history/src/instructions/copy_tip_distribution_account.rs`, `copy_priority_fee_distribution.rs` | Apache-2.0 | Fixed program ids; a missing account is a no-op; vote cross-check; one reader for both layouts |
 | `programs/epoch/src/instructions/history/update_stake_info.rs` | stakenet `programs/validator-history/src/instructions/update_stake_history.rs` | Apache-2.0 | Signed by the pool's scorer; bounded to the ring; rank checked |
+| `programs/epoch/src/math/consensus.rs`, `programs/epoch/src/state/index_ballot.rs` | [jito-foundation/jito-tip-router](https://github.com/jito-foundation/jito-tip-router) `core/src/ballot_box.rs` | MIT or Apache-2.0 | Ballot box per epoch, operator votes tallied against the total registered weight, vote changes before consensus, locked votes and late votes after it. Rewritten in Anchor for a numeric index: votes agree within a tolerance of the weighted median instead of being equal, the threshold is a bps parameter with an explicit rounding rule, every vote's deviation is stored, the operator set is snapshotted into the ballot, and a vetoed round reopens in place |
+| `programs/epoch/src/state/index_operators.rs` | jito-tip-router `program/src/cast_vote.rs` (operators from [jito-foundation/restaking](https://github.com/jito-foundation/restaking), Apache-2.0) | MIT or Apache-2.0 | An admin-registered list of up to eight voting keys and weights instead of restaking operators, vault delegations and weight tables; ballots copy it when a round opens |
 
 `programs/epoch/src/jito_account.rs` implements the public account layouts of
 [jito-foundation/jito-programs](https://github.com/jito-foundation/jito-programs)
@@ -20,7 +22,8 @@ read those accounts; no code is copied.
 
 ## Apache License 2.0 notice
 
-The adapted files above are distributed under the Apache License, Version 2.0, the licence of the original work. You may
-obtain a copy of the licence at <https://www.apache.org/licenses/LICENSE-2.0>. Unless required by applicable law or agreed
-to in writing, software distributed under the licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
-OF ANY KIND, either express or implied. The changes made are listed in the table and in each file's header.
+The adapted files above are distributed under the Apache License, Version 2.0, the licence of the original work
+(jito-tip-router is dual-licensed MIT or Apache-2.0; Epoch takes it under Apache-2.0). You may obtain a copy of the
+licence at <https://www.apache.org/licenses/LICENSE-2.0>. Unless required by applicable law or agreed to in writing,
+software distributed under the licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. The changes made are listed in the table and in each file's header.

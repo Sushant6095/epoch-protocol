@@ -5,6 +5,7 @@ import {
   type AdvanceAccount,
   decodeAdvance,
   decodeFeeIndex,
+  decodeIndexBallot,
   decodeFeeQuote,
   decodeLenderShares,
   decodePool,
@@ -15,6 +16,7 @@ import {
   decodeWithdrawRequest,
   type EventName,
   type FeeIndexAccount,
+  type IndexBallotAccount,
   type FeeQuoteAccount,
   fieldFilter,
   findFeeIndexPda,
@@ -83,6 +85,7 @@ const STALE_AFTER: Partial<Record<EventName, CacheKey[]>> = {
   IndexFinalized: ['feeIndex'],
   IndexVetoed: ['feeIndex'],
   QuotePosted: ['quotes'],
+  QuoteWithdrawn: ['quotes'],
   SwapOpened: ['quotes', 'swaps'],
   SwapSettled: ['quotes', 'swaps'],
   // A treasury claim adds to the pool's cash and undistributed income.
@@ -124,6 +127,7 @@ export class EpochProgramSource {
 
   private readonly poolCache: SnapshotCache<ProgramAccount<PoolAccount> | null>;
   private readonly feeIndexCache: SnapshotCache<ProgramAccount<FeeIndexAccount> | null>;
+  private readonly ballotsCache: SnapshotCache<ProgramAccount<IndexBallotAccount>[]>;
   private readonly positionsCache: SnapshotCache<ProgramAccount<ValidatorPositionAccount>[]>;
   private readonly advancesCache: SnapshotCache<ProgramAccount<AdvanceAccount>[]>;
   private readonly lendersCache: SnapshotCache<ProgramAccount<LenderSharesAccount>[]>;
@@ -141,6 +145,11 @@ export class EpochProgramSource {
     this.connections = new ConnectionManager(config.EPOCH_RPC_URL, config.EPOCH_RPC_FALLBACK_URL, 'confirmed');
     this.poolCache = new SnapshotCache('program.pool', 10_000, () => this.loadPool());
     this.feeIndexCache = new SnapshotCache('program.feeIndex', 10_000, () => this.loadFeeIndex());
+    this.ballotsCache = new SnapshotCache('program.indexBallots', 10_000, () => {
+      const programId = this.requireProgramId();
+      const feeIndex = findFeeIndexPda(programId, findPoolPda(programId)[0])[0];
+      return this.loadAll('IndexBallot', decodeIndexBallot, [fieldFilter('IndexBallot', 'feeIndex', feeIndex)]);
+    });
     this.positionsCache = new SnapshotCache('program.positions', 30_000, () =>
       this.loadAll('ValidatorPosition', decodeValidatorPosition),
     );
@@ -217,6 +226,12 @@ export class EpochProgramSource {
   async feeIndex(): Promise<ProgramAccount<FeeIndexAccount> | null> {
     this.requireProgramId();
     return this.feeIndexCache.get();
+  }
+
+  /** The FeeIndex's open IndexBallot accounts (operator consensus; closed ones live on in the events). */
+  async indexBallots(): Promise<ProgramAccount<IndexBallotAccount>[]> {
+    this.requireProgramId();
+    return this.ballotsCache.get();
   }
 
   async positions(): Promise<ProgramAccount<ValidatorPositionAccount>[]> {

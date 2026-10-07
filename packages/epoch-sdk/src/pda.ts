@@ -30,6 +30,8 @@ const SEED = {
   escrow: ascii(SEEDS.escrow),
   advance: ascii(SEEDS.advance),
   feeIndex: ascii(SEEDS.feeIndex),
+  indexOperators: ascii(SEEDS.indexOperators),
+  indexBallot: ascii(SEEDS.indexBallot),
   quote: ascii(SEEDS.quote),
   swap: ascii(SEEDS.swap),
   revenueToken: ascii(SEEDS.revenueToken),
@@ -105,6 +107,23 @@ export function findAdvancePda(programId: PublicKey, vote: PublicKey, seq: bigin
 /** `["fee_index", pool]`: the Solana Fee Index. */
 export function findFeeIndexPda(programId: PublicKey, pool: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([SEED.feeIndex, pool.toBytes()], programId);
+}
+
+/** `["index_operators", fee_index]`: the Fee Index operator registry (its PDA is `FeeIndex.publisher` once consensus is on). */
+export function findIndexOperatorsPda(programId: PublicKey, feeIndex: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([SEED.indexOperators, feeIndex.toBytes()], programId);
+}
+
+/** `["index_ballot", fee_index, epoch_le_u64]`: one program epoch's Fee Index ballot. */
+export function findIndexBallotPda(
+  programId: PublicKey,
+  feeIndex: PublicKey,
+  epoch: bigint | number,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [SEED.indexBallot, feeIndex.toBytes(), u64ToLeBytes(epoch, 'epoch')],
+    programId,
+  );
 }
 
 /** `["quote", maker, epoch_le_u64]`: a maker's quote for one epoch. */

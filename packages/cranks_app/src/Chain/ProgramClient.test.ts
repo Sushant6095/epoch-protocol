@@ -121,6 +121,15 @@ describe('ProgramClient reads', () => {
     expect(config.filters[2]).toEqual({ memcmp: { offset: 40, bytes: key(22).toBase58() } });
   });
 
+  it('lists the Fee Index ballots of this program’s FeeIndex only', async () => {
+    const { programClient, connection } = client();
+    await programClient.indexBallots();
+    const [, config] = connection.getProgramAccounts.mock.calls[0] as unknown as [PublicKey, { filters: unknown[] }];
+    const [feeIndexAddress] = findFeeIndexPda(PROGRAM_ID, findPoolPda(PROGRAM_ID)[0]);
+    expect(config.filters).toContainEqual({ dataSize: 936 });
+    expect(config.filters[2]).toEqual({ memcmp: { offset: 8, bytes: feeIndexAddress.toBase58() } });
+  });
+
   it('reads the pool, fee index and queue entries at their PDAs; null when missing or not the program’s', async () => {
     const [poolPda] = findPoolPda(PROGRAM_ID);
     const [indexPda] = findFeeIndexPda(PROGRAM_ID, poolPda);

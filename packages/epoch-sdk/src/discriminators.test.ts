@@ -33,10 +33,10 @@ describe('precomputed discriminators', () => {
     expect(hex(EVENT_DISCRIMINATORS[name])).toBe(sighash('event', name));
   });
 
-  it('covers exactly the program: 11 accounts, 47 instructions, 41 events', () => {
-    expect(ACCOUNT_NAMES).toHaveLength(11);
-    expect(INSTRUCTION_NAMES).toHaveLength(47);
-    expect(EVENT_NAMES).toHaveLength(41);
+  it('covers exactly the program: 13 accounts, 56 instructions, 52 events', () => {
+    expect(ACCOUNT_NAMES).toHaveLength(13);
+    expect(INSTRUCTION_NAMES).toHaveLength(56);
+    expect(EVENT_NAMES).toHaveLength(52);
     expect([...ACCOUNT_NAMES].sort()).toEqual(Object.keys(vectors.accounts).sort());
     expect([...INSTRUCTION_NAMES].sort()).toEqual([...new Set(vectors.instructions.map((i) => i.name))].sort());
     expect([...EVENT_NAMES].sort()).toEqual([...new Set(vectors.events.map((e) => e.name))].sort());

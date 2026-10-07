@@ -124,11 +124,14 @@ export class PgIndexHistory implements IndexHistory {
    * IndexFinalized event with the same value: whatever the mainnet → program epoch offset (publisher_app README).
    */
   async recentFinal(beforeEpoch: number, limit: number): Promise<{ epoch: number; value: number }[]> {
+    // posted_signature is the post_index transaction (IndexProposed) or, under operator consensus, publisher_app's
+    // first cast_index_vote (IndexVoteCast; a sole operator's vote carries both, hence DISTINCT). Either event's epoch
+    // is the program epoch the value was finalized under.
     const result = await this.db.execute<{ epoch: number | string; value: number | string }>(sql`
-      SELECT ei.epoch, ei.value
+      SELECT DISTINCT ei.epoch, ei.value
       FROM ${epochIndex} ei
       JOIN ${programEvents} proposed
-        ON proposed.signature = ei.posted_signature AND proposed.kind = 'IndexProposed'
+        ON proposed.signature = ei.posted_signature AND proposed.kind IN ('IndexProposed', 'IndexVoteCast')
       WHERE ei.epoch < ${beforeEpoch}
         AND EXISTS (
           SELECT 1 FROM ${programEvents} fin

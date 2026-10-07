@@ -20,6 +20,7 @@ describe('CranksConfigSchema', () => {
       DRY_RUN: false,
       CRANK_POLL_SECONDS: 60,
       CRANK_ALERT_AFTER_MINUTES: 60,
+      INDEX_BALLOT_RETENTION_EPOCHS: 4,
     });
     expect(config.SCORER_KEYPAIR_PATH).toBeUndefined();
     expect(() => loadConfig(CranksConfigSchema, { CRANK_KEYPAIR_PATH: 'x' })).toThrow('EPOCH_PROGRAM_ID');
@@ -54,6 +55,18 @@ describe('PublisherConfigSchema', () => {
     expect(parse('auto')).toBe('auto');
     expect(() => parse('1.5')).toThrow('FEE_INDEX_EPOCH_OFFSET');
     expect(() => parse('soon')).toThrow('FEE_INDEX_EPOCH_OFFSET');
+  });
+
+  it('splits the operator keypair paths, at most 8 and without duplicates', () => {
+    const parse = (INDEX_OPERATOR_KEYPAIR_PATHS?: string) =>
+      loadConfig(PublisherConfigSchema, { EPOCH_PROGRAM_ID: PROGRAM, INDEX_OPERATOR_KEYPAIR_PATHS })
+        .INDEX_OPERATOR_KEYPAIR_PATHS;
+    expect(parse()).toEqual([]);
+    expect(parse(' /k/a.json , /k/b.json,,')).toEqual(['/k/a.json', '/k/b.json']);
+    expect(() => parse('/k/a.json,/k/a.json')).toThrow('INDEX_OPERATOR_KEYPAIR_PATHS');
+    expect(() => parse(Array.from({ length: 9 }, (_, i) => `/k/${i}.json`).join(','))).toThrow(
+      'INDEX_OPERATOR_KEYPAIR_PATHS',
+    );
   });
 
   it('validates the notional and spread', () => {

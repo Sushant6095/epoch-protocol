@@ -15,7 +15,7 @@ describe('EPOCH_ERRORS', () => {
     const rust = [...vectors.errors].sort((a, b) => a.code - b.code);
     expect(EPOCH_ERRORS.map((e) => ({ name: e.name, code: e.code, message: e.message }))).toEqual(rust);
     EPOCH_ERRORS.forEach((e, i) => expect(e.code).toBe(6000 + i));
-    expect(EPOCH_ERRORS).toHaveLength(101);
+    expect(EPOCH_ERRORS).toHaveLength(117);
   });
 
   it('is frozen', () => {
@@ -36,7 +36,10 @@ describe('EPOCH_ERRORS', () => {
     expect(epochErrorFromCode(6090)?.name).toBe('LiquidityNotLocked');
     expect(epochErrorFromCode(6092)?.name).toBe('ImpactAboveFeeBound');
     expect(epochErrorFromCode(6099)?.name).toBe('HistoryIsFresh');
-    expect(epochErrorFromCode(6101)).toBeUndefined();
+    expect(epochErrorFromCode(6101)?.name).toBe('InvalidConsensusParams');
+    expect(epochErrorFromCode(6115)?.name).toBe('BallotPayerMismatch');
+    expect(epochErrorFromCode(6116)?.name).toBe('QuoteNotExpired');
+    expect(epochErrorFromCode(6117)).toBeUndefined();
     expect(epochErrorFromCode(2006)).toBeUndefined();
   });
 });

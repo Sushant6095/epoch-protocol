@@ -7,7 +7,6 @@ use crate::{
     constants::*,
     errors::EpochError,
     events::{IndexFinalized, IndexProposed, IndexVetoed, ParamsUpdated},
-    math::bps_of,
     state::*,
 };
 
@@ -85,10 +84,15 @@ pub fn configure_index(
     Ok(())
 }
 
+/// `post_index`. Optional `remaining_accounts[0]`: the `IndexOperators`
+/// registry, needed only when consensus is on (`fee_index.publisher` is the
+/// registry PDA) and the signer is its sole operator. Kept out of the
+/// `Accounts` struct so existing two-account callers work unchanged.
 #[derive(Accounts)]
 pub struct PostIndex<'info> {
+    /// `fee_index.publisher`, or the sole operator of a one-operator registry.
     pub publisher: Signer<'info>,
-    #[account(mut, seeds = [FEE_INDEX_SEED, fee_index.pool.as_ref()], bump = fee_index.bump, has_one = publisher @ EpochError::NotPublisher)]
+    #[account(mut, seeds = [FEE_INDEX_SEED, fee_index.pool.as_ref()], bump = fee_index.bump)]
     pub fee_index: Account<'info, FeeIndex>,
 }
 
@@ -96,28 +100,40 @@ pub struct PostIndex<'info> {
 /// `max_move_bps` from the last finalized value; otherwise it waits out the
 /// dispute window before anyone can finalize it. `inputs_hash` commits to
 /// the per-slot inputs so the value can be recomputed from public data.
+///
+/// With operator consensus on, only the sole operator of a one-operator
+/// registry may post this way (a one-vote ballot would reach consensus
+/// anyway); with two or more operators, values come from ballots.
 pub fn post_index(
     ctx: Context<PostIndex>,
     epoch: u64,
     value: u64,
     inputs_hash: [u8; 32],
 ) -> Result<()> {
+    let signer = ctx.accounts.publisher.key();
     let index = &mut ctx.accounts.fee_index;
-    require!(!index.has_proposal, EpochError::DisputeWindowOpen);
-    require!(epoch > index.epoch, EpochError::IndexEpochNotNewer);
-
-    if index.finalized_slot > 0 && index.value > 0 {
-        let bound = bps_of(index.value, index.max_move_bps).ok_or(EpochError::MathOverflow)?;
-        let diff = value.abs_diff(index.value);
-        require!(diff <= bound, EpochError::IndexMoveTooLarge);
+    if index.publisher != signer {
+        let registry = ctx
+            .remaining_accounts
+            .first()
+            .ok_or(EpochError::NotPublisher)?;
+        require_keys_eq!(registry.key(), index.publisher, EpochError::NotPublisher);
+        require_keys_eq!(*registry.owner, crate::ID, EpochError::NotPublisher);
+        let data = registry.try_borrow_data()?;
+        let operators = IndexOperators::try_deserialize(&mut &data[..])?;
+        require_keys_eq!(operators.fee_index, index.key(), EpochError::NotPublisher);
+        require!(
+            operators.is_sole_operator(&signer),
+            EpochError::NotPublisher
+        );
     }
 
-    let slot = Clock::get()?.slot;
-    index.has_proposal = true;
-    index.proposed_epoch = epoch;
-    index.proposed_value = value;
-    index.proposed_inputs_hash = inputs_hash;
-    index.proposed_slot = slot;
+    let clock = Clock::get()?;
+    if let Some(blocker) = FeeIndex::start_blocker(epoch, clock.epoch) {
+        return Err(blocker.into());
+    }
+    let slot = clock.slot;
+    index.propose(epoch, value, inputs_hash, slot)?;
 
     emit!(IndexProposed {
         epoch,

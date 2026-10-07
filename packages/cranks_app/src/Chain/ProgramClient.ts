@@ -4,6 +4,7 @@ import {
   type AdvanceAccount,
   decodeAdvance,
   decodeFeeIndex,
+  decodeIndexBallot,
   decodePool,
   decodeRevenueToken,
   decodeScoreConfig,
@@ -12,6 +13,7 @@ import {
   decodeValidatorPosition,
   decodeWithdrawRequest,
   type FeeIndexAccount,
+  type IndexBallotAccount,
   fieldFilter,
   findFeeIndexPda,
   findPoolPda,
@@ -128,6 +130,11 @@ export class ProgramClient implements EpochChain {
   feeIndex(): Promise<ProgramAccount<FeeIndexAccount> | null> {
     const [pool] = findPoolPda(this.programId);
     return this.loadOne(findFeeIndexPda(this.programId, pool)[0], decodeFeeIndex);
+  }
+
+  indexBallots(): Promise<ProgramAccount<IndexBallotAccount>[]> {
+    const [feeIndex] = findFeeIndexPda(this.programId, findPoolPda(this.programId)[0]);
+    return this.loadAll('IndexBallot', decodeIndexBallot, [fieldFilter('IndexBallot', 'feeIndex', feeIndex)]);
   }
 
   async withdrawRequest(seq: bigint): Promise<WithdrawRequestAccount | null> {

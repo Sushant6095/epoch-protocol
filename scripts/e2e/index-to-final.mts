@@ -1,8 +1,11 @@
 /**
  * Pipeline to final, end to end on a local validator. A finished mainnet epoch's Fee Index goes from `epoch_index`
- * (computed) through publisher_app (`post_index`), the on-chain dispute window and cranks_app's FinalizeIndexJob
- * (`finalize_index`), and api_app's GET /v1/index/epochs/:N, the source Epoch's Panta markets resolve from, answers
- * `final` with the value and the signatures. Every step goes through the shipped code: the built apps run as processes
+ * (computed) through publisher_app, the on-chain dispute window and cranks_app's FinalizeIndexJob (`finalize_index`),
+ * and api_app's GET /v1/index/epochs/:N, the source Epoch's Panta markets resolve from, answers `final` with the value
+ * and the signatures. `--mode consensus` (the default): the admin registers two operators (weight 1 each, threshold
+ * two thirds, tolerance 1%), publisher_app votes with both keys (`cast_index_vote`, INDEX_OPERATOR_KEYPAIR_PATHS) and
+ * the second vote proposes; the API shows the ballot, and CloseBallotsJob closes it afterwards. `--mode legacy`: one
+ * publisher key and `post_index`, as before operator consensus. Every step goes through the shipped code: the built apps run as processes
  * (publisher_app, api_app) or as their own modules (FinalizeIndexJob).
  *
  *   pnpm build
@@ -12,6 +15,7 @@
  * The program must be built with `declare_id!` set to the keypair's address (a throwaway id). Options (defaults):
  *   --rpc-port 19899 (websocket = rpc + 1)   --faucet-port 19901   --api-port 19902   --gossip-port 19905
  *   --dynamic-ports 19910-20010   --epoch 1051   --value 1400   --dispute-window 100 (slots, ~40 s)
+ *   --mode consensus|legacy (consensus)   --limit-ledger-size 200000
  *   --solana-bin <dir of solana-test-validator, default from PATH>   --out <results.json>
  *   --keep (the validator and the schema stay for inspection)
  *
@@ -49,6 +53,7 @@ const solana = cranks('@epoch/solana');
 const pg = fromPackage('pg_models')('pg');
 const { ProgramClient } = cranks(join(ROOT, 'packages/cranks_app/dist/Chain/ProgramClient.js'));
 const { FinalizeIndexJob } = cranks(join(ROOT, 'packages/cranks_app/dist/Jobs/FinalizeIndexJob.js'));
+const { CloseBallotsJob } = cranks(join(ROOT, 'packages/cranks_app/dist/Jobs/CloseBallotsJob.js'));
 
 // ── Options ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -72,6 +77,9 @@ const dynamicPorts = option('dynamic-ports', '19910-20010');
 const mainnetEpoch = Number(option('epoch', '1051'));
 const value = Number(option('value', '1400'));
 const disputeWindow = BigInt(option('dispute-window', '100'));
+const mode = option('mode', 'consensus');
+if (mode !== 'consensus' && mode !== 'legacy') throw new Error('--mode is consensus or legacy');
+const consensus = mode === 'consensus';
 const solanaBin = option('solana-bin', '');
 const out = resolve(option('out', join(work, 'results.json')));
 
@@ -221,7 +229,7 @@ async function main(): Promise<void> {
       '--slots-per-epoch',
       String(SLOTS_PER_EPOCH),
       '--limit-ledger-size',
-      '200000',
+      option('limit-ledger-size', '200000'),
       '--bpf-program',
       programId.toBase58(),
       programSo,
@@ -278,6 +286,29 @@ async function main(): Promise<void> {
     [admin],
   );
 
+  // 3b. Operator consensus: two operators of weight 1, threshold 6,667 bps, tolerance 100 bps. The registry PDA becomes
+  //     the FeeIndex's publisher, so the publisher key above can no longer post.
+  const operators = consensus ? [web3.Keypair.generate(), web3.Keypair.generate()] : [];
+  for (const key of operators) {
+    const signature = await connection.requestAirdrop(key.publicKey, 10 * web3.LAMPORTS_PER_SOL);
+    await connection.confirmTransaction(signature, 'confirmed');
+  }
+  if (consensus) {
+    await send(
+      'initialize_index_operators + 2 × add_index_operator',
+      [
+        ...sdk.initializeIndexOperators({ ...ids, thresholdBps: 6_667, toleranceBps: 100 }),
+        ...operators.flatMap((op) => sdk.addIndexOperator({ ...ids, operator: op.publicKey, weight: 1 })),
+      ],
+      [admin],
+    );
+    const index = await feeIndex();
+    const [registry] = sdk.findIndexOperatorsPda(programId, feeIndexPda);
+    check('consensus is on: the registry is the FeeIndex publisher', index?.publisher.equals(registry) === true, {
+      publisher: index?.publisher.toBase58(),
+    });
+  }
+
   // 4. Postgres: a schema of our own from the migrations, and a finished mainnet epoch the indexer computed.
   const db = new pg.Client({ connectionString: baseDbUrl });
   await db.connect();
@@ -325,7 +356,9 @@ async function main(): Promise<void> {
   const publisherEnv = {
     ...appDb,
     ...program,
-    PUBLISHER_KEYPAIR_PATH: keyFile('publisher', publisher),
+    ...(consensus
+      ? { INDEX_OPERATOR_KEYPAIR_PATHS: operators.map((op, i) => keyFile(`operator-${i + 1}`, op)).join(',') }
+      : { PUBLISHER_KEYPAIR_PATH: keyFile('publisher', publisher) }),
     PUBLISHER_INTERVAL_SECONDS: '5',
     FEE_INDEX_EPOCH_OFFSET: String(offset),
   };
@@ -343,7 +376,7 @@ async function main(): Promise<void> {
     [join(ROOT, 'packages/publisher_app/dist/index.js'), '--env', envFile],
     publisherEnv,
   );
-  log('publisher_app started', { offset, programEpoch });
+  log('publisher_app started', { offset, programEpoch, mode });
   const posted = await until('publisher_app to post the epoch', 180_000, async () => {
     const client = new pg.Client({ connectionString: dbUrl });
     await client.connect();
@@ -352,7 +385,7 @@ async function main(): Promise<void> {
     return (rows[0]?.posted_signature as string | null) ?? null;
   });
   await stop(publisherApp);
-  log('post_index landed (publisher_app)', { signature: posted });
+  log(consensus ? 'votes landed (publisher_app)' : 'post_index landed (publisher_app)', { signature: posted });
   const proposed = await feeIndex();
   check('the FeeIndex holds the proposal', Boolean(proposed?.hasProposal) && proposed.proposedValue === BigInt(value), {
     proposedEpoch: proposed?.proposedEpoch,
@@ -362,6 +395,30 @@ async function main(): Promise<void> {
   check('posted under program epoch P = M + offset', proposed?.proposedEpoch === BigInt(programEpoch), {
     programEpoch,
   });
+  const [ballotPda] = sdk.findIndexBallotPda(programId, feeIndexPda, programEpoch);
+  let ballot: { payer: { toBase58(): string } } | null = null;
+  if (consensus) {
+    const info = await connection.getAccountInfo(ballotPda, 'confirmed');
+    const decoded = info ? sdk.decodeIndexBallot(info.data) : null;
+    ballot = decoded;
+    const votes = decoded ? sdk.ballotVotes(decoded) : [];
+    check(
+      'both operator keys voted the value and its inputs hash',
+      votes.length === 2 && votes.every((v: { voted: boolean; value: bigint }) => v.voted && v.value === BigInt(value)),
+      {
+        votes: votes.map((v: { operator: { toBase58(): string }; value: bigint }) => [v.operator.toBase58(), v.value]),
+      },
+    );
+    check(
+      'their agreement met the threshold and proposed the value',
+      decoded !== null &&
+        decoded.consensusSlot > 0n &&
+        decoded.consensusValue === BigInt(value) &&
+        decoded.proposedSlot === proposed.proposedSlot &&
+        decoded.agreeingWeight === 2n,
+      { consensusSlot: decoded?.consensusSlot, proposedSlot: decoded?.proposedSlot },
+    );
+  }
 
   // 6. The dispute window, then cranks_app's FinalizeIndexJob.
   const finalizableAt = (proposed.proposedSlot as bigint) + disputeWindow;
@@ -422,9 +479,11 @@ async function main(): Promise<void> {
     },
   );
   const url = `${apiUrl}/v1/index/epochs/${mainnetEpoch}`;
-  const view = await until(`${url} to say final`, 150_000, async () => {
+  // The status comes from the FeeIndex account, the finalize signature from the indexed IndexFinalized event, which
+  // the API (just started) may not have ingested yet: wait for both.
+  const view = await until(`${url} to say final with its finalize signature`, 150_000, async () => {
     const data = await viewOf(mainnetEpoch, null);
-    return data?.status === 'final' ? data : null;
+    return data?.status === 'final' && data.onChain?.finalizeSignature ? data : null;
   });
   log('api_app answers final', { url });
   check('status final, final: true', view.status === 'final' && view.final === true, { status: view.status });
@@ -440,6 +499,42 @@ async function main(): Promise<void> {
     'the FeeIndex account and program are named',
     view.onChain?.feeIndexAccount === feeIndexPda.toBase58() && view.onChain?.programId === programId.toBase58(),
   );
+  if (consensus) {
+    const b = view.ballot;
+    check(
+      'the epoch view carries the ballot (2 of 2 agree, settled, from the account)',
+      b?.consensus === true &&
+        b.votesCast === 2 &&
+        b.agreeingBps === 10_000 &&
+        b.consensusValue === value &&
+        b.status === 'settled' &&
+        b.source === 'account' &&
+        b.votes.every((v: { deviationBps: number; agrees: boolean }) => v.deviationBps === 0 && v.agrees),
+      b,
+    );
+    // CloseBallotsJob (retention 0): the settled ballot closes and its rent goes back to the operator that opened it.
+    const payer = new web3.PublicKey(ballot!.payer.toBase58());
+    const before = await connection.getBalance(payer, 'confirmed');
+    const closeOutcome = await new CloseBallotsJob(chain, 0).run(0n);
+    const gone = (await connection.getAccountInfo(ballotPda, 'confirmed')) === null;
+    const refund = (await connection.getBalance(payer, 'confirmed')) - before;
+    check('CloseBallotsJob closes the settled ballot and refunds its payer', gone && refund === 7_405_440, {
+      closeOutcome,
+      refund,
+    });
+    const rebuilt = await until('the API to rebuild the closed ballot from events', 90_000, async () => {
+      const data = await viewOf(mainnetEpoch, null);
+      return data?.ballot?.source === 'events' ? data : null;
+    });
+    check(
+      'after the close the API rebuilds the ballot from the indexed events',
+      rebuilt.status === 'final' &&
+        rebuilt.ballot.consensus === true &&
+        rebuilt.ballot.votesCast === 2 &&
+        rebuilt.ballot.status === 'settled',
+      rebuilt.ballot,
+    );
+  }
   const next = await viewOf(mainnetEpoch + 1, null);
   check('the next epoch is pending', next?.status === 'pending' && next?.value === null, { status: next?.status });
   await stop(apiApp);

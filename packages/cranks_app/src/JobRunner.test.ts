@@ -209,11 +209,12 @@ describe('JobRunner.create', () => {
     expect(chain.executed()).toEqual(['sweep', 'accrue', 'process_withdrawal']);
     expect(data.voters).not.toHaveBeenCalled();
     // History first (it scores validators from the chain), then the scorer for the rest, then the bounded MEV claim
-    // gate, the first step that can block, then the sweep and the steps after it.
+    // gate, the first step that can block, then closing settled Fee Index ballots, the sweep and the steps after it.
     expect(runner.doneSteps()).toEqual([
       'HistoryJob',
       'UpdateScoreJob',
       'ClaimMevJob',
+      'CloseBallotsJob',
       'SweepJob',
       'MarkDefaultJob',
       'AccrueJob',
@@ -246,6 +247,7 @@ describe('JobRunner.create', () => {
       'HistoryJob',
       'UpdateScoreJob',
       'ClaimMevJob',
+      'CloseBallotsJob',
       'SweepJob',
       'MarkDefaultJob',
       'AccrueJob',

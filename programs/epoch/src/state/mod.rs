@@ -4,6 +4,8 @@
 pub mod advance;
 pub mod fee_index;
 pub mod fee_quote;
+pub mod index_ballot;
+pub mod index_operators;
 pub mod lender;
 pub mod pool;
 pub mod revenue_token;
@@ -16,6 +18,8 @@ pub mod withdraw_request;
 pub use advance::*;
 pub use fee_index::*;
 pub use fee_quote::*;
+pub use index_ballot::*;
+pub use index_operators::*;
 pub use lender::*;
 pub use pool::*;
 pub use revenue_token::*;

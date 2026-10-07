@@ -49,12 +49,12 @@ const positions = accounts.map(({ account }) => decodeValidatorPosition(account.
 | Area | Exports |
 | --- | --- |
 | Constants | `SEEDS`, `VOTE_PROGRAM_ID`, `PROGRAM_CONSTANTS`, `RAW_SHARES_PER_UI_SHARE`, `sharePriceE9ToSol`, `rawSharesToUi`, `COMMISSION_KIND`, `REVENUE_TOKEN_FLAGS`, `METEORA` (DBC and DAMM v2 program ids and fixed PDAs), `CP_AMM_POSITION_NFT_ACCOUNT_SEED`, `TOKEN_PROGRAM_ID`, `TOKEN_2022_PROGRAM_ID`, `ASSOCIATED_TOKEN_PROGRAM_ID`, `NATIVE_MINT`, `INSTRUCTIONS_SYSVAR_ID`, enum types and variant lists |
-| PDAs | `findPoolPda`, `findVaultPda`, `findLenderPda`, `findWithdrawRequestPda`, `findPositionPda`, `findVoteAuthPda`, `findEscrowPda`, `findAdvancePda`, `findFeeIndexPda`, `findQuotePda`, `findSwapPda`, `findRevenueTokenPda`, `findBuybackEscrowPda`, `findBuybackWsolPda`, `findBuybackTokensPda`, `findPartnerTreasuryPda`, `findTreasuryWsolPda` — each returns `[PublicKey, bump]`; `findMeteoraVaultPda` (a Meteora pool's token vault), `findAssociatedTokenAddress`, `findTreasuryTokensAddress` (the treasury's token account for a mint), `findDammPositionPda`, `findDammPositionNftAccount` |
-| Accounts | Types for all 9 accounts; `decodePool`, `decodeLenderShares`, `decodeWithdrawRequest`, `decodeValidatorPosition`, `decodeAdvance`, `decodeFeeIndex`, `decodeFeeQuote`, `decodeSwapPosition`, `decodeRevenueToken`, `decodeAccount`; `ACCOUNT_DISCRIMINATORS`, `ACCOUNT_SIZES`, `FIELD_OFFSETS`, `accountFilters`, `fieldFilter`; `feeIndexHistory`, `feeIndexValueFor`, `revenueHistory`, `trailingRevenue`; `revenueTokenInTerm`, `revenueTokenTermActive`, `revenueTokenRedeemOpen`, `revenueTokenBuybacksPaused` |
-| Events | `EpochEvent` (union of all 34, discriminated by `name`), `EpochEventMap`, `EVENT_DISCRIMINATORS`, `decodeEvent`, `parseEventsFromLogs`, `eventToJson` |
-| Instructions | A builder per instruction (40) plus `onboardWithBond`, `openSwaps` and `sweepPosition`; `INSTRUCTION_DISCRIMINATORS`; `solToLamports`, `lamportsToSolString`; input types (`DepositInput`, …) |
-| Errors | `EPOCH_ERRORS` (90, code 6000 + declaration index, `#[msg]` verbatim), `epochErrorFromCode`, `parseEpochError` |
-| Math | `bpsOf`, `bpsOfCeil`, `mulDiv`, `assetsToShares`, `sharesToAssets`, `sharePriceE9`, `creditLimit`, `splitSweep`, `attributeRepayment`, `distributeIncome`, `juniorRatioBps`, `absorbLoss`, `takerPnl`, `swapCollateral`, `computeScore`, `EpochMathError`; revenue tokens: `splitSweepWithShare`, `sliceDueSlot`, `sliceTiming`, `sliceBudget`, `redeemPayout`, `planBuybackSlice`; Meteora buy quotes: `deltaBase`, `deltaQuote`, `nextSqrtFromQuoteIn`, `dbcBuy`, `dbcMaxQuoteIn`, `dammConcentratedBuy`, `dammConcentratedMaxQuoteIn`, `dammCompoundingBuy`, `dammCompoundingMaxQuoteIn`, `impactTargetSqrtPrice`, `minOutFloor`; treasury claims: `dbcPartnerPart`, `dbcPartnerSurplus`, `dbcPartnerMigrationFee`, `dbcLeftover` |
+| PDAs | `findPoolPda`, `findVaultPda`, `findLenderPda`, `findWithdrawRequestPda`, `findPositionPda`, `findVoteAuthPda`, `findEscrowPda`, `findAdvancePda`, `findFeeIndexPda`, `findIndexOperatorsPda` (the Fee Index operator registry), `findIndexBallotPda` (one program epoch's ballot), `findQuotePda`, `findSwapPda`, `findRevenueTokenPda`, `findBuybackEscrowPda`, `findBuybackWsolPda`, `findBuybackTokensPda`, `findPartnerTreasuryPda`, `findTreasuryWsolPda` — each returns `[PublicKey, bump]`; `findMeteoraVaultPda` (a Meteora pool's token vault), `findAssociatedTokenAddress`, `findTreasuryTokensAddress` (the treasury's token account for a mint), `findDammPositionPda`, `findDammPositionNftAccount` |
+| Accounts | Types for all 13 accounts; `decodePool`, `decodeLenderShares`, `decodeWithdrawRequest`, `decodeValidatorPosition`, `decodeAdvance`, `decodeFeeIndex`, `decodeFeeQuote`, `decodeSwapPosition`, `decodeRevenueToken`, `decodeValidatorHistory`, `decodeScoreConfig`, `decodeIndexOperators`, `decodeIndexBallot`, `decodeAccount`; `ACCOUNT_DISCRIMINATORS`, `ACCOUNT_SIZES`, `FIELD_OFFSETS`, `accountFilters`, `fieldFilter`; `feeIndexHistory`, `feeIndexValueFor`, `activeIndexOperators` (the registry's live slots), `ballotVotes` (the votes cast in a ballot's round), `revenueHistory`, `trailingRevenue`; `revenueTokenInTerm`, `revenueTokenTermActive`, `revenueTokenRedeemOpen`, `revenueTokenBuybacksPaused` |
+| Events | `EpochEvent` (union of all 52, discriminated by `name`), `EpochEventMap`, `EVENT_DISCRIMINATORS`, `decodeEvent`, `parseEventsFromLogs`, `eventToJson` (pubkeys base58, u64 decimal strings, bytes hex; `IndexBallotOpened.operators` as a list of `{ key, weight }` records), `EventJsonValue`, `EventJsonScalar` |
+| Instructions | A builder per instruction (56) plus `onboardWithBond`, `openSwaps` and `sweepPosition`; `INSTRUCTION_DISCRIMINATORS`; `solToLamports`, `lamportsToSolString`; input types (`DepositInput`, …) |
+| Errors | `EPOCH_ERRORS` (117, code 6000 + declaration index, `#[msg]` verbatim), `epochErrorFromCode`, `parseEpochError` |
+| Math | `bpsOf`, `bpsOfCeil`, `mulDiv`, `assetsToShares`, `sharesToAssets`, `sharePriceE9`, `creditLimit`, `splitSweep`, `attributeRepayment`, `distributeIncome`, `juniorRatioBps`, `absorbLoss`, `takerPnl`, `swapCollateral`, `computeScore`, `EpochMathError`; Fee Index consensus: `weightedMedian`, `agreesWithin`, `deviationBps`, `meetsThreshold`, `tallyVotes`; revenue tokens: `splitSweepWithShare`, `sliceDueSlot`, `sliceTiming`, `sliceBudget`, `redeemPayout`, `planBuybackSlice`; Meteora buy quotes: `deltaBase`, `deltaQuote`, `nextSqrtFromQuoteIn`, `dbcBuy`, `dbcMaxQuoteIn`, `dammConcentratedBuy`, `dammConcentratedMaxQuoteIn`, `dammCompoundingBuy`, `dammCompoundingMaxQuoteIn`, `impactTargetSqrtPrice`, `minOutFloor`; treasury claims: `dbcPartnerPart`, `dbcPartnerSurplus`, `dbcPartnerMigrationFee`, `dbcLeftover` |
 | Discriminator lookups | `accountNameOf`, `instructionNameOf`, `eventNameOf`, `ACCOUNT_NAMES`, `INSTRUCTION_NAMES`, `EVENT_NAMES` |
 | Encodings | `base58Encode`, `base58Decode`, `base64Encode`, `base64Decode`, `bytesToHex`, `hexToBytes` |
 
@@ -68,6 +68,11 @@ derived for you; pass the values the program uses as seeds when they are not der
 - `requestAdvance({ …, advanceSeq })`: `position.advance_seq` at send time.
 - `cancelWithdraw` / `processWithdrawal({ …, seq, tranche })`: the request's `seq` and tranche.
 - `withdrawQuote({ maker, epoch })`, `openSwap({ quote })`, `settleSwap({ quote, taker })`.
+- Fee Index consensus: `castIndexVote({ operator, payer?, epoch, value, inputsHash })` (the payer, who funds a
+  ballot the vote opens and gets the rent back on close, defaults to the operator); `submitIndexBallot`,
+  `resetIndexBallot` and `closeIndexBallot({ …, payer })` take the ballot's `epoch` (its PDA seed; the program
+  takes no arguments); `postIndex({ …, soleOperator: true })` appends the registry PDA as `remaining_accounts[0]`,
+  which the program needs to accept a post from the only operator of a one-operator registry.
 
 **Optional accounts.** `Sweep.advance` is an `Option<Account<Advance>>`. Anchor 1.2 reads an optional account as
 `None` when its key equals the executing program's id (`anchor-lang` `accounts/option.rs`), so `sweep({ openAdvance:
@@ -148,6 +153,8 @@ offered as memcmp filters:
 | FeeQuote | 151 | pool 8, maker 40 |
 | SwapPosition | 133 | quote 8, taker 40 |
 | RevenueToken | 503 | pool 8, position 40, vote 72, operator 104, mint 136, dbcPool 200 |
+| IndexOperators | 406 | feeIndex 8 |
+| IndexBallot | 936 | feeIndex 8 |
 
 `accountFilters(name)` gives `[memcmp(discriminator) at 0, dataSize]`; `fieldFilter(name, field, key)` adds a memcmp
 on one of the fields above and throws for anything else. Ring buffers come back raw (`revenue`, `history`);

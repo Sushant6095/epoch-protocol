@@ -1,12 +1,15 @@
 import { sdkEnum, vectors } from './__fixtures__/vectors';
+import { U64_MAX } from './borsh';
 import { type Side } from './constants';
 import {
   absorbLoss,
+  agreesWithin,
   assetsToShares,
   attributeRepayment,
   bpsOf,
   bpsOfCeil,
   type BuyFill,
+  circulatingSupply,
   computeScore,
   creditLimit,
   type CurvePoint,
@@ -17,21 +20,21 @@ import {
   dbcBuy,
   dbcLeftover,
   dbcMaxQuoteIn,
+  dbcMigratedFeeBps,
+  dbcMinBaseFeeNumerator,
   dbcPartnerMigrationFee,
   dbcPartnerPart,
   dbcPartnerSurplus,
   deltaBase,
   deltaQuote,
+  deviationBps,
   distributeIncome,
   EpochMathError,
   impactTargetSqrtPrice,
   juniorRatioBps,
-  minOutFloor,
   maxImpactBound,
-  circulatingSupply,
-  dbcMigratedFeeBps,
-  dbcMinBaseFeeNumerator,
-  venueFeeFloorBps,
+  meetsThreshold,
+  minOutFloor,
   mulDiv,
   nextSqrtFromQuoteIn,
   planBuybackSlice,
@@ -45,6 +48,9 @@ import {
   splitSweepWithShare,
   swapCollateral,
   takerPnl,
+  tallyVotes,
+  venueFeeFloorBps,
+  weightedMedian,
 } from './math';
 
 // web3.js loads its websocket client at import time (rpc-websockets → ESM-only uuid), which jest's CommonJS runtime
@@ -434,5 +440,68 @@ describe('input validation (values the Rust signature cannot hold)', () => {
     expect(error).toBeInstanceOf(RangeError);
     expect((error as EpochMathError).fn).toBe('mulDiv');
     expect((error as EpochMathError).name).toBe('EpochMathError');
+  });
+});
+
+describe('Fee Index consensus (math/consensus.rs worked examples)', () => {
+  const v = (value: bigint, weight: bigint) => ({ value, weight });
+
+  it('two of three equal operators reach two thirds', () => {
+    expect(tallyVotes([v(1_000n, 1n), v(1_004n, 1n)], 100)).toEqual({
+      median: 1_000n,
+      agreeingWeight: 2n,
+      castWeight: 2n,
+    });
+    expect(meetsThreshold(2n, 3n, 6_667)).toBe(true);
+    expect(meetsThreshold(1n, 3n, 6_667)).toBe(false);
+    expect(deviationBps(1_004n, 1_000n)).toBe(40);
+  });
+
+  it('a dissenter is outvoted and its deviation recorded', () => {
+    const t = tallyVotes([v(1_000n, 1n), v(1_004n, 1n), v(1_500n, 1n)], 100);
+    expect(t).toEqual({ median: 1_004n, agreeingWeight: 2n, castWeight: 3n });
+    expect(agreesWithin(1_500n, 1_004n, 100)).toBe(false);
+    expect(deviationBps(1_500n, 1_004n)).toBe(4_941);
+  });
+
+  it('unequal weights: the heaviest operator alone cannot move the index', () => {
+    const t = tallyVotes([v(2_000n, 5n), v(2_010n, 3n), v(1_000n, 2n)], 100);
+    expect(t).toEqual({ median: 2_000n, agreeingWeight: 8n, castWeight: 10n });
+    expect(meetsThreshold(8n, 10n, 6_667)).toBe(true);
+    expect(meetsThreshold(5n, 10n, 6_667)).toBe(false);
+  });
+
+  it('edges', () => {
+    expect(weightedMedian([])).toBeNull();
+    expect(weightedMedian([v(5n, 0n)])).toBeNull();
+    expect(tallyVotes([], 100)).toBeNull();
+    expect(weightedMedian([v(20n, 1n), v(10n, 1n)])).toBe(10n);
+    expect(weightedMedian([v(1n, 1n), v(2n, 1n), v(3n, 5n)])).toBe(3n);
+    expect(agreesWithin(0n, 0n, 0)).toBe(true);
+    expect(agreesWithin(1n, 0n, 1_000)).toBe(false);
+    expect(deviationBps(1n, 0n)).toBe(0xffff_ffff);
+    expect(deviationBps(1_001n, 3n)).toBe(3_326_667);
+    expect(deviationBps(U64_MAX, 1n)).toBe(0xffff_ffff);
+    expect(meetsThreshold(10_000n, 10_000n, 10_000)).toBe(true);
+    expect(meetsThreshold(9_999n, 10_000n, 10_000)).toBe(false);
+    expect(meetsThreshold(0n, 10n, 5_001)).toBe(false);
+    expect(meetsThreshold(5n, 0n, 5_001)).toBe(false);
+    expect(() => tallyVotes([v(1n, U64_MAX), v(1n, 1n)], 0)).toThrow(EpochMathError);
+    expect(() => agreesWithin(-1n, 0n, 0)).toThrow(RangeError);
+    expect(() => meetsThreshold(1n, 1n, 70_000)).toThrow(RangeError);
+  });
+
+  it('6,667 bps is "at least two thirds", lenient by under 1 bps up to the 10,000 weight cap', () => {
+    for (let total = 1n; total <= 10_000n; total += 1n) {
+      for (const agreeing of [(2n * total) / 3n - 1n, (2n * total) / 3n, (2n * total + 2n) / 3n]) {
+        if (agreeing < 1n || agreeing > total) continue;
+        const twoThirds = 3n * agreeing >= 2n * total;
+        const meets = meetsThreshold(agreeing, total, 6_667);
+        if (total <= 300n) expect(meets).toBe(twoThirds);
+        if (twoThirds) expect(meets).toBe(true);
+        // Accepted below two thirds only by less than 1 bps: (2/3 − A/W) × 10,000 < 1.
+        if (meets) expect((2n * total - 3n * agreeing) * 10_000n < 3n * total).toBe(true);
+      }
+    }
   });
 });

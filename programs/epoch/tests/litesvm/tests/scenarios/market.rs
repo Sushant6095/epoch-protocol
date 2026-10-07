@@ -69,6 +69,8 @@ fn veto_as(ctx: &mut TestContext, who: &str) -> TxResult {
 #[test]
 fn fee_index_post_dispute_window_finalize_veto_and_move_limit() {
     let mut ctx = TestContext::with_pool();
+    // post_index refuses an epoch the cluster has not reached: every epoch posted below (800..=802) has started.
+    ctx.warp_to_epoch(802);
     let admin = ctx.key("admin");
     let publisher = ctx.wallet("publisher");
     let intruder = ctx.wallet("intruder");
@@ -205,6 +207,7 @@ fn fee_index_post_dispute_window_finalize_veto_and_move_limit() {
 #[test]
 fn fee_index_history_keeps_the_last_sixteen_points() {
     let mut ctx = with_index(1, 10_000);
+    ctx.warp_to_epoch(817); // the newest epoch posted below has started
     for e in 0..18u64 {
         publish(&mut ctx, 800 + e, 1_000 + e);
     }

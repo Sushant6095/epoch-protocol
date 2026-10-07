@@ -111,20 +111,33 @@ async function expectFinals(history: IndexHistory): Promise<void> {
 it('MemoryIndexHistory reads only the values the program has finalized', () =>
   expectFinals(new MemoryIndexHistory(HISTORY, FINALIZED)));
 
-/** program_events rows as api_app records them: a post's IndexProposed and, once final, an IndexFinalized. */
+/**
+ * program_events rows as api_app records them: a post's IndexProposed and, once final, an IndexFinalized. Under operator
+ * consensus the recorded signature is publisher_app's first vote: BASE + 48's is an IndexVoteCast alone (another
+ * operator's vote reached consensus), BASE + 50's carries the vote and the proposal (a sole operator).
+ */
 function indexEvents() {
-  const event = (signature: string, kind: string, programEpoch: number, value: number) => ({
+  const event = (signature: string, kind: string, programEpoch: number, value: number, ix = 0) => ({
     signature,
-    ix: 0,
+    ix,
     slot: programEpoch,
     kind,
     payload: { epoch: String(programEpoch), value: String(value), slot: String(programEpoch) },
   });
   return HISTORY.flatMap(({ epoch, value }) => {
     const programEpoch = 970_000 + (epoch - BASE);
-    const posted = event(`bot-store-test-post-${epoch}`, 'IndexProposed', programEpoch, value);
+    const signature = `bot-store-test-post-${epoch}`;
+    const posted =
+      epoch === BASE + 48
+        ? [event(signature, 'IndexVoteCast', programEpoch, value)]
+        : epoch === BASE + 50
+          ? [
+              event(signature, 'IndexVoteCast', programEpoch, value),
+              event(signature, 'IndexProposed', programEpoch, value, 1),
+            ]
+          : [event(signature, 'IndexProposed', programEpoch, value)];
     const finalized = event(`bot-store-test-final-${epoch}`, 'IndexFinalized', programEpoch, value);
-    return FINALIZED.has(epoch) ? [posted, finalized] : [posted];
+    return FINALIZED.has(epoch) ? [...posted, finalized] : posted;
   });
 }
 

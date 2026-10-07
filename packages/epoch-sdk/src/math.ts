@@ -805,3 +805,94 @@ export function dbcLeftover(
     'dbcLeftover',
   );
 }
+
+// ─── Fee Index operator consensus (math/consensus.rs) ─────────────────────
+
+const U32_MAX = 0xffff_ffff;
+
+/** One cast vote: the value (µL/CU) and the operator's weight. */
+export interface WeightedVote {
+  value: bigint;
+  weight: bigint;
+}
+
+/** A round's tally: `Tally` in `math/consensus.rs`. */
+export interface ConsensusTally {
+  /** Lower weighted median of the votes cast. */
+  median: bigint;
+  /** Weight within the tolerance of `median`. */
+  agreeingWeight: bigint;
+  castWeight: bigint;
+}
+
+/**
+ * `weighted_median`: the smallest cast value at which the weight of the votes at or below it reaches half of the cast
+ * weight (`2 × cumulative ≥ cast`). Always one of the cast values; null when no vote carries weight.
+ */
+export function weightedMedian(votes: readonly WeightedVote[]): bigint | null {
+  let cast = 0n;
+  for (const vote of votes) {
+    u64(vote.value, 'value');
+    cast += u64(vote.weight, 'weight');
+  }
+  if (cast === 0n) return null;
+  let median: bigint | null = null;
+  for (const candidate of votes) {
+    if (candidate.weight === 0n || (median !== null && median <= candidate.value)) continue;
+    let atOrBelow = 0n;
+    for (const vote of votes) if (vote.value <= candidate.value) atOrBelow += vote.weight;
+    if (atOrBelow * 2n >= cast) median = candidate.value;
+  }
+  return median;
+}
+
+/** `agrees`: `|value − center| × 10,000 ≤ center × toleranceBps`, exactly. At center 0 only 0 agrees. */
+export function agreesWithin(value: bigint, center: bigint, toleranceBps: number): boolean {
+  u64(value, 'value');
+  u64(center, 'center');
+  const diff = value > center ? value - center : center - value;
+  return diff * BPS <= center * uint(toleranceBps, 16, 'toleranceBps');
+}
+
+/**
+ * `deviation_bps`: `|value − center|` in bps of `center`, rounded up, saturating at u32::MAX (also returned for any
+ * non-zero value at center 0). `agreesWithin(v, c, t)` holds exactly when `deviationBps(v, c) ≤ t`.
+ */
+export function deviationBps(value: bigint, center: bigint): number {
+  u64(value, 'value');
+  u64(center, 'center');
+  const diff = value > center ? value - center : center - value;
+  if (diff === 0n) return 0;
+  if (center === 0n) return U32_MAX;
+  const bps = (diff * BPS + center - 1n) / center;
+  return bps > BigInt(U32_MAX) ? U32_MAX : Number(bps);
+}
+
+/**
+ * `meets_threshold`: the agreeing share of the TOTAL registered weight, rounded up to a whole bps, is at least
+ * `thresholdBps` (`agreeing × 10,000 > (thresholdBps − 1) × total`). 6,667 means "at least two thirds". False when
+ * either weight is 0.
+ */
+export function meetsThreshold(agreeingWeight: bigint, totalWeight: bigint, thresholdBps: number): boolean {
+  u64(agreeingWeight, 'agreeingWeight');
+  u64(totalWeight, 'totalWeight');
+  const threshold = uint(thresholdBps, 16, 'thresholdBps');
+  if (totalWeight === 0n || agreeingWeight === 0n) return false;
+  return agreeingWeight * BPS > (threshold > 0n ? threshold - 1n : 0n) * totalWeight;
+}
+
+/**
+ * `tally`: the median, the weight agreeing with it and the cast weight; null when no vote carries weight. A weight
+ * sum above u64 (the program's `checked_add` returns None) throws an `EpochMathError`.
+ */
+export function tallyVotes(votes: readonly WeightedVote[], toleranceBps: number): ConsensusTally | null {
+  const median = weightedMedian(votes);
+  if (median === null) return null;
+  let agreeingWeight = 0n;
+  let castWeight = 0n;
+  for (const vote of votes) {
+    castWeight = toU64(castWeight + vote.weight, 'tally');
+    if (agreesWithin(vote.value, median, toleranceBps)) agreeingWeight = toU64(agreeingWeight + vote.weight, 'tally');
+  }
+  return { median, agreeingWeight, castWeight };
+}

@@ -7,6 +7,8 @@ import {
   decodeAccount,
   decodeAdvance,
   decodeFeeIndex,
+  decodeIndexBallot,
+  decodeIndexOperators,
   decodeFeeQuote,
   decodeLenderShares,
   decodePool,
@@ -17,6 +19,8 @@ import {
   decodeValidatorPosition,
   decodeWithdrawRequest,
   type FeeIndexAccount,
+  type IndexBallotAccount,
+  indexBallotStatus,
   feeIndexHistory,
   feeIndexValueFor,
   FIELD_OFFSETS,
@@ -51,6 +55,8 @@ const DECODERS: Record<AccountName, (data: Uint8Array) => unknown> = {
   RevenueToken: decodeRevenueToken,
   ValidatorHistory: decodeValidatorHistory,
   ScoreConfig: decodeScoreConfig,
+  IndexOperators: decodeIndexOperators,
+  IndexBallot: decodeIndexBallot,
 };
 
 const examples = ACCOUNT_NAMES.flatMap((name) =>
@@ -79,6 +85,8 @@ describe('account layout matches the program (8 + INIT_SPACE)', () => {
       RevenueToken: 503,
       ValidatorHistory: 8352,
       ScoreConfig: 145,
+      IndexOperators: 406,
+      IndexBallot: 936,
     });
   });
 });
@@ -257,6 +265,8 @@ describe('FIELD_OFFSETS', () => {
       RevenueToken: { pool: 8, position: 40, vote: 72, operator: 104, mint: 136, dbcPool: 200 },
       ValidatorHistory: { vote: 8 },
       ScoreConfig: { pool: 8 },
+      IndexOperators: { feeIndex: 8 },
+      IndexBallot: { feeIndex: 8 },
     });
   });
 
@@ -340,5 +350,24 @@ describe('decoder errors', () => {
     const before = hex(index.inputsHash);
     data.fill(0);
     expect(hex(index.inputsHash)).toBe(before);
+  });
+});
+
+describe('indexBallotStatus (IndexBallot::status)', () => {
+  const ballot = (o: Partial<IndexBallotAccount> = {}) =>
+    ({ epoch: 10n, consensusSlot: 0n, proposedSlot: 0n, ...o }) as IndexBallotAccount;
+  const index = (o: Partial<FeeIndexAccount> = {}) =>
+    ({ epoch: 9n, hasProposal: false, proposedEpoch: 0n, proposedSlot: 0n, ...o }) as FeeIndexAccount;
+
+  it('follows the program: settled, voting, queued, proposed, vetoed', () => {
+    expect(indexBallotStatus(ballot({ consensusSlot: 5n, proposedSlot: 5n }), index({ epoch: 10n }))).toBe('settled');
+    expect(indexBallotStatus(ballot(), index({ epoch: 12n }))).toBe('settled'); // skipped over by a later final
+    expect(indexBallotStatus(ballot(), index())).toBe('voting');
+    expect(indexBallotStatus(ballot({ consensusSlot: 5n }), index())).toBe('queued');
+    const pending = index({ hasProposal: true, proposedEpoch: 10n, proposedSlot: 7n });
+    expect(indexBallotStatus(ballot({ consensusSlot: 5n, proposedSlot: 7n }), pending)).toBe('proposed');
+    expect(indexBallotStatus(ballot({ consensusSlot: 5n, proposedSlot: 7n }), index())).toBe('vetoed');
+    // Another proposal in the slot (a post_index of the same epoch at another slot) is not this ballot's.
+    expect(indexBallotStatus(ballot({ consensusSlot: 5n, proposedSlot: 6n }), pending)).toBe('vetoed');
   });
 });

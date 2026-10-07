@@ -1,6 +1,7 @@
 export * from './AccrueJob';
 export * from './BuybackJob';
 export * from './ClaimMevJob';
+export * from './CloseBallotsJob';
 export * from './FinalizeIndexJob';
 export * from './HistoryJob';
 export * from './Job';

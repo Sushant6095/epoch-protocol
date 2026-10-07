@@ -3,7 +3,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::state::{BuybackVenue, Side, Tranche};
+use crate::state::{BuybackVenue, IndexOperator, Side, Tranche};
 
 // ── Pool ───────────────────────────────────────────────────────────────────
 
@@ -202,6 +202,131 @@ pub struct IndexFinalized {
 pub struct IndexVetoed {
     pub epoch: u64,
     pub value: u64,
+}
+
+// ── Fee index operator consensus ───────────────────────────────────────────
+
+/// The operator registry was created; `FeeIndex.publisher` is now the
+/// registry PDA, so values come from ballots.
+#[event]
+pub struct IndexOperatorsInitialized {
+    pub fee_index: Pubkey,
+    pub index_operators: Pubkey,
+    pub threshold_bps: u16,
+    pub tolerance_bps: u16,
+}
+
+#[event]
+pub struct IndexOperatorAdded {
+    pub fee_index: Pubkey,
+    pub operator: Pubkey,
+    pub weight: u32,
+    pub total_weight: u64,
+    pub operator_count: u8,
+}
+
+#[event]
+pub struct IndexOperatorRemoved {
+    pub fee_index: Pubkey,
+    pub operator: Pubkey,
+    pub weight: u32,
+    pub total_weight: u64,
+    pub operator_count: u8,
+}
+
+#[event]
+pub struct IndexOperatorWeightSet {
+    pub fee_index: Pubkey,
+    pub operator: Pubkey,
+    pub old_weight: u32,
+    pub weight: u32,
+    pub total_weight: u64,
+}
+
+#[event]
+pub struct IndexConsensusSet {
+    pub fee_index: Pubkey,
+    pub threshold_bps: u16,
+    pub tolerance_bps: u16,
+}
+
+/// A ballot round opened (round 0 with the first vote; later rounds after a
+/// veto or an admin reset), with the registry snapshot it votes under.
+#[event]
+pub struct IndexBallotOpened {
+    pub fee_index: Pubkey,
+    pub ballot: Pubkey,
+    pub epoch: u64,
+    pub round: u8,
+    pub operators: Vec<IndexOperator>,
+    pub total_weight: u64,
+    pub threshold_bps: u16,
+    pub tolerance_bps: u16,
+    /// Opened by the admin's `reset_index_ballot` rather than by a vote.
+    pub reset: bool,
+    pub slot: u64,
+}
+
+/// One operator's vote. `deviation_bps` and `agrees` are against the median
+/// after this vote (against the agreed value for a late vote); the tally
+/// fields are the round's after this vote.
+#[event]
+pub struct IndexVoteCast {
+    pub fee_index: Pubkey,
+    pub epoch: u64,
+    pub round: u8,
+    pub operator: Pubkey,
+    pub weight: u32,
+    pub value: u64,
+    pub inputs_hash: [u8; 32],
+    pub deviation_bps: u32,
+    pub agrees: bool,
+    /// Replaced the operator's earlier vote this round.
+    pub changed: bool,
+    /// Cast after consensus: recorded, never counted.
+    pub late: bool,
+    pub median_value: u64,
+    pub agreeing_weight: u64,
+    pub total_weight: u64,
+    pub votes_cast: u8,
+    pub slot: u64,
+}
+
+/// The agreeing weight met the threshold. `proposed`: the value went into
+/// `FeeIndex` in the same instruction (`IndexProposed` follows); otherwise it
+/// is queued for `submit_index_ballot`.
+#[event]
+pub struct IndexConsensusReached {
+    pub fee_index: Pubkey,
+    pub epoch: u64,
+    pub round: u8,
+    pub value: u64,
+    pub inputs_hash: [u8; 32],
+    pub agreeing_weight: u64,
+    pub total_weight: u64,
+    pub threshold_bps: u16,
+    pub votes_cast: u8,
+    pub proposed: bool,
+    pub slot: u64,
+}
+
+/// A queued consensus was written into `FeeIndex` (`IndexProposed` follows).
+#[event]
+pub struct IndexBallotSubmitted {
+    pub fee_index: Pubkey,
+    pub epoch: u64,
+    pub round: u8,
+    pub value: u64,
+    pub slot: u64,
+}
+
+#[event]
+pub struct IndexBallotClosed {
+    pub fee_index: Pubkey,
+    pub epoch: u64,
+    pub round: u8,
+    pub payer: Pubkey,
+    pub lamports: u64,
 }
 
 #[event]
@@ -460,4 +585,13 @@ pub struct ScoringConfigured {
     pub count_block_commission: bool,
     pub credits_reference_bps: u16,
     pub max_copy_age_slots: u32,
+}
+
+/// `withdraw_quote` closed the quote: `lamports` (collateral left plus rent) went back to the maker.
+#[event]
+pub struct QuoteWithdrawn {
+    pub quote: Pubkey,
+    pub maker: Pubkey,
+    pub epoch: u64,
+    pub lamports: u64,
 }

@@ -31,7 +31,7 @@ pub enum EpochError {
     InsufficientLiquidity,
     #[msg("Junior tranche is still locked")]
     JuniorLocked,
-    #[msg("Withdrawal would push the junior tranche below its floor")]
+    #[msg("Senior deposit would push the junior tranche below its floor")]
     JuniorFloorBreached,
     #[msg("Withdrawal requests are processed in order; this one is not next")]
     NotHeadOfQueue,
@@ -225,4 +225,40 @@ pub enum EpochError {
     HistoryIsFresh,
     #[msg("Score configuration is out of range")]
     InvalidScoreConfig,
+
+    // ── Fee index operator consensus (appended: earlier codes never move) ─
+    #[msg("Threshold must be 5,001 to 10,000 bps and tolerance at most 1,000 bps")]
+    InvalidConsensusParams,
+    #[msg("Operator weight must be above zero and the total weight at most 10,000")]
+    InvalidOperatorWeight,
+    #[msg("This key is already a Fee Index operator")]
+    IndexOperatorExists,
+    #[msg("The Fee Index already has the maximum of 8 operators")]
+    IndexOperatorsFull,
+    #[msg("This key is not a registered Fee Index operator")]
+    UnknownIndexOperator,
+    #[msg("No Fee Index operators are registered")]
+    NoIndexOperators,
+    #[msg("Signer is not an operator in this ballot round")]
+    NotIndexOperator,
+    #[msg("Consensus was reached: this operator's vote is locked")]
+    VoteLocked,
+    #[msg("That epoch has not started on this cluster; vote after it starts")]
+    IndexEpochNotStarted,
+    #[msg("The ballot has not reached consensus")]
+    NoConsensus,
+    #[msg("The ballot's proposal was already written into the Fee Index")]
+    BallotAlreadyProposed,
+    #[msg("Only a ballot that is voting, queued or vetoed can be reset; veto a pending proposal first")]
+    BallotNotResettable,
+    #[msg("The ballot's epoch is not final yet")]
+    BallotNotClosable,
+    #[msg("Operator consensus is off: the Fee Index has a single publisher")]
+    ConsensusOff,
+    #[msg("The rent goes back to the account that paid for the ballot")]
+    BallotPayerMismatch,
+
+    // ── Quotes (appended: earlier codes never move) ──────────────────────
+    #[msg("The quote has not expired and its epoch has not started")]
+    QuoteNotExpired,
 }

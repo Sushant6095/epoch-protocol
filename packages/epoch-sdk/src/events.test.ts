@@ -78,6 +78,17 @@ describe('eventToJson', () => {
     expect(json.data).toEqual(expected);
     expect(JSON.parse(JSON.stringify(json))).toEqual(json);
   });
+
+  it('turns the operator snapshot of IndexBallotOpened into a list of flat records', () => {
+    const three = rustEvent('IndexBallotOpened', 'a');
+    const json = eventToJson(decodeEvent(fromHex(three.data))!);
+    expect(json.data.operators).toEqual(three.fields.operators);
+    expect((json.data.operators as unknown[]).length).toBe(3);
+    expect(JSON.parse(JSON.stringify(json))).toEqual(json);
+    const none = eventToJson(decodeEvent(fromHex(rustEvent('IndexBallotOpened', 'b').data))!);
+    expect(none.data.operators).toEqual([]);
+    expect(none.data.reset).toBe(true);
+  });
 });
 
 describe('eventToJson with None options (validator history)', () => {

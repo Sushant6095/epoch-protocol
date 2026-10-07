@@ -2,6 +2,7 @@
 import {
   type AdvanceAccount,
   type FeeIndexAccount,
+  type IndexBallotAccount,
   type PoolAccount,
   type PoolParams,
   type RevenueTokenAccount,
@@ -135,6 +136,39 @@ export const feeIndex = (overrides: Partial<FeeIndexAccount> = {}): FeeIndexAcco
   history: Array.from({ length: 16 }, () => ({ epoch: 0n, value: 0n })),
   historyHead: 0,
   historyCount: 0,
+  ...overrides,
+});
+
+/** A Fee Index ballot for `epoch` (three operators of weight 1, nobody voted, no consensus). */
+export const indexBallot = (epoch: bigint, overrides: Partial<IndexBallotAccount> = {}): IndexBallotAccount => ({
+  feeIndex: key(11),
+  epoch,
+  bump: 253,
+  payer: key(60),
+  round: 0,
+  openedSlot: 1n,
+  thresholdBps: 6_667,
+  toleranceBps: 100,
+  totalWeight: 3n,
+  operatorCount: 3,
+  votesCast: 0,
+  votes: Array.from({ length: 8 }, (_, i) => ({
+    operator: i < 3 ? key(60 + i) : key(0),
+    weight: i < 3 ? 1 : 0,
+    voted: false,
+    value: 0n,
+    inputsHash: new Uint8Array(32),
+    slot: 0n,
+    deviationBps: 0,
+    agrees: false,
+    late: false,
+  })),
+  medianValue: 0n,
+  agreeingWeight: 0n,
+  consensusSlot: 0n,
+  consensusValue: 0n,
+  consensusInputsHash: new Uint8Array(32),
+  proposedSlot: 0n,
   ...overrides,
 });
 

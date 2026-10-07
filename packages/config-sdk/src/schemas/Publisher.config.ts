@@ -22,6 +22,23 @@ export const feeIndexEpochOffset = z
   .refine((value) => value === 'auto' || /^-?\d+$/.test(value), 'a whole number or "auto"')
   .transform((value): number | 'auto' => (value === 'auto' ? 'auto' : Number(value)));
 
+/**
+ * Comma-separated keypair paths of the Fee Index operators this process votes for (cast_index_vote), at most 8 (the
+ * registry's size), no duplicates. Empty when unset.
+ */
+export const indexOperatorKeypairPaths = z
+  .string()
+  .trim()
+  .default('')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((path) => path.trim())
+      .filter((path) => path.length > 0),
+  )
+  .refine((paths) => paths.length <= 8, 'at most 8 keypair paths (the operator registry holds 8)')
+  .refine((paths) => new Set(paths).size === paths.length, 'a keypair path is listed twice');
+
 /** publisher_app: the Fee Index publisher (post_index) and Epoch's seeded market maker (post_quote, withdraw_quote). */
 export const PublisherConfigSchema = z.object({
   ...EpochProgramConfigSchema.pick({
@@ -31,8 +48,17 @@ export const PublisherConfigSchema = z.object({
     EPOCH_MARKET_MAKER: true,
   }).shape,
   EPOCH_PROGRAM_ID: address,
-  /** The FeeIndex's `publisher` key; also needs DATABASE_URL. Unset: the index publisher is off. */
+  /**
+   * The FeeIndex's `publisher` key (legacy post_index); also needs DATABASE_URL. With INDEX_OPERATOR_KEYPAIR_PATHS
+   * unset it is also the one operator key that votes once consensus is on. Unset with no operator keys: the index
+   * publisher is off.
+   */
   PUBLISHER_KEYPAIR_PATH: z.string().min(1).optional(),
+  /**
+   * Fee Index operator keys that vote (cast_index_vote) once the admin turns consensus on (initialize_index_operators):
+   * several in one process for a demo, one per process in production. See packages/publisher_app/README.md.
+   */
+  INDEX_OPERATOR_KEYPAIR_PATHS: indexOperatorKeypairPaths,
   /** Epoch's market maker (funds every quote's collateral). Unset: the quote maker is off. */
   MAKER_KEYPAIR_PATH: z.string().min(1).optional(),
   PUBLISHER_CU_PRICE_MICROLAMPORTS: computeUnitPrice,

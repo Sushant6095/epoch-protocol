@@ -1,7 +1,7 @@
 import { findFeeIndexPda, findPoolPda } from '@epoch/epoch-sdk';
 import { Keypair } from '@solana/web3.js';
 
-import { type FeeIndexStatus } from '../../types/Activity.types';
+import { type FeeIndexBallotView, type FeeIndexStatus } from '../../types/Activity.types';
 import { type FeeIndexEpochDeps, FeeIndexEpochService } from './FeeIndexEpochService';
 
 const PROGRAM = Keypair.generate().publicKey;
@@ -15,6 +15,7 @@ function service(
     finals?: Record<number, string>;
     cluster?: string;
     program?: boolean;
+    ballots?: Record<number, FeeIndexBallotView>;
   } = {},
 ) {
   const deps: FeeIndexEpochDeps = {
@@ -22,6 +23,7 @@ function service(
     programPoint: async (epoch) => setup.points?.[epoch] ?? null,
     postedEpoch: async (signature) => setup.posts?.[signature] ?? null,
     finalizedBy: async (programEpoch) => setup.finals?.[programEpoch] ?? null,
+    ballot: async (programEpoch) => setup.ballots?.[programEpoch] ?? null,
     program: { programId: setup.program === false ? null : PROGRAM.toBase58(), cluster: setup.cluster ?? 'devnet' },
     methodologyUrl: 'https://github.com/Sushant6095/epoch-protocol/blob/main/docs/FEE_INDEX_METHODOLOGY.md',
     now: () => Date.parse('2026-10-03T12:00:00Z'),
@@ -102,5 +104,26 @@ describe('FeeIndexEpochService (GET /v1/index/epochs/:epoch)', () => {
       points: { 1_051: { value: 1_400, status: 'final' } },
     }).epoch(1_051);
     expect(view).toMatchObject({ status: 'computed', final: false, onChain: null });
+  });
+
+  it('shows a voted epoch as voting with its ballot (the first vote is its posted signature)', async () => {
+    const ballot = { address: 'ballot', programEpoch: 1_176, round: 0, status: 'voting' } as FeeIndexBallotView;
+    const view = await service({
+      computed: { 1_051: { value: 1_400, postedSignature: 'sigVote' } },
+      posts: { sigVote: 1_176 },
+      points: { 1_176: { value: 1_398, status: 'voting' } },
+      ballots: { 1_176: ballot },
+    }).epoch(1_051);
+    expect(view).toMatchObject({
+      status: 'voting',
+      value: 1_398,
+      final: false,
+      computedValue: 1_400,
+      onChain: { programEpoch: 1_176, postSignature: 'sigVote' },
+    });
+    expect(view.ballot).toBe(ballot);
+    expect(
+      (await service({ computed: { 1_051: { value: 1_400, postedSignature: null } } }).epoch(1_051)).ballot,
+    ).toBeNull();
   });
 });

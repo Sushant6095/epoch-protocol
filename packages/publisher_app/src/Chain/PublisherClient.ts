@@ -2,12 +2,18 @@ import {
   accountFilters,
   decodeFeeIndex,
   decodeFeeQuote,
+  decodeIndexBallot,
+  decodeIndexOperators,
   decodePool,
+  type EpochEvent,
   type FeeIndexAccount,
   type FeeQuoteAccount,
   fieldFilter,
   findFeeIndexPda,
+  findIndexOperatorsPda,
   findPoolPda,
+  type IndexBallotAccount,
+  type IndexOperatorsAccount,
   parseEpochError,
   parseEventsFromLogs,
   type PoolAccount,
@@ -20,15 +26,17 @@ import { sameHash } from '../Index/InputsHash';
 import {
   type ChainClock,
   describeFailure,
+  describeSigner,
   type ExecuteResult,
   type ProgramAccount,
   type PublisherChain,
   type PublisherRole,
+  type PublisherSigner,
 } from './PublisherChain';
 
 const logger = Logger.create('PublisherClient');
 
-/** How far back `findProposalSignature` looks in the publisher key's history. */
+/** How far back `findProposalSignature` and `findVoteSignature` look in a key's history. */
 const PROPOSAL_SEARCH_LIMIT = 50;
 /** Under DRY_RUN an identical action is simulated once per this window, not on every tick. */
 const DRY_RUN_MEMO_MS = 30 * 60_000;
@@ -38,6 +46,8 @@ export interface PublisherClientOptions {
   connections: ConnectionManager;
   /** One sender per configured role; each key pays for its own transactions. */
   senders: Partial<Record<PublisherRole, TransactionSender>>;
+  /** One sender per Fee Index operator key (INDEX_OPERATOR_KEYPAIR_PATHS); each pays for its own votes. */
+  operators?: TransactionSender[];
   computeUnitPriceMicroLamports: number;
   dryRun: boolean;
   now?: () => number;
@@ -48,6 +58,7 @@ export class PublisherClient implements PublisherChain {
   readonly dryRun: boolean;
   private readonly connections: ConnectionManager;
   private readonly senders: Partial<Record<PublisherRole, TransactionSender>>;
+  private readonly operators: TransactionSender[];
   private readonly computeUnitPriceMicroLamports: number;
   private readonly now: () => number;
   private schedule?: Promise<EpochSchedule>;
@@ -58,12 +69,17 @@ export class PublisherClient implements PublisherChain {
     this.dryRun = options.dryRun;
     this.connections = options.connections;
     this.senders = options.senders;
+    this.operators = options.operators ?? [];
     this.computeUnitPriceMicroLamports = options.computeUnitPriceMicroLamports;
     this.now = options.now ?? Date.now;
   }
 
   keyOf(role: PublisherRole): PublicKey | undefined {
     return this.senders[role]?.payerKey;
+  }
+
+  operatorKeys(): PublicKey[] {
+    return this.operators.map((sender) => sender.payerKey);
   }
 
   async clock(): Promise<ChainClock> {
@@ -88,7 +104,21 @@ export class PublisherClient implements PublisherChain {
   }
 
   async feeIndex(): Promise<FeeIndexAccount | null> {
-    return this.loadOne(findFeeIndexPda(this.programId, findPoolPda(this.programId)[0])[0], decodeFeeIndex);
+    return this.loadOne(this.feeIndexAddress(), decodeFeeIndex);
+  }
+
+  async indexOperators(): Promise<IndexOperatorsAccount | null> {
+    return this.loadOne(findIndexOperatorsPda(this.programId, this.feeIndexAddress())[0], decodeIndexOperators);
+  }
+
+  async indexBallots(): Promise<IndexBallotAccount[]> {
+    const accounts = await this.connections.withFailover((c) =>
+      c.getProgramAccounts(this.programId, {
+        commitment: 'confirmed',
+        filters: [...accountFilters('IndexBallot'), fieldFilter('IndexBallot', 'feeIndex', this.feeIndexAddress())],
+      }),
+    );
+    return accounts.map(({ account }) => decodeIndexBallot(account.data));
   }
 
   async quotes(maker: PublicKey): Promise<ProgramAccount<FeeQuoteAccount>[]> {
@@ -112,23 +142,27 @@ export class PublisherClient implements PublisherChain {
   async findProposalSignature(inputsHash: Uint8Array): Promise<string | null> {
     const publisher = this.keyOf('publisher');
     if (!publisher) return null;
-    const signatures = await this.connections.withFailover((c) =>
-      c.getSignaturesForAddress(publisher, { limit: PROPOSAL_SEARCH_LIMIT }, 'confirmed'),
+    return this.findOwnSignature(
+      publisher,
+      (e) => e.name === 'IndexProposed' && sameHash(e.data.inputsHash, inputsHash),
     );
-    for (const { signature, err } of signatures) {
-      if (err) continue;
-      const tx = await this.connections.withFailover((c) =>
-        c.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 }),
-      );
-      const events = parseEventsFromLogs(tx?.meta?.logMessages ?? [], this.programId);
-      if (events.some((e) => e.name === 'IndexProposed' && sameHash(e.data.inputsHash, inputsHash))) return signature;
-    }
-    return null;
   }
 
-  async execute(label: string, instructions: TransactionInstruction[], role: PublisherRole): Promise<ExecuteResult> {
-    const sender = this.senders[role];
-    if (!sender) throw new Error(`no keypair configured for the ${role} role`);
+  async findVoteSignature(operator: PublicKey, inputsHash: Uint8Array): Promise<string | null> {
+    return this.findOwnSignature(
+      operator,
+      (e) => e.name === 'IndexVoteCast' && e.data.operator.equals(operator) && sameHash(e.data.inputsHash, inputsHash),
+    );
+  }
+
+  async execute(
+    label: string,
+    instructions: TransactionInstruction[],
+    signer: PublisherSigner,
+  ): Promise<ExecuteResult> {
+    const sender =
+      typeof signer === 'string' ? this.senders[signer] : this.operators.find((o) => o.payerKey.equals(signer));
+    if (!sender) throw new Error(`no keypair configured for ${describeSigner(signer)}`);
     const options = { computeUnitPriceMicroLamports: this.computeUnitPriceMicroLamports };
 
     if (this.dryRun) {
@@ -177,6 +211,25 @@ export class PublisherClient implements PublisherChain {
         transient: !programError && !isExecutionFailure({ logs, message }),
       };
     }
+  }
+
+  private feeIndexAddress(): PublicKey {
+    return findFeeIndexPda(this.programId, findPoolPda(this.programId)[0])[0];
+  }
+
+  /** The newest successful transaction of `key` (within PROPOSAL_SEARCH_LIMIT) that emitted a matching event. */
+  private async findOwnSignature(key: PublicKey, matches: (event: EpochEvent) => boolean): Promise<string | null> {
+    const signatures = await this.connections.withFailover((c) =>
+      c.getSignaturesForAddress(key, { limit: PROPOSAL_SEARCH_LIMIT }, 'confirmed'),
+    );
+    for (const { signature, err } of signatures) {
+      if (err) continue;
+      const tx = await this.connections.withFailover((c) =>
+        c.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 }),
+      );
+      if (parseEventsFromLogs(tx?.meta?.logMessages ?? [], this.programId).some(matches)) return signature;
+    }
+    return null;
   }
 
   private async loadOne<T>(address: PublicKey, decode: (data: Uint8Array) => T): Promise<T | null> {

@@ -10,6 +10,8 @@ import {
   findDbcPoolPda,
   findEscrowPda,
   findFeeIndexPda,
+  findIndexBallotPda,
+  findIndexOperatorsPda,
   findLenderPda,
   findPartnerTreasuryPda,
   findPoolPda,
@@ -52,6 +54,10 @@ function derive(pda: RustPda): [PublicKey, number] {
       return findAdvancePda(programId, key(i.vote), BigInt(i.seq));
     case 'feeIndex':
       return findFeeIndexPda(programId, key(i.pool));
+    case 'indexOperators':
+      return findIndexOperatorsPda(programId, key(i.feeIndex));
+    case 'indexBallot':
+      return findIndexBallotPda(programId, key(i.feeIndex), BigInt(i.epoch));
     case 'quote':
       return findQuotePda(programId, key(i.maker), BigInt(i.epoch));
     case 'swap':
@@ -90,6 +96,8 @@ describe('PDAs match Pubkey::find_program_address in the program crate', () => {
         'escrow',
         'advance',
         'feeIndex',
+        'indexOperators',
+        'indexBallot',
         'quote',
         'swap',
         'revenueToken',

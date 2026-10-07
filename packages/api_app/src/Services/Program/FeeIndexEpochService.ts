@@ -1,15 +1,17 @@
 import { FEE_INDEX_METHODOLOGY_URL, loadConfig, PantaApiConfigSchema } from '@epoch/config-sdk';
-import { findFeeIndexPda, findPoolPda } from '@epoch/epoch-sdk';
+import { findFeeIndexPda, findIndexBallotPda, findPoolPda } from '@epoch/epoch-sdk';
 import { type EpochDb, epochIndex, PostgresConnectionManager } from '@epoch/pg_models';
 import { PublicKey } from '@solana/web3.js';
 import { eq } from 'drizzle-orm';
 
 import { dbAvailable } from '../../Lib/Db';
+import { type StoredProgramEvent } from '../../Lib/EventBus';
 import { isoIst } from '../../Lib/Stats';
-import { type FeeIndexStatus } from '../../types/Activity.types';
+import { type FeeIndexBallotView, type FeeIndexStatus } from '../../types/Activity.types';
 import { type FeeIndexEpochStatus, type FeeIndexEpochView } from '../../types/Panta.types';
 import { getServices } from '../index';
 import { TimedCache } from '../Panta/TimedCache';
+import { BALLOT_EVENT_NAMES, ballotFromAccount, ballotFromEvents } from './FeeIndexBallotView';
 import { FeeIndexService } from './FeeIndexService';
 
 export const FEE_INDEX_EPOCH_SOURCE = "Epoch indexer (epoch_index) and the Epoch program's FeeIndex account";
@@ -20,8 +22,13 @@ export interface FeeIndexEpochDeps {
   computed(epoch: number): Promise<{ value: number; postedSignature: string | null } | null>;
   /** The program's own value for a PROGRAM epoch (final, proposed or vetoed), or null. */
   programPoint(programEpoch: number): Promise<{ value: number; status: FeeIndexStatus } | null>;
-  /** The program epoch an index post landed under (from its IndexProposed event), or null when not ingested. */
+  /**
+   * The program epoch an index post landed under: its IndexProposed event, or under operator consensus its
+   * IndexVoteCast event (publisher_app records the first vote's signature). Null when not ingested.
+   */
   postedEpoch(signature: string): Promise<number | null>;
+  /** The operator-consensus ballot of a PROGRAM epoch (live account, else rebuilt from events), or null. */
+  ballot?(programEpoch: number): Promise<FeeIndexBallotView | null>;
   /** The `finalize_index` transaction of a PROGRAM epoch (its IndexFinalized event), or null. */
   finalizedBy?(programEpoch: number): Promise<string | null>;
   program: { programId: string | null; cluster: string };
@@ -31,6 +38,7 @@ export interface FeeIndexEpochDeps {
 
 const NOTE =
   'Solana mainnet epoch. pending: no value yet. computed: computed by the indexer, not posted on chain yet. ' +
+  'voting: the registered operators are voting on it (ballot), no agreed value proposed yet. ' +
   'proposed: posted to the FeeIndex account, inside its dispute window. final: the dispute window passed without a ' +
   'veto (what Epoch’s Panta markets resolve from). vetoed: the posted value was vetoed; a corrected value may follow.';
 
@@ -55,6 +63,7 @@ export class FeeIndexEpochService {
     const status: FeeIndexEpochStatus = point?.status ?? (row ? 'computed' : 'pending');
     const finalizeSignature =
       status === 'final' && programEpoch !== null && deps.finalizedBy ? await deps.finalizedBy(programEpoch) : null;
+    const ballot = programEpoch !== null && deps.ballot ? await deps.ballot(programEpoch) : null;
     return {
       schemaVersion: 1,
       kind: 'real',
@@ -77,6 +86,7 @@ export class FeeIndexEpochService {
             finalizeSignature,
           }
         : null,
+      ballot,
       methodology: deps.methodologyUrl,
     };
   }
@@ -99,6 +109,8 @@ export function getFeeIndexEpochService(): FeeIndexEpochService {
   // changes).
   const posts = new TimedCache<Map<string, number>>(30_000, 10 * 60_000, 1);
   const finals = new TimedCache<Map<number, string>>(30_000, 10 * 60_000, 1);
+  // Closed ballots' events, re-read at most every 15 s.
+  const ballotEvents = new TimedCache<StoredProgramEvent[]>(15_000, 10 * 60_000, 1);
   const methodologyUrl = (() => {
     try {
       return loadConfig(PantaApiConfigSchema).PANTA_METHODOLOGY_URL;
@@ -119,10 +131,22 @@ export function getFeeIndexEpochService(): FeeIndexEpochService {
     },
     postedEpoch: async (signature) => {
       const map = await posts.get('posts', async () => {
-        const proposed = await events.query({ names: ['IndexProposed'], limit: 10_000 });
-        return new Map(proposed.map((event) => [event.signature, Number(event.data.epoch)]));
+        const posted = await events.query({ names: ['IndexProposed', 'IndexVoteCast'], limit: 10_000 });
+        return new Map(posted.map((event) => [event.signature, Number(event.data.epoch)]));
       });
       return map.value.get(signature) ?? null;
+    },
+    ballot: async (programEpoch) => {
+      if (!program.configured || !program.programId) return null;
+      const [ballots, index] = await Promise.all([program.indexBallots(), program.feeIndex()]);
+      const live = ballots.find((b) => Number(b.account.epoch) === programEpoch);
+      if (live) return ballotFromAccount(live.address, live.account, index?.account ?? null);
+      const stored = await ballotEvents.get('ballots', () =>
+        events.query({ names: BALLOT_EVENT_NAMES, limit: 10_000 }),
+      );
+      const feeIndex = findFeeIndexPda(program.programId, findPoolPda(program.programId)[0])[0];
+      const address = findIndexBallotPda(program.programId, feeIndex, programEpoch)[0].toBase58();
+      return ballotFromEvents(address, programEpoch, stored.value, index?.account ?? null);
     },
     finalizedBy: async (programEpoch) => {
       const map = await finals.get('finals', async () => {

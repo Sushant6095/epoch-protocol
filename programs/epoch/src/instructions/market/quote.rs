@@ -4,8 +4,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::*, cpi::system::transfer_from_signer, errors::EpochError, events::QuotePosted,
-    math::bps_of, state::*,
+    constants::*,
+    cpi::system::transfer_from_signer,
+    errors::EpochError,
+    events::{QuotePosted, QuoteWithdrawn},
+    math::bps_of,
+    state::*,
 };
 
 #[derive(Accounts)]
@@ -109,13 +113,19 @@ pub struct WithdrawQuote<'info> {
 }
 
 /// Take the collateral back once the quote has expired or its epoch has
-/// settled, and no swap is still open against it. Closing the account
+/// started, and no swap is still open against it. Closing the account
 /// returns rent plus whatever collateral is left after settlements.
 pub fn withdraw_quote(ctx: Context<WithdrawQuote>) -> Result<()> {
     let quote = &ctx.accounts.quote;
     require!(quote.open_swaps == 0, EpochError::QuoteHasOpenSwaps);
     let clock = Clock::get()?;
     let expired = clock.slot >= quote.expiry_slot || clock.epoch >= quote.epoch;
-    require!(expired, EpochError::QuoteHasOpenSwaps);
+    require!(expired, EpochError::QuoteNotExpired);
+    emit!(QuoteWithdrawn {
+        quote: quote.key(),
+        maker: quote.maker,
+        epoch: quote.epoch,
+        lamports: quote.to_account_info().lamports(),
+    });
     Ok(())
 }

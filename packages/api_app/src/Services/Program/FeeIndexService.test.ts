@@ -1,4 +1,4 @@
-import { type FeeIndexAccount } from '@epoch/epoch-sdk';
+import { type FeeIndexAccount, type IndexBallotAccount } from '@epoch/epoch-sdk';
 import { epochIndex, type EpochDb, PostgresConnectionManager, runMigrations } from '@epoch/pg_models';
 import { PublicKey } from '@solana/web3.js';
 import { TransactionRollbackError } from 'drizzle-orm';
@@ -62,11 +62,52 @@ const indexEvent = (
       : { epoch: String(epoch), value: String(value), slot: String(slot) },
 });
 
+/** An open IndexBallot: three operators of weight 1; `votes` are the values cast by the first operators. */
+function ballotAccount(
+  epoch: number,
+  votes: number[],
+  overrides: Partial<IndexBallotAccount> = {},
+): IndexBallotAccount {
+  const operators = [1, 2, 3].map((n) => new PublicKey(new Uint8Array(32).fill(60 + n)));
+  return {
+    feeIndex: PublicKey.default,
+    epoch: BigInt(epoch),
+    bump: 253,
+    payer: operators[0],
+    round: 0,
+    openedSlot: 900n,
+    thresholdBps: 6_667,
+    toleranceBps: 100,
+    totalWeight: 3n,
+    operatorCount: 3,
+    votesCast: votes.length,
+    votes: Array.from({ length: 8 }, (_, i) => ({
+      operator: i < 3 ? operators[i] : PublicKey.default,
+      weight: i < 3 ? 1 : 0,
+      voted: i < votes.length,
+      value: BigInt(votes[i] ?? 0),
+      inputsHash: new Uint8Array(32).fill(i < votes.length ? i + 1 : 0),
+      slot: i < votes.length ? 901n + BigInt(i) : 0n,
+      deviationBps: 0,
+      agrees: i < votes.length,
+      late: false,
+    })),
+    medianValue: BigInt(votes[0] ?? 0),
+    agreeingWeight: BigInt(votes.length),
+    consensusSlot: 0n,
+    consensusValue: 0n,
+    consensusInputsHash: new Uint8Array(32),
+    proposedSlot: 0n,
+    ...overrides,
+  };
+}
+
 async function build(options: {
   account?: FeeIndexAccount | null | Error;
   events?: StoredProgramEvent[];
   computed?: [number, number][] | null;
   configured?: boolean;
+  ballots?: IndexBallotAccount[];
 }) {
   const events = new MemoryEventStore();
   await events.insert(options.events ?? []);
@@ -76,6 +117,8 @@ async function build(options: {
       if (options.account instanceof Error) throw options.account;
       return options.account ? { address: 'fee-index', account: options.account } : null;
     },
+    indexBallots: async () =>
+      (options.ballots ?? []).map((ballot) => ({ address: `ballot-${ballot.epoch}`, account: ballot })),
   };
   const rows = options.computed === undefined ? [] : options.computed;
   const computed: ComputedIndexSource | null =
@@ -114,6 +157,62 @@ describe('FeeIndexService', () => {
     });
     expect(await reproposed.points({ limit: 1 })).toEqual([{ epoch: 1043, value: 1330, status: 'proposed' }]);
     expect((await reproposed.latest()).proposed).toEqual({ epoch: 1043, value: 1330, disputeEndsSlot: 800 + WINDOW });
+  });
+
+  it('shows an epoch still voting (median, then the queued agreed value); the stream carries its ballot', async () => {
+    const voting = await build({ account: account([[1042, 1284]]), ballots: [ballotAccount(1043, [1300])] });
+    expect(await voting.points({ limit: 2 })).toEqual([
+      { epoch: 1043, value: 1300, status: 'voting' },
+      { epoch: 1042, value: 1284, status: 'final' },
+    ]);
+    const { ballot } = await voting.stream();
+    expect(ballot).toMatchObject({
+      address: 'ballot-1043',
+      programEpoch: 1043,
+      status: 'voting',
+      votesCast: 1,
+      agreeingWeight: 1,
+      agreeingBps: 3334,
+      thresholdBps: 6_667,
+      consensus: false,
+      source: 'account',
+    });
+    expect(ballot?.votes.map((v) => v.voted)).toEqual([true, false, false]);
+
+    const queued = await build({
+      account: account([[1042, 1284]]),
+      ballots: [ballotAccount(1043, [1300, 1302], { consensusSlot: 950n, consensusValue: 1300n })],
+    });
+    expect((await queued.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1300, status: 'voting' });
+    expect((await queued.stream()).ballot).toMatchObject({ status: 'queued', consensus: true, agreeingBps: 6667 });
+  });
+
+  it('a ballot reopened after a veto replaces the vetoed point; proposed, final and settled ballots do not', async () => {
+    const events = [indexEvent('IndexProposed', 600, 1043, 1500), indexEvent('IndexVetoed', 700, 1043, 1500)];
+    const reopened = await build({
+      account: account([[1042, 1284]]),
+      events,
+      ballots: [ballotAccount(1043, [1310], { round: 1, openedSlot: 750n })],
+    });
+    expect((await reopened.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1310, status: 'voting' });
+
+    const notYet = await build({
+      account: account([[1042, 1284]]),
+      events,
+      ballots: [ballotAccount(1043, [1500, 1500], { consensusSlot: 590n, consensusValue: 1500n, proposedSlot: 600n })],
+    });
+    expect((await notYet.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1500, status: 'vetoed' });
+    expect((await notYet.stream()).ballot).toMatchObject({ status: 'vetoed' });
+
+    const proposed = await build({
+      account: account([[1042, 1284]], { epoch: 1043, value: 1330, slot: 800 }),
+      ballots: [ballotAccount(1043, [1330, 1331], { consensusSlot: 800n, consensusValue: 1330n, proposedSlot: 800n })],
+    });
+    expect((await proposed.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1330, status: 'proposed' });
+
+    const settled = await build({ account: account([[1042, 1284]]), ballots: [ballotAccount(1042, [1284])] });
+    expect((await settled.points({ limit: 1 }))[0]).toEqual({ epoch: 1042, value: 1284, status: 'final' });
+    expect((await settled.stream()).ballot).toBeNull();
   });
 
   it('trusts a veto newer than the proposal a cached account read still shows', async () => {

@@ -166,6 +166,56 @@ pub mod epoch {
         instructions::veto_index(ctx)
     }
 
+    // ── Fee Index operator consensus ──
+    pub fn initialize_index_operators(
+        ctx: Context<InitializeIndexOperators>,
+        threshold_bps: u16,
+        tolerance_bps: u16,
+    ) -> Result<()> {
+        instructions::initialize_index_operators(ctx, threshold_bps, tolerance_bps)
+    }
+
+    pub fn add_index_operator(ctx: Context<ManageIndexOperator>, weight: u32) -> Result<()> {
+        instructions::add_index_operator(ctx, weight)
+    }
+
+    pub fn remove_index_operator(ctx: Context<ManageIndexOperator>) -> Result<()> {
+        instructions::remove_index_operator(ctx)
+    }
+
+    pub fn set_index_operator_weight(ctx: Context<ManageIndexOperator>, weight: u32) -> Result<()> {
+        instructions::set_index_operator_weight(ctx, weight)
+    }
+
+    pub fn set_index_consensus(
+        ctx: Context<SetIndexConsensus>,
+        threshold_bps: u16,
+        tolerance_bps: u16,
+    ) -> Result<()> {
+        instructions::set_index_consensus(ctx, threshold_bps, tolerance_bps)
+    }
+
+    pub fn cast_index_vote(
+        ctx: Context<CastIndexVote>,
+        epoch: u64,
+        value: u64,
+        inputs_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::cast_index_vote(ctx, epoch, value, inputs_hash)
+    }
+
+    pub fn submit_index_ballot(ctx: Context<SubmitIndexBallot>) -> Result<()> {
+        instructions::submit_index_ballot(ctx)
+    }
+
+    pub fn reset_index_ballot(ctx: Context<ResetIndexBallot>) -> Result<()> {
+        instructions::reset_index_ballot(ctx)
+    }
+
+    pub fn close_index_ballot(ctx: Context<CloseIndexBallot>) -> Result<()> {
+        instructions::close_index_ballot(ctx)
+    }
+
     // ── Fee Market ──
     pub fn post_quote(
         ctx: Context<PostQuote>,

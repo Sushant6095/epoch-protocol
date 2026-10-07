@@ -234,6 +234,53 @@ impl ToJ for [IndexPoint; INDEX_HISTORY] {
         J::Arr(self.iter().map(ToJ::j).collect())
     }
 }
+impl ToJ for IndexOperator {
+    fn j(&self) -> J {
+        let IndexOperator { key, weight } = self;
+        obj(vec![("key", key.j()), ("weight", weight.j())])
+    }
+}
+impl ToJ for [IndexOperator; MAX_INDEX_OPERATORS] {
+    fn j(&self) -> J {
+        J::Arr(self.iter().map(ToJ::j).collect())
+    }
+}
+impl ToJ for Vec<IndexOperator> {
+    fn j(&self) -> J {
+        J::Arr(self.iter().map(ToJ::j).collect())
+    }
+}
+impl ToJ for IndexVote {
+    fn j(&self) -> J {
+        let IndexVote {
+            operator,
+            weight,
+            voted,
+            value,
+            inputs_hash,
+            slot,
+            deviation_bps,
+            agrees,
+            late,
+        } = self;
+        obj(vec![
+            ("operator", operator.j()),
+            ("weight", weight.j()),
+            ("voted", voted.j()),
+            ("value", value.j()),
+            ("inputs_hash", inputs_hash.j()),
+            ("slot", slot.j()),
+            ("deviation_bps", deviation_bps.j()),
+            ("agrees", agrees.j()),
+            ("late", late.j()),
+        ])
+    }
+}
+impl ToJ for [IndexVote; MAX_INDEX_OPERATORS] {
+    fn j(&self) -> J {
+        J::Arr(self.iter().map(ToJ::j).collect())
+    }
+}
 impl ToJ for Tranche {
     fn j(&self) -> J {
         s(format!("{self:?}"))
@@ -820,6 +867,96 @@ fn fee_index_examples(g: &mut Gen) -> Vec<J> {
     out
 }
 
+fn index_operators_json(a: &IndexOperators) -> J {
+    fields!(a, IndexOperators {
+        fee_index, bump, threshold_bps, tolerance_bps, operator_count, total_weight, operators,
+    } skip { _reserved })
+}
+
+fn index_operators_examples(g: &mut Gen) -> Vec<J> {
+    [("empty", 0usize), ("three", 3), ("full", MAX_INDEX_OPERATORS)]
+        .into_iter()
+        .map(|(label, count)| {
+            let mut operators = [IndexOperator::default(); MAX_INDEX_OPERATORS];
+            for op in operators.iter_mut().take(count) {
+                *op = IndexOperator {
+                    key: g.key(),
+                    weight: g.u32(),
+                };
+            }
+            let a = IndexOperators {
+                fee_index: g.key(),
+                bump: g.u8(),
+                threshold_bps: g.u16(),
+                tolerance_bps: g.u16(),
+                operator_count: count as u8,
+                total_weight: g.u64(),
+                operators,
+                _reserved: [0; 64],
+            };
+            let (data, len) = account_bytes(&a, None);
+            example(label, &data, len, index_operators_json(&a), vec![])
+        })
+        .collect()
+}
+
+fn index_ballot_json(a: &IndexBallot) -> J {
+    fields!(a, IndexBallot {
+        fee_index, epoch, bump, payer, round, opened_slot, threshold_bps, tolerance_bps,
+        total_weight, operator_count, votes_cast, votes, median_value, agreeing_weight,
+        consensus_slot, consensus_value, consensus_inputs_hash, proposed_slot,
+    } skip { _reserved })
+}
+
+fn index_ballot_examples(g: &mut Gen) -> Vec<J> {
+    // (label, operators in the snapshot, votes cast, consensus reached)
+    [
+        ("voting", 3usize, 2usize, false),
+        ("consensus", MAX_INDEX_OPERATORS, MAX_INDEX_OPERATORS, true),
+    ]
+    .into_iter()
+    .map(|(label, count, cast, consensus)| {
+        let mut votes = [IndexVote::default(); MAX_INDEX_OPERATORS];
+        for (i, v) in votes.iter_mut().take(count).enumerate() {
+            v.operator = g.key();
+            v.weight = g.u32();
+            if i < cast {
+                v.voted = true;
+                v.value = g.sized();
+                v.inputs_hash = g.bytes32();
+                v.slot = g.u64();
+                v.deviation_bps = g.u32();
+                v.agrees = g.u8() & 1 == 1;
+                v.late = g.u8() & 1 == 1;
+            }
+        }
+        let a = IndexBallot {
+            fee_index: g.key(),
+            epoch: g.u64(),
+            bump: g.u8(),
+            payer: g.key(),
+            round: g.u8(),
+            opened_slot: g.u64(),
+            threshold_bps: g.u16(),
+            tolerance_bps: g.u16(),
+            total_weight: g.u64(),
+            operator_count: count as u8,
+            votes_cast: cast as u8,
+            votes,
+            median_value: g.sized(),
+            agreeing_weight: g.u64(),
+            consensus_slot: if consensus { g.u64() } else { 0 },
+            consensus_value: if consensus { g.sized() } else { 0 },
+            consensus_inputs_hash: if consensus { g.bytes32() } else { [0; 32] },
+            proposed_slot: if consensus { g.u64() } else { 0 },
+            _reserved: [0; 32],
+        };
+        let (data, len) = account_bytes(&a, None);
+        example(label, &data, len, index_ballot_json(&a), vec![])
+    })
+    .collect()
+}
+
 fn quote_json(a: &FeeQuote) -> J {
     fields!(a, FeeQuote {
         pool, maker, epoch, fixed_rate, max_notional, filled_notional, max_move_bps, expiry_slot,
@@ -1290,7 +1427,7 @@ fn account_entry<T: Discriminator + Space>(name: &str, examples: Vec<J>) -> (Str
     )
 }
 
-fn accounts(g: &mut Gen, g2: &mut Gen, g4: &mut Gen) -> J {
+fn accounts(g: &mut Gen, g2: &mut Gen, g4: &mut Gen, g5: &mut Gen) -> J {
     J::Obj(vec![
         account_entry::<Pool>("Pool", pool_examples(g)),
         account_entry::<LenderShares>("LenderShares", lender_examples(g)),
@@ -1308,6 +1445,8 @@ fn accounts(g: &mut Gen, g2: &mut Gen, g4: &mut Gen) -> J {
             history_examples(g4),
         ),
         account_entry::<ScoreConfig>("ScoreConfig", score_config_examples(g4)),
+        account_entry::<IndexOperators>("IndexOperators", index_operators_examples(g5)),
+        account_entry::<IndexBallot>("IndexBallot", index_ballot_examples(g5)),
     ])
 }
 
@@ -1341,7 +1480,7 @@ macro_rules! event {
     }};
 }
 
-fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen, g4: &mut Gen) -> J {
+fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen, g4: &mut Gen, g5: &mut Gen) -> J {
     let mut out = Vec::new();
     for (label, flag) in [("a", true), ("b", false)] {
         let tranche = if flag {
@@ -1849,6 +1988,155 @@ fn events(g: &mut Gen, g2: &mut Gen, g3: &mut Gen, g4: &mut Gen) -> J {
                 count_block_commission: flag,
                 credits_reference_bps: g4.u16(),
                 max_copy_age_slots: g4.u32(),
+            }
+        );
+    }
+    // Fee Index operator consensus (added after that): a fifth sequence, for the same reason.
+    for (label, flag) in [("a", true), ("b", false)] {
+        event!(
+            out,
+            label,
+            IndexOperatorsInitialized {
+                fee_index: g5.key(),
+                index_operators: g5.key(),
+                threshold_bps: g5.u16(),
+                tolerance_bps: g5.u16()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexOperatorAdded {
+                fee_index: g5.key(),
+                operator: g5.key(),
+                weight: g5.u32(),
+                total_weight: g5.u64(),
+                operator_count: g5.u8()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexOperatorRemoved {
+                fee_index: g5.key(),
+                operator: g5.key(),
+                weight: g5.u32(),
+                total_weight: g5.u64(),
+                operator_count: g5.u8()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexOperatorWeightSet {
+                fee_index: g5.key(),
+                operator: g5.key(),
+                old_weight: g5.u32(),
+                weight: g5.u32(),
+                total_weight: g5.u64()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexConsensusSet {
+                fee_index: g5.key(),
+                threshold_bps: g5.u16(),
+                tolerance_bps: g5.u16()
+            }
+        );
+        // "a" carries a three-operator snapshot, "b" an empty one (a zero-length Vec).
+        let operators: Vec<IndexOperator> = (0..if flag { 3 } else { 0 })
+            .map(|_| IndexOperator {
+                key: g5.key(),
+                weight: g5.u32(),
+            })
+            .collect();
+        event!(
+            out,
+            label,
+            IndexBallotOpened {
+                fee_index: g5.key(),
+                ballot: g5.key(),
+                epoch: g5.u64(),
+                round: g5.u8(),
+                operators: operators.clone(),
+                total_weight: g5.u64(),
+                threshold_bps: g5.u16(),
+                tolerance_bps: g5.u16(),
+                reset: !flag,
+                slot: g5.u64()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexVoteCast {
+                fee_index: g5.key(),
+                epoch: g5.u64(),
+                round: g5.u8(),
+                operator: g5.key(),
+                weight: g5.u32(),
+                value: g5.sized(),
+                inputs_hash: g5.bytes32(),
+                deviation_bps: g5.u32(),
+                agrees: flag,
+                changed: !flag,
+                late: !flag,
+                median_value: g5.sized(),
+                agreeing_weight: g5.u64(),
+                total_weight: g5.u64(),
+                votes_cast: g5.u8(),
+                slot: g5.u64()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexConsensusReached {
+                fee_index: g5.key(),
+                epoch: g5.u64(),
+                round: g5.u8(),
+                value: g5.sized(),
+                inputs_hash: g5.bytes32(),
+                agreeing_weight: g5.u64(),
+                total_weight: g5.u64(),
+                threshold_bps: g5.u16(),
+                votes_cast: g5.u8(),
+                proposed: flag,
+                slot: g5.u64()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexBallotSubmitted {
+                fee_index: g5.key(),
+                epoch: g5.u64(),
+                round: g5.u8(),
+                value: g5.sized(),
+                slot: g5.u64()
+            }
+        );
+        event!(
+            out,
+            label,
+            IndexBallotClosed {
+                fee_index: g5.key(),
+                epoch: g5.u64(),
+                round: g5.u8(),
+                payer: g5.key(),
+                lamports: g5.u64(),
+            }
+        );
+        event!(
+            out,
+            label,
+            QuoteWithdrawn {
+                quote: g5.key(),
+                maker: g5.key(),
+                epoch: g5.u64(),
+                lamports: g5.u64(),
             }
         );
     }
@@ -3144,6 +3432,191 @@ fn treasury_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
 
 // ─── PDAs ──────────────────────────────────────────────────────────────────
 
+/// Fee Index operator consensus: the nine new instructions and `post_index` through the
+/// sole-operator shortcut (the registry appended as `remaining_accounts[0]`).
+fn consensus_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
+    let system = anchor_lang::solana_program::system_program::ID;
+    let (admin, cranker) = (k(1), k(6));
+    let (payer, operator) = (k(17), k(18));
+    let pool = addr(&[POOL_SEED], &pid);
+    let fee_index = addr(&[FEE_INDEX_SEED, pool.as_ref()], &pid);
+    let index_operators = addr(&[INDEX_OPERATORS_SEED, fee_index.as_ref()], &pid);
+    let ballot = |epoch: u64| {
+        addr(
+            &[INDEX_BALLOT_SEED, fee_index.as_ref(), &epoch.to_le_bytes()],
+            &pid,
+        )
+    };
+    let mut out = Vec::new();
+    ix!(
+        out,
+        pid,
+        "initialize_index_operators",
+        "default",
+        InitializeIndexOperators {
+            threshold_bps: DEFAULT_INDEX_THRESHOLD_BPS,
+            tolerance_bps: DEFAULT_INDEX_TOLERANCE_BPS
+        },
+        InitializeIndexOperators {
+            admin,
+            pool,
+            fee_index,
+            index_operators,
+            system_program: system
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "add_index_operator",
+        "default",
+        AddIndexOperator { weight: g.u32() },
+        ManageIndexOperator {
+            admin,
+            pool,
+            fee_index,
+            index_operators,
+            operator
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "remove_index_operator",
+        "default",
+        RemoveIndexOperator,
+        ManageIndexOperator {
+            admin,
+            pool,
+            fee_index,
+            index_operators,
+            operator
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "set_index_operator_weight",
+        "default",
+        SetIndexOperatorWeight { weight: g.u32() },
+        ManageIndexOperator {
+            admin,
+            pool,
+            fee_index,
+            index_operators,
+            operator
+        },
+        context {}
+    );
+    ix!(
+        out,
+        pid,
+        "set_index_consensus",
+        "default",
+        SetIndexConsensus {
+            threshold_bps: g.u16(),
+            tolerance_bps: g.u16()
+        },
+        SetIndexConsensus {
+            admin,
+            pool,
+            fee_index,
+            index_operators
+        },
+        context {}
+    );
+    for (label, epoch, voter_pays) in [("operator_pays", 813u64, true), ("separate_payer", (1 << 53) + 1, false)] {
+        ix!(
+            out,
+            pid,
+            "cast_index_vote",
+            label,
+            CastIndexVote {
+                epoch,
+                value: g.u64(),
+                inputs_hash: g.bytes32()
+            },
+            CastIndexVote {
+                payer: if voter_pays { operator } else { payer },
+                operator,
+                fee_index,
+                index_operators,
+                ballot: ballot(epoch),
+                system_program: system
+            },
+            context {}
+        );
+    }
+    ix!(
+        out,
+        pid,
+        "submit_index_ballot",
+        "default",
+        SubmitIndexBallot,
+        SubmitIndexBallot {
+            cranker,
+            fee_index,
+            index_operators,
+            ballot: ballot(813)
+        },
+        context { epoch: 813u64 }
+    );
+    ix!(
+        out,
+        pid,
+        "reset_index_ballot",
+        "default",
+        ResetIndexBallot,
+        ResetIndexBallot {
+            admin,
+            pool,
+            fee_index,
+            index_operators,
+            ballot: ballot(814)
+        },
+        context { epoch: 814u64 }
+    );
+    ix!(
+        out,
+        pid,
+        "close_index_ballot",
+        "default",
+        CloseIndexBallot,
+        CloseIndexBallot {
+            cranker,
+            fee_index,
+            ballot: ballot(u64::MAX),
+            payer
+        },
+        context { epoch: u64::MAX }
+    );
+    ix!(
+        out,
+        pid,
+        "post_index",
+        "sole_operator",
+        PostIndex {
+            epoch: 813,
+            value: g.u64(),
+            inputs_hash: g.bytes32()
+        },
+        PostIndex {
+            publisher: operator,
+            fee_index
+        },
+        context { index_operators }
+    );
+    // The program reads the registry from remaining_accounts[0], which the Accounts struct does not list.
+    out.last_mut()
+        .expect("post_index vector")
+        .metas
+        .push(AccountMeta::new_readonly(index_operators, false));
+    out
+}
+
 fn pdas(pid: &Pubkey) -> J {
     let mut out = Vec::new();
     let mut push = |kind: &str, inputs: Vec<(&str, J)>, seeds: &[&[u8]]| {
@@ -3218,6 +3691,19 @@ fn pdas(pid: &Pubkey) -> J {
         vec![("pool", pool.j())],
         &[FEE_INDEX_SEED, pool.as_ref()],
     );
+    let fee_index = addr(&[FEE_INDEX_SEED, pool.as_ref()], pid);
+    push(
+        "indexOperators",
+        vec![("feeIndex", fee_index.j())],
+        &[INDEX_OPERATORS_SEED, fee_index.as_ref()],
+    );
+    for epoch in [0u64, 1, 1051, 255, 256, (1 << 53) + 1, u64::MAX] {
+        push(
+            "indexBallot",
+            vec![("feeIndex", fee_index.j()), ("epoch", epoch.j())],
+            &[INDEX_BALLOT_SEED, fee_index.as_ref(), &epoch.to_le_bytes()],
+        );
+    }
     for (maker, epoch) in [(k(15), 0u64), (k(15), 813), (k(99), u64::MAX)] {
         push(
             "quote",
@@ -3387,6 +3873,22 @@ fn errors() -> J {
         InvalidHedgeAccount,
         HistoryIsFresh,
         InvalidScoreConfig,
+        InvalidConsensusParams,
+        InvalidOperatorWeight,
+        IndexOperatorExists,
+        IndexOperatorsFull,
+        UnknownIndexOperator,
+        NoIndexOperators,
+        NotIndexOperator,
+        VoteLocked,
+        IndexEpochNotStarted,
+        NoConsensus,
+        BallotAlreadyProposed,
+        BallotNotResettable,
+        BallotNotClosable,
+        ConsensusOff,
+        BallotPayerMismatch,
+        QuoteNotExpired,
     ))
 }
 
@@ -4646,6 +5148,8 @@ fn main() {
     let mut g3 = Gen(0x0e70_c4e9_5d1c_0003);
     // Validator history: a fourth sequence.
     let mut g4 = Gen(0x0e70_c4e9_5d1c_0004);
+    // Fee Index operator consensus and quote withdrawals: a fifth sequence.
+    let mut g5 = Gen(0x0e70_c4e9_5d1c_0005);
 
     let mut ixs: Vec<J> = instructions(&mut g, program_id)
         .into_iter()
@@ -4664,6 +5168,11 @@ fn main() {
     );
     ixs.extend(
         history_instructions(&mut g4, program_id)
+            .into_iter()
+            .map(Ix::json),
+    );
+    ixs.extend(
+        consensus_instructions(&mut g5, program_id)
             .into_iter()
             .map(Ix::json),
     );
@@ -4689,6 +5198,8 @@ fn main() {
                 ("escrow", s(String::from_utf8_lossy(ESCROW_SEED))),
                 ("advance", s(String::from_utf8_lossy(ADVANCE_SEED))),
                 ("feeIndex", s(String::from_utf8_lossy(FEE_INDEX_SEED))),
+                ("indexOperators", s(String::from_utf8_lossy(INDEX_OPERATORS_SEED))),
+                ("indexBallot", s(String::from_utf8_lossy(INDEX_BALLOT_SEED))),
                 ("quote", s(String::from_utf8_lossy(QUOTE_SEED))),
                 ("swap", s(String::from_utf8_lossy(SWAP_SEED))),
                 ("revenueToken", s(String::from_utf8_lossy(REVENUE_TOKEN_SEED))),
@@ -4713,6 +5224,12 @@ fn main() {
                 ("MIN_REVENUE_HISTORY", MIN_REVENUE_HISTORY.j()),
                 ("DEFAULT_AFTER_LATE_EPOCHS", DEFAULT_AFTER_LATE_EPOCHS.j()),
                 ("INDEX_HISTORY", J::Int(INDEX_HISTORY as i64)),
+                ("MAX_INDEX_OPERATORS", J::Int(MAX_INDEX_OPERATORS as i64)),
+                ("MAX_INDEX_TOTAL_WEIGHT", J::Int(MAX_INDEX_TOTAL_WEIGHT as i64)),
+                ("DEFAULT_INDEX_THRESHOLD_BPS", DEFAULT_INDEX_THRESHOLD_BPS.j()),
+                ("MIN_INDEX_THRESHOLD_BPS", MIN_INDEX_THRESHOLD_BPS.j()),
+                ("DEFAULT_INDEX_TOLERANCE_BPS", DEFAULT_INDEX_TOLERANCE_BPS.j()),
+                ("MAX_INDEX_TOLERANCE_BPS", MAX_INDEX_TOLERANCE_BPS.j()),
                 ("VOTE_PROGRAM_ID", VOTE_PROGRAM_ID.j()),
                 ("MIN_SHARE_BPS", MIN_SHARE_BPS.j()),
                 ("MAX_SHARE_BPS", MAX_SHARE_BPS.j()),
@@ -4764,9 +5281,9 @@ fn main() {
                 ("PF_DISTRIBUTION_ACCOUNT_SEED", s(String::from_utf8_lossy(PF_DISTRIBUTION_ACCOUNT_SEED))),
             ]),
         ),
-        ("accounts", accounts(&mut g, &mut g2, &mut g4)),
+        ("accounts", accounts(&mut g, &mut g2, &mut g4, &mut g5)),
         ("instructions", J::Arr(ixs)),
-        ("events", events(&mut g, &mut g2, &mut g3, &mut g4)),
+        ("events", events(&mut g, &mut g2, &mut g3, &mut g4, &mut g5)),
         ("pdas", pdas(&program_id)),
         ("errors", errors()),
         ("math", math(&mut g, &mut g2, &mut g3)),

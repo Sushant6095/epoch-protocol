@@ -37,8 +37,66 @@ export interface ActivityFeed extends Meta {
 }
 
 // ── GET /v1/index · WS /v1/stream channel `feeIndex` ────────────────────────────────────────────────
-/** "vetoed": the admin dropped the proposal inside its dispute window; it stays visible until a new one is posted. */
-export type FeeIndexStatus = 'final' | 'proposed' | 'vetoed';
+/**
+ * "vetoed": the admin dropped the proposal inside its dispute window; it stays visible until a new one is posted.
+ * "voting": operator consensus is open for the epoch (no agreed value yet, or an agreed value queued until the
+ * FeeIndex can take it); the value is the current weighted median of the votes (the agreed value once queued).
+ */
+export type FeeIndexStatus = 'final' | 'proposed' | 'vetoed' | 'voting';
+
+/** One operator's slot in a Fee Index ballot round. */
+export interface FeeIndexBallotVote {
+  operator: string;
+  /** Registry weight in the round's snapshot. */
+  weight: number;
+  voted: boolean;
+  /** µL/CU; null when not voted. */
+  value: number | null;
+  /** Hex sha256 of the operator's inputs (publisher_app Index/InputsHash.ts); null when not voted. */
+  inputsHash: string | null;
+  /** From the weighted median before consensus, from the agreed value after it, in bps rounded up; null when not voted. */
+  deviationBps: number | null;
+  /** Within the tolerance of the median (of the agreed value after consensus); null when not voted. */
+  agrees: boolean | null;
+  /** Cast after consensus: on the record, never counted. */
+  late: boolean;
+  /** Program-cluster slot of the vote; null when not voted. */
+  slot: number | null;
+}
+
+/**
+ * A Fee Index ballot (operator consensus, docs/FEE_INDEX_METHODOLOGY.md): the current round's operators, weights,
+ * values and deviations, and whether the agreeing weight reached the threshold.
+ */
+export interface FeeIndexBallotView {
+  /** IndexBallot account, PDA ["index_ballot", fee_index, epoch le-bytes]. */
+  address: string;
+  /** Program epoch voted on. */
+  programEpoch: number;
+  /** 0 for the first round; +1 each time a vetoed or stuck ballot reopens. */
+  round: number;
+  /** voting · queued (agreed, waiting for the FeeIndex) · proposed (in the dispute window) · vetoed · settled. */
+  status: 'voting' | 'queued' | 'proposed' | 'vetoed' | 'settled';
+  /** Agreeing weight needed, bps of the total registered weight (two thirds = 6,667). */
+  thresholdBps: number;
+  /** A vote agrees when within this many bps of the weighted median. */
+  toleranceBps: number;
+  totalWeight: number;
+  agreeingWeight: number;
+  /** agreeingWeight as bps of totalWeight, rounded up as the program compares it. */
+  agreeingBps: number;
+  votesCast: number;
+  operatorCount: number;
+  /** Weighted median of the votes cast (µL/CU); null before the first vote of the round. */
+  medianValue: number | null;
+  consensus: boolean;
+  /** The agreed value; null before consensus. */
+  consensusValue: number | null;
+  consensusSlot: number | null;
+  votes: FeeIndexBallotVote[];
+  /** `account`: the live IndexBallot; `events`: rebuilt from the indexed events once the account is closed. */
+  source: 'account' | 'events';
+}
 
 /** The contract's FeeIndexPoint: the computed point plus the program's status (request #3). */
 export interface FeeIndexPoint extends ComputedFeeIndexPoint {
@@ -63,6 +121,11 @@ export interface FeeIndexLatest {
 export interface FeeIndexStreamData extends FeeIndexLatest {
   /** The 16 newest points, newest first, as `GET /v1/index?limit=16` returns them. */
   points: FeeIndexPoint[];
+  /**
+   * Operator consensus progress: the newest ballot that is not settled (voting, queued, proposed or vetoed); null
+   * when none is open or consensus is off. Pushed on every vote.
+   */
+  ballot: FeeIndexBallotView | null;
 }
 
 // ── WS /v1/stream ───────────────────────────────────────────────────────────────────────────────────

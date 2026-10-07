@@ -78,6 +78,116 @@
       "args": []
     },
     {
+      "name": "add_index_operator",
+      "discriminator": [
+        53,
+        84,
+        242,
+        152,
+        120,
+        218,
+        183,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          },
+          "relations": [
+            "index_operators"
+          ]
+        },
+        {
+          "name": "index_operators",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operator"
+        }
+      ],
+      "args": [
+        {
+          "name": "weight",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "burn_leftover",
       "discriminator": [
         58,
@@ -270,6 +380,153 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "cast_index_vote",
+      "discriminator": [
+        193,
+        124,
+        112,
+        119,
+        50,
+        188,
+        106,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Pays the ballot's rent when this vote creates it (refunded on close)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "operator",
+          "docs": [
+            "A registered operator in the ballot's current round."
+          ],
+          "signer": true
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index.pool",
+                "account": "FeeIndex"
+              }
+            ]
+          },
+          "relations": [
+            "index_operators"
+          ]
+        },
+        {
+          "name": "index_operators",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ballot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  98,
+                  97,
+                  108,
+                  108,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              },
+              {
+                "kind": "arg",
+                "path": "epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "value",
+          "type": "u64"
+        },
+        {
+          "name": "inputs_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "claim_partner_migration_fee",
@@ -935,6 +1192,99 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_index_ballot",
+      "discriminator": [
+        230,
+        80,
+        84,
+        119,
+        35,
+        160,
+        233,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone."
+          ],
+          "signer": true
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index.pool",
+                "account": "FeeIndex"
+              }
+            ]
+          },
+          "relations": [
+            "ballot"
+          ]
+        },
+        {
+          "name": "ballot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  98,
+                  97,
+                  108,
+                  108,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              },
+              {
+                "kind": "account",
+                "path": "ballot.epoch",
+                "account": "IndexBallot"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "relations": [
+            "ballot"
+          ]
         }
       ],
       "args": []
@@ -2068,6 +2418,120 @@
       ]
     },
     {
+      "name": "initialize_index_operators",
+      "discriminator": [
+        184,
+        53,
+        52,
+        228,
+        137,
+        109,
+        113,
+        247
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "index_operators",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "threshold_bps",
+          "type": "u16"
+        },
+        {
+          "name": "tolerance_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "initialize_pool",
       "discriminator": [
         95,
@@ -2626,10 +3090,10 @@
       "accounts": [
         {
           "name": "publisher",
-          "signer": true,
-          "relations": [
-            "fee_index"
-          ]
+          "docs": [
+            "`fee_index.publisher`, or the sole operator of a one-operator registry."
+          ],
+          "signer": true
         },
         {
           "name": "fee_index",
@@ -3591,6 +4055,111 @@
       "args": []
     },
     {
+      "name": "remove_index_operator",
+      "discriminator": [
+        27,
+        157,
+        232,
+        215,
+        0,
+        209,
+        204,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          },
+          "relations": [
+            "index_operators"
+          ]
+        },
+        {
+          "name": "index_operators",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operator"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "request_advance",
       "discriminator": [
         30,
@@ -3813,6 +4382,142 @@
       ]
     },
     {
+      "name": "reset_index_ballot",
+      "discriminator": [
+        120,
+        242,
+        35,
+        233,
+        150,
+        55,
+        202,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          },
+          "relations": [
+            "index_operators",
+            "ballot"
+          ]
+        },
+        {
+          "name": "index_operators",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ballot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  98,
+                  97,
+                  108,
+                  108,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              },
+              {
+                "kind": "account",
+                "path": "ballot.epoch",
+                "account": "IndexBallot"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "set_collectors",
       "discriminator": [
         159,
@@ -3914,6 +4619,227 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "set_index_consensus",
+      "discriminator": [
+        64,
+        229,
+        225,
+        67,
+        232,
+        149,
+        171,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          },
+          "relations": [
+            "index_operators"
+          ]
+        },
+        {
+          "name": "index_operators",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "threshold_bps",
+          "type": "u16"
+        },
+        {
+          "name": "tolerance_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_index_operator_weight",
+      "discriminator": [
+        57,
+        47,
+        206,
+        94,
+        153,
+        166,
+        194,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "fee_index"
+          ]
+        },
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          },
+          "relations": [
+            "index_operators"
+          ]
+        },
+        {
+          "name": "index_operators",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operator"
+        }
+      ],
+      "args": [
+        {
+          "name": "weight",
+          "type": "u32"
+        }
+      ]
     },
     {
       "name": "set_paused",
@@ -4111,6 +5037,125 @@
               {
                 "kind": "account",
                 "path": "taker"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submit_index_ballot",
+      "discriminator": [
+        247,
+        68,
+        69,
+        118,
+        147,
+        65,
+        182,
+        9
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone."
+          ],
+          "signer": true
+        },
+        {
+          "name": "fee_index",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index.pool",
+                "account": "FeeIndex"
+              }
+            ]
+          },
+          "relations": [
+            "index_operators",
+            "ballot"
+          ]
+        },
+        {
+          "name": "index_operators",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ballot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  100,
+                  101,
+                  120,
+                  95,
+                  98,
+                  97,
+                  108,
+                  108,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index"
+              },
+              {
+                "kind": "account",
+                "path": "ballot.epoch",
+                "account": "IndexBallot"
               }
             ]
           }
@@ -5087,6 +6132,32 @@
       ]
     },
     {
+      "name": "IndexBallot",
+      "discriminator": [
+        73,
+        220,
+        215,
+        30,
+        68,
+        189,
+        28,
+        83
+      ]
+    },
+    {
+      "name": "IndexOperators",
+      "discriminator": [
+        59,
+        20,
+        65,
+        136,
+        24,
+        75,
+        192,
+        107
+      ]
+    },
+    {
       "name": "LenderShares",
       "discriminator": [
         92,
@@ -5349,6 +6420,71 @@
       ]
     },
     {
+      "name": "IndexBallotClosed",
+      "discriminator": [
+        138,
+        187,
+        34,
+        23,
+        34,
+        195,
+        84,
+        71
+      ]
+    },
+    {
+      "name": "IndexBallotOpened",
+      "discriminator": [
+        241,
+        21,
+        181,
+        209,
+        101,
+        34,
+        215,
+        152
+      ]
+    },
+    {
+      "name": "IndexBallotSubmitted",
+      "discriminator": [
+        58,
+        200,
+        114,
+        238,
+        220,
+        189,
+        183,
+        57
+      ]
+    },
+    {
+      "name": "IndexConsensusReached",
+      "discriminator": [
+        50,
+        111,
+        1,
+        253,
+        151,
+        76,
+        92,
+        182
+      ]
+    },
+    {
+      "name": "IndexConsensusSet",
+      "discriminator": [
+        243,
+        7,
+        217,
+        59,
+        39,
+        74,
+        172,
+        242
+      ]
+    },
+    {
       "name": "IndexFinalized",
       "discriminator": [
         220,
@@ -5359,6 +6495,58 @@
         165,
         201,
         162
+      ]
+    },
+    {
+      "name": "IndexOperatorAdded",
+      "discriminator": [
+        230,
+        63,
+        118,
+        191,
+        146,
+        159,
+        195,
+        21
+      ]
+    },
+    {
+      "name": "IndexOperatorRemoved",
+      "discriminator": [
+        153,
+        75,
+        208,
+        67,
+        182,
+        8,
+        116,
+        1
+      ]
+    },
+    {
+      "name": "IndexOperatorWeightSet",
+      "discriminator": [
+        203,
+        103,
+        20,
+        76,
+        30,
+        148,
+        33,
+        116
+      ]
+    },
+    {
+      "name": "IndexOperatorsInitialized",
+      "discriminator": [
+        242,
+        206,
+        143,
+        74,
+        3,
+        96,
+        2,
+        54
       ]
     },
     {
@@ -5385,6 +6573,19 @@
         24,
         194,
         132
+      ]
+    },
+    {
+      "name": "IndexVoteCast",
+      "discriminator": [
+        106,
+        53,
+        13,
+        151,
+        35,
+        117,
+        100,
+        224
       ]
     },
     {
@@ -5450,6 +6651,19 @@
         130,
         239,
         156
+      ]
+    },
+    {
+      "name": "QuoteWithdrawn",
+      "discriminator": [
+        201,
+        132,
+        14,
+        18,
+        98,
+        162,
+        155,
+        141
       ]
     },
     {
@@ -5790,7 +7004,7 @@
     {
       "code": 6012,
       "name": "JuniorFloorBreached",
-      "msg": "Withdrawal would push the junior tranche below its floor"
+      "msg": "Senior deposit would push the junior tranche below its floor"
     },
     {
       "code": 6013,
@@ -6231,6 +7445,86 @@
       "code": 6100,
       "name": "InvalidScoreConfig",
       "msg": "Score configuration is out of range"
+    },
+    {
+      "code": 6101,
+      "name": "InvalidConsensusParams",
+      "msg": "Threshold must be 5,001 to 10,000 bps and tolerance at most 1,000 bps"
+    },
+    {
+      "code": 6102,
+      "name": "InvalidOperatorWeight",
+      "msg": "Operator weight must be above zero and the total weight at most 10,000"
+    },
+    {
+      "code": 6103,
+      "name": "IndexOperatorExists",
+      "msg": "This key is already a Fee Index operator"
+    },
+    {
+      "code": 6104,
+      "name": "IndexOperatorsFull",
+      "msg": "The Fee Index already has the maximum of 8 operators"
+    },
+    {
+      "code": 6105,
+      "name": "UnknownIndexOperator",
+      "msg": "This key is not a registered Fee Index operator"
+    },
+    {
+      "code": 6106,
+      "name": "NoIndexOperators",
+      "msg": "No Fee Index operators are registered"
+    },
+    {
+      "code": 6107,
+      "name": "NotIndexOperator",
+      "msg": "Signer is not an operator in this ballot round"
+    },
+    {
+      "code": 6108,
+      "name": "VoteLocked",
+      "msg": "Consensus was reached: this operator's vote is locked"
+    },
+    {
+      "code": 6109,
+      "name": "IndexEpochNotStarted",
+      "msg": "That epoch has not started on this cluster; vote after it starts"
+    },
+    {
+      "code": 6110,
+      "name": "NoConsensus",
+      "msg": "The ballot has not reached consensus"
+    },
+    {
+      "code": 6111,
+      "name": "BallotAlreadyProposed",
+      "msg": "The ballot's proposal was already written into the Fee Index"
+    },
+    {
+      "code": 6112,
+      "name": "BallotNotResettable",
+      "msg": "Only a ballot that is voting, queued or vetoed can be reset; veto a pending proposal first"
+    },
+    {
+      "code": 6113,
+      "name": "BallotNotClosable",
+      "msg": "The ballot's epoch is not final yet"
+    },
+    {
+      "code": 6114,
+      "name": "ConsensusOff",
+      "msg": "Operator consensus is off: the Fee Index has a single publisher"
+    },
+    {
+      "code": 6115,
+      "name": "BallotPayerMismatch",
+      "msg": "The rent goes back to the account that paid for the ballot"
+    },
+    {
+      "code": 6116,
+      "name": "QuoteNotExpired",
+      "msg": "The quote has not expired and its epoch has not started"
     }
   ],
   "types": [
@@ -6703,11 +7997,16 @@
       "docs": [
         "The Solana Fee Index (seeds: `[\"fee_index\", pool]`).",
         "",
-        "The program is its own oracle: the publisher proposes a value with the",
-        "hash of its inputs, anyone can finalize it after `dispute_window_slots`,",
-        "and the admin can veto inside the window. A proposal that moves more than",
+        "The program is its own oracle: a proposal carries a value and the hash of",
+        "its inputs, anyone can finalize it after `dispute_window_slots`, and the",
+        "admin can veto inside the window. A proposal that moves more than",
         "`max_move_bps` from the last finalized value is rejected outright.",
-        "Readers take `value`/`epoch` directly; a CPI read is `get_sfi`."
+        "Readers take `value`/`epoch` directly; a CPI read is `get_sfi`.",
+        "",
+        "Who proposes: `publisher`. With operator consensus on, `publisher` is the",
+        "`IndexOperators` PDA (no key can sign for it), and proposals come from",
+        "`IndexBallot`s that reached consensus, or from `post_index` by the sole",
+        "operator of a one-operator registry. The layout is unchanged."
       ],
       "type": {
         "kind": "struct",
@@ -7086,6 +8385,346 @@
       }
     },
     {
+      "name": "IndexBallot",
+      "docs": [
+        "One epoch's Fee Index vote (seeds: `[\"index_ballot\", fee_index, epoch]`).",
+        "",
+        "Adapted from jito-foundation/jito-tip-router/core/src/ballot_box.rs",
+        "(MIT or Apache-2.0): a per-epoch box of operator votes tallied against the",
+        "TOTAL registered weight; an operator may change its vote until consensus,",
+        "its vote is locked after it, and operators that had not voted may still",
+        "vote late for the record. Changed for a numeric index: votes agree when",
+        "they fall within `tolerance_bps` of the weighted median instead of being",
+        "equal, each vote's deviation is stored, the operator set is snapshotted",
+        "into the ballot (no separate snapshot accounts), one fixed account holds",
+        "up to eight operators, and a vetoed round reopens in place (`round`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "payer",
+            "docs": [
+              "Paid the rent; `close_index_ballot` refunds it."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "round",
+            "docs": [
+              "0 for the first round, +1 for every reopening."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "opened_slot",
+            "type": "u64"
+          },
+          {
+            "name": "threshold_bps",
+            "docs": [
+              "Snapshot of the registry when the round opened."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "tolerance_bps",
+            "type": "u16"
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          },
+          {
+            "name": "operator_count",
+            "type": "u8"
+          },
+          {
+            "name": "votes_cast",
+            "type": "u8"
+          },
+          {
+            "name": "votes",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "IndexVote"
+                  }
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "median_value",
+            "docs": [
+              "Weighted median of the votes cast; frozen at consensus."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "agreeing_weight",
+            "docs": [
+              "Weight within the tolerance of the median (of the agreed value after",
+              "consensus, late votes included)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "consensus_slot",
+            "docs": [
+              "0 until the threshold is met."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "consensus_value",
+            "type": "u64"
+          },
+          {
+            "name": "consensus_inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "proposed_slot",
+            "docs": [
+              "Slot the proposal was written into `FeeIndex`; 0 while queued."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexBallotClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexBallotOpened",
+      "docs": [
+        "A ballot round opened (round 0 with the first vote; later rounds after a",
+        "veto or an admin reset), with the registry snapshot it votes under."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "ballot",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "operators",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "IndexOperator"
+                }
+              }
+            }
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          },
+          {
+            "name": "threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "tolerance_bps",
+            "type": "u16"
+          },
+          {
+            "name": "reset",
+            "docs": [
+              "Opened by the admin's `reset_index_ballot` rather than by a vote."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexBallotSubmitted",
+      "docs": [
+        "A queued consensus was written into `FeeIndex` (`IndexProposed` follows)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexConsensusReached",
+      "docs": [
+        "The agreeing weight met the threshold. `proposed`: the value went into",
+        "`FeeIndex` in the same instruction (`IndexProposed` follows); otherwise it",
+        "is queued for `submit_index_ballot`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          },
+          {
+            "name": "inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "agreeing_weight",
+            "type": "u64"
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          },
+          {
+            "name": "threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "votes_cast",
+            "type": "u8"
+          },
+          {
+            "name": "proposed",
+            "type": "bool"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexConsensusSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "tolerance_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
       "name": "IndexFinalized",
       "type": {
         "kind": "struct",
@@ -7110,6 +8749,217 @@
           {
             "name": "slot",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexOperator",
+      "docs": [
+        "One registered Fee Index operator: the key that signs its votes and its",
+        "voting weight."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "key",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexOperatorAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u32"
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          },
+          {
+            "name": "operator_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexOperatorRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u32"
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          },
+          {
+            "name": "operator_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexOperatorWeightSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_weight",
+            "type": "u32"
+          },
+          {
+            "name": "weight",
+            "type": "u32"
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexOperators",
+      "docs": [
+        "The operators that vote on the Solana Fee Index (seeds:",
+        "`[\"index_operators\", fee_index]`).",
+        "",
+        "Adapted from jito-foundation/jito-tip-router/program/src/cast_vote.rs",
+        "(MIT or Apache-2.0): there the voter is a Jito restaking `Operator.voter`",
+        "and its stake weight comes from per-epoch operator snapshots and weight",
+        "tables. Epoch has no restaking: the admin registers up to eight voting keys",
+        "and their weights here, and each ballot copies this registry when a round",
+        "opens, so a change applies from the next round and never moves a vote in",
+        "progress.",
+        "",
+        "Creating the registry points `FeeIndex.publisher` at this PDA, which no key",
+        "can sign for: from then on a value reaches `FeeIndex` only through a ballot",
+        "(or `post_index` by the sole operator of a one-operator registry)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "threshold_bps",
+            "docs": [
+              "Agreeing weight needed, bps of `total_weight` (rounded-up share)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "tolerance_bps",
+            "docs": [
+              "A vote agrees when within this many bps of the weighted median."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "operator_count",
+            "type": "u8"
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          },
+          {
+            "name": "operators",
+            "docs": [
+              "The first `operator_count` entries are used, in the order added."
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "IndexOperator"
+                  }
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexOperatorsInitialized",
+      "docs": [
+        "The operator registry was created; `FeeIndex.publisher` is now the",
+        "registry PDA, so values come from ballots."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "index_operators",
+            "type": "pubkey"
+          },
+          {
+            "name": "threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "tolerance_bps",
+            "type": "u16"
           }
         ]
       }
@@ -7173,6 +9023,163 @@
           },
           {
             "name": "value",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexVote",
+      "docs": [
+        "One operator's slot in a ballot round. `operator` and `weight` are copied",
+        "from the registry when the round opens; the rest is its vote."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u32"
+          },
+          {
+            "name": "voted",
+            "type": "bool"
+          },
+          {
+            "name": "value",
+            "docs": [
+              "µL/CU, as `post_index`'s `value`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "slot",
+            "docs": [
+              "Slot of the operator's latest vote this round."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deviation_bps",
+            "docs": [
+              "Distance from the weighted median before consensus, from the agreed",
+              "value after it; bps rounded up (`math::consensus::deviation_bps`)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "agrees",
+            "docs": [
+              "Within the tolerance of that same reference value."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "late",
+            "docs": [
+              "Cast after consensus: on the record, never counted."
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexVoteCast",
+      "docs": [
+        "One operator's vote. `deviation_bps` and `agrees` are against the median",
+        "after this vote (against the agreed value for a late vote); the tally",
+        "fields are the round's after this vote."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_index",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u32"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          },
+          {
+            "name": "inputs_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "deviation_bps",
+            "type": "u32"
+          },
+          {
+            "name": "agrees",
+            "type": "bool"
+          },
+          {
+            "name": "changed",
+            "docs": [
+              "Replaced the operator's earlier vote this round."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "late",
+            "docs": [
+              "Cast after consensus: recorded, never counted."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "median_value",
+            "type": "u64"
+          },
+          {
+            "name": "agreeing_weight",
+            "type": "u64"
+          },
+          {
+            "name": "total_weight",
+            "type": "u64"
+          },
+          {
+            "name": "votes_cast",
+            "type": "u8"
+          },
+          {
+            "name": "slot",
             "type": "u64"
           }
         ]
@@ -7470,7 +9477,7 @@
           {
             "name": "senior_rate_bps_per_epoch",
             "docs": [
-              "Senior tranche target coupon per epoch (4 = 0.04%/epoch ≈ 7.5%/yr at ~182 epochs)."
+              "Senior tranche target coupon per epoch (3 = 0.03%/epoch ≈ 8.1%/yr at ≈271.5 epochs a year)."
             ],
             "type": "u16"
           },
@@ -7677,6 +9684,33 @@
           {
             "name": "max_move_bps",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteWithdrawn",
+      "docs": [
+        "`withdraw_quote` closed the quote: `lamports` (collateral left plus rent) went back to the maker."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quote",
+            "type": "pubkey"
+          },
+          {
+            "name": "maker",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "lamports",
+            "type": "u64"
           }
         ]
       }

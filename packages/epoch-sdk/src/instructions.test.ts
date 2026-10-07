@@ -6,12 +6,15 @@ import { INSTRUCTIONS_SYSVAR_ID, METEORA, NATIVE_MINT, type Side, type Tranche }
 import { INSTRUCTION_DISCRIMINATORS, INSTRUCTION_NAMES, type InstructionName } from './discriminators';
 import {
   accrue,
+  addIndexOperator,
   burnLeftover,
   cancelWithdraw,
+  castIndexVote,
   claimPartnerMigrationFee,
   claimPartnerSurplus,
   claimPartnerTradingFee,
   claimTreasuryLpFee,
+  closeIndexBallot,
   closeRevenueToken,
   configureIndex,
   configureScoring,
@@ -24,6 +27,7 @@ import {
   finalizeIndex,
   findMeteoraVaultPda,
   initializeIndex,
+  initializeIndexOperators,
   initializePool,
   initValidatorHistory,
   lamportsToSolString,
@@ -40,13 +44,18 @@ import {
   refreshScore,
   registerRevenueToken,
   releaseValidator,
+  removeIndexOperator,
   requestAdvance,
   requestWithdraw,
+  resetIndexBallot,
   setCollectors,
+  setIndexConsensus,
+  setIndexOperatorWeight,
   setPaused,
   setRoles,
   settleSwap,
   solToLamports,
+  submitIndexBallot,
   sweep,
   sweepPosition,
   syncRevenueTokenPool,
@@ -59,7 +68,14 @@ import {
   withdrawBond,
   withdrawQuote,
 } from './instructions';
-import { findDammPositionNftAccount, findTreasuryTokensAddress } from './pda';
+import {
+  findDammPositionNftAccount,
+  findFeeIndexPda,
+  findIndexBallotPda,
+  findIndexOperatorsPda,
+  findPoolPda,
+  findTreasuryTokensAddress,
+} from './pda';
 
 // web3.js loads its websocket client at import time (rpc-websockets → ESM-only uuid), which jest's CommonJS runtime
 // cannot parse. The SDK never opens a websocket, so a stub is enough; everything else is the real web3.js.
@@ -254,9 +270,56 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
       epoch: big(v.args.epoch),
       value: big(v.args.value),
       inputsHash: bytes32(v.args.inputs_hash),
+      // The sole-operator shortcut: the vector appends the registry as remaining_accounts[0].
+      soleOperator: typeof v.context.index_operators === 'string',
     }),
   finalize_index: (v, programId) => finalizeIndex({ programId, cranker: acc(v, 'cranker') }),
   veto_index: (v, programId) => vetoIndex({ programId, admin: acc(v, 'admin') }),
+  initialize_index_operators: (v, programId) =>
+    initializeIndexOperators({
+      programId,
+      admin: acc(v, 'admin'),
+      thresholdBps: v.args.threshold_bps as number,
+      toleranceBps: v.args.tolerance_bps as number,
+    }),
+  add_index_operator: (v, programId) =>
+    addIndexOperator({
+      programId,
+      admin: acc(v, 'admin'),
+      operator: acc(v, 'operator'),
+      weight: v.args.weight as number,
+    }),
+  remove_index_operator: (v, programId) =>
+    removeIndexOperator({ programId, admin: acc(v, 'admin'), operator: acc(v, 'operator') }),
+  set_index_operator_weight: (v, programId) =>
+    setIndexOperatorWeight({
+      programId,
+      admin: acc(v, 'admin'),
+      operator: acc(v, 'operator'),
+      weight: v.args.weight as number,
+    }),
+  set_index_consensus: (v, programId) =>
+    setIndexConsensus({
+      programId,
+      admin: acc(v, 'admin'),
+      thresholdBps: v.args.threshold_bps as number,
+      toleranceBps: v.args.tolerance_bps as number,
+    }),
+  cast_index_vote: (v, programId) =>
+    castIndexVote({
+      programId,
+      operator: acc(v, 'operator'),
+      payer: acc(v, 'payer'),
+      epoch: big(v.args.epoch),
+      value: big(v.args.value),
+      inputsHash: bytes32(v.args.inputs_hash),
+    }),
+  submit_index_ballot: (v, programId) =>
+    submitIndexBallot({ programId, cranker: acc(v, 'cranker'), epoch: big(v.context.epoch) }),
+  reset_index_ballot: (v, programId) =>
+    resetIndexBallot({ programId, admin: acc(v, 'admin'), epoch: big(v.context.epoch) }),
+  close_index_ballot: (v, programId) =>
+    closeIndexBallot({ programId, cranker: acc(v, 'cranker'), epoch: big(v.context.epoch), payer: acc(v, 'payer') }),
   post_quote: (v, programId) =>
     postQuote({
       programId,
@@ -798,5 +861,60 @@ describe('treasury claims', () => {
     const fee = find('claim_partner_migration_fee');
     expect(fee.metas).toEqual(surplus.metas);
     expect(fee.data).not.toBe(surplus.data);
+  });
+});
+
+describe('Fee Index consensus builders', () => {
+  const find = (name: InstructionName, label = 'default') =>
+    vectors.instructions.find((v) => v.name === name && v.label === label)!;
+  const programId = key(vectors.programId);
+  const feeIndex = findFeeIndexPda(programId, findPoolPda(programId)[0])[0];
+  const hash = new Uint8Array(32).fill(7);
+
+  it('castIndexVote charges the operator when no payer is given, one key in both signer slots', () => {
+    const operator = key(find('cast_index_vote', 'operator_pays').accounts.operator as string);
+    const [ix] = castIndexVote({ programId, operator, epoch: 813n, value: 1_000n, inputsHash: hash });
+    expect(metas(ix).slice(0, 2)).toEqual([
+      { pubkey: operator.toBase58(), isSigner: true, isWritable: true },
+      { pubkey: operator.toBase58(), isSigner: true, isWritable: false },
+    ]);
+    expect(ix.keys[4].pubkey.equals(findIndexBallotPda(programId, feeIndex, 813n)[0])).toBe(true);
+  });
+
+  it('postIndex keeps the legacy two accounts unless the signer is the sole operator', () => {
+    const v = find('post_index');
+    const input = {
+      programId,
+      publisher: acc(v, 'publisher'),
+      epoch: big(v.args.epoch),
+      value: big(v.args.value),
+      inputsHash: bytes32(v.args.inputs_hash),
+    };
+    const [legacy] = postIndex(input);
+    expect(metas(legacy)).toEqual(v.metas);
+    const [sole] = postIndex({ ...input, soleOperator: true });
+    expect(hex(sole.data)).toBe(hex(legacy.data));
+    expect(metas(sole)).toEqual([
+      ...v.metas,
+      { pubkey: findIndexOperatorsPda(programId, feeIndex)[0].toBase58(), isSigner: false, isWritable: false },
+    ]);
+  });
+
+  it('submit, reset and close name the ballot of the epoch they are given', () => {
+    const cranker = programId;
+    for (const epoch of [0n, 813n, 2n ** 64n - 1n]) {
+      const [ballot] = findIndexBallotPda(programId, feeIndex, epoch);
+      expect(submitIndexBallot({ programId, cranker, epoch })[0].keys[3].pubkey.equals(ballot)).toBe(true);
+      expect(resetIndexBallot({ programId, admin: cranker, epoch })[0].keys[4].pubkey.equals(ballot)).toBe(true);
+      const [close] = closeIndexBallot({ programId, cranker, epoch, payer: cranker });
+      expect(close.keys[2].pubkey.equals(ballot)).toBe(true);
+      expect(close.keys[3]).toEqual({ pubkey: cranker, isSigner: false, isWritable: true });
+    }
+  });
+
+  it('rejects out-of-range arguments before building', () => {
+    expect(() => addIndexOperator({ programId, admin: programId, operator: programId, weight: -1 })).toThrow();
+    expect(() => setIndexConsensus({ programId, admin: programId, thresholdBps: 70_000, toleranceBps: 0 })).toThrow();
+    expect(() => submitIndexBallot({ programId, cranker: programId, epoch: -1n })).toThrow();
   });
 });

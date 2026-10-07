@@ -1,6 +1,14 @@
 import { Logger } from '@epoch/logger';
 
-import { FakePublisherChain, feeIndex, key, MemoryIndexStore } from '../__fixtures__/fakes';
+import {
+  FakePublisherChain,
+  feeIndex,
+  indexBallot,
+  indexOperators,
+  key,
+  MemoryIndexStore,
+  REGISTRY,
+} from '../__fixtures__/fakes';
 import { type EpochOffset } from '../Index/EpochMapping';
 import { IndexPublisher } from './IndexPublisher';
 
@@ -174,5 +182,137 @@ describe('IndexPublisher', () => {
     chain.publisher = undefined;
     await publisher().tick();
     expect(chain.calls).toEqual([]);
+  });
+});
+
+describe('IndexPublisher in consensus mode (the FeeIndex publisher is the operator registry)', () => {
+  let chain: FakePublisherChain;
+  let store: MemoryIndexStore;
+  let errors: jest.SpyInstance;
+  const publisher = () => new IndexPublisher(chain, store, { offset: 0 });
+  const stops = () => errors.mock.calls.map(([m]) => String(m)).filter((m) => m.startsWith('STOPPED'));
+  const votes = () =>
+    chain.calls.map((c) => ({ name: c.name, by: String(c.role), ...decodePostIndex(c.instruction.data) }));
+  const hash = async (m: number) => (await store.inputsHash(m)).hash;
+
+  beforeEach(async () => {
+    chain = new FakePublisherChain();
+    store = new MemoryIndexStore().add(98, 1_000, 'sig98').add(99, 1_004);
+    chain.publisher = undefined;
+    chain.operators = [key(60), key(61), key(99)]; // key(99) is not registered
+    chain.registryAccount = indexOperators([1, 1, 1]);
+    chain.feeIndexAccount = { ...(await finalAt(store, 98, 98n, 1_000n)), publisher: REGISTRY };
+    chain.epoch = 100n;
+    errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => errors.mockRestore());
+
+  it('every registered operator key votes the same value and hash; the first vote is recorded', async () => {
+    await publisher().tick();
+    const h = await hash(99);
+    expect(votes()).toEqual([
+      { name: 'cast_index_vote', by: key(60).toBase58(), epoch: 99n, value: 1_004n, inputsHash: h },
+      { name: 'cast_index_vote', by: key(61).toBase58(), epoch: 99n, value: 1_004n, inputsHash: h },
+    ]);
+    expect(store.rows.get(99)?.postedSignature).toBe(`sig:cast_index_vote 99 (mainnet 99) by ${key(60).toBase58()}`);
+    expect(stops()).toEqual([]);
+  });
+
+  it('waits while its ballot is voting, queued or proposed; nobody votes twice', async () => {
+    store.rows.get(99)!.postedSignature = 'sigVote';
+    const h = await hash(99);
+    const voted = { voted: true, value: 1_004n, inputsHash: h };
+    chain.ballotAccounts = [indexBallot(99n, chain.registryAccount!, {}, { 0: voted, 1: voted })];
+    await publisher().tick();
+    chain.ballotAccounts = [indexBallot(99n, chain.registryAccount!, { consensusSlot: 9n }, { 0: voted, 1: voted })];
+    await publisher().tick();
+    const proposed = { consensusSlot: 9n, proposedSlot: 9n };
+    chain.ballotAccounts = [indexBallot(99n, chain.registryAccount!, proposed, { 0: voted, 1: voted })];
+    chain.feeIndexAccount = { ...chain.feeIndexAccount!, hasProposal: true, proposedEpoch: 99n, proposedSlot: 9n };
+    await publisher().tick();
+    expect(chain.calls).toEqual([]);
+    expect(stops()).toEqual([]);
+  });
+
+  it('a key that missed its ballot (a crash between two votes) votes the same value and hash', async () => {
+    store.rows.get(99)!.postedSignature = 'sigVote';
+    const h = await hash(99);
+    chain.ballotAccounts = [
+      indexBallot(99n, chain.registryAccount!, {}, { 0: { voted: true, value: 1_004n, inputsHash: h } }),
+    ];
+    await publisher().tick();
+    expect(votes()).toEqual([
+      { name: 'cast_index_vote', by: key(61).toBase58(), epoch: 99n, value: 1_004n, inputsHash: h },
+    ]);
+    expect(store.rows.get(99)?.postedSignature).toBe('sigVote');
+  });
+
+  it('records a vote that landed without being recorded instead of voting twice, or stops if it cannot trace it', async () => {
+    const h = await hash(99);
+    chain.ballotAccounts = [
+      indexBallot(99n, chain.registryAccount!, {}, { 0: { voted: true, value: 1_004n, inputsHash: h } }),
+    ];
+    await publisher().tick();
+    expect(chain.calls).toEqual([]);
+    expect(stops()).toEqual([expect.stringContaining('posted_signature for that row by hand')]);
+
+    chain.voteSignatures.set(`${key(60).toBase58()}:${Buffer.from(h).toString('hex')}`, 'sigLanded');
+    await publisher().tick();
+    expect(chain.calls).toEqual([]);
+    expect(store.rows.get(99)?.postedSignature).toBe('sigLanded');
+  });
+
+  it('stops at a vetoed proposal; once the admin re-opens the row, every key votes again (a new round)', async () => {
+    store.rows.get(99)!.postedSignature = 'sigVote';
+    const h = await hash(99);
+    const voted = { voted: true, value: 1_004n, inputsHash: h };
+    const vetoed = { consensusSlot: 9n, proposedSlot: 9n, consensusValue: 1_004n };
+    chain.ballotAccounts = [indexBallot(99n, chain.registryAccount!, vetoed, { 0: voted, 1: voted })];
+    await publisher().tick();
+    expect(chain.calls).toEqual([]);
+    expect(stops()).toEqual([expect.stringContaining('was vetoed')]);
+
+    store.rows.get(99)!.postedSignature = null;
+    await publisher().tick();
+    expect(votes().map((v) => [v.by, v.epoch])).toEqual([
+      [key(60).toBase58(), 99n],
+      [key(61).toBase58(), 99n],
+    ]);
+  });
+
+  it('a key registered after the round opened cannot vote in it: stops and points at reset_index_ballot', async () => {
+    chain.operators = [key(62)];
+    chain.ballotAccounts = [indexBallot(99n, indexOperators([1, 1]))];
+    await publisher().tick();
+    expect(chain.calls).toEqual([]);
+    expect(stops()).toEqual([expect.stringContaining('reset_index_ballot')]);
+  });
+
+  it('stops without operator keys, without registered keys, or without the legacy publisher key', async () => {
+    chain.operators = [];
+    chain.publisher = key(5);
+    await publisher().tick();
+    chain.publisher = undefined;
+    chain.operators = [key(99)];
+    await publisher().tick();
+    chain.feeIndexAccount = { ...chain.feeIndexAccount!, publisher: key(5) };
+    await publisher().tick();
+    expect(chain.calls).toEqual([]);
+    expect(stops()).toEqual([
+      expect.stringContaining('INDEX_OPERATOR_KEYPAIR_PATHS'),
+      expect.stringContaining('add_index_operator'),
+      expect.stringContaining('operator consensus is off'),
+    ]);
+  });
+
+  it('applies the same max_move_bps check as post_index, and under DRY_RUN records nothing', async () => {
+    store.rows.get(99)!.value = 1_201;
+    await publisher().tick();
+    expect(stops()).toEqual([expect.stringContaining('max_move_bps')]);
+    store.rows.get(99)!.value = 1_004;
+    chain.dryRun = true;
+    await publisher().tick();
+    expect(chain.calls.map((c) => c.name)).toEqual(['cast_index_vote', 'cast_index_vote']);
+    expect(store.rows.get(99)?.postedSignature).toBeNull();
   });
 });

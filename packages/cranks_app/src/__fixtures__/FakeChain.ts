@@ -1,6 +1,7 @@
 import {
   type AdvanceAccount,
   type FeeIndexAccount,
+  type IndexBallotAccount,
   type InstructionName,
   instructionNameOf,
   type PoolAccount,
@@ -63,6 +64,7 @@ export class FakeChain implements EpochChain {
   positionAccounts: ProgramAccount<ValidatorPositionAccount>[] = [];
   advances = new Map<string, AdvanceAccount>();
   feeIndexAccount: FeeIndexAccount | null = null;
+  ballotAccounts: IndexBallotAccount[] = [];
   requests = new Map<bigint, WithdrawRequestAccount>();
   swapAccounts: ProgramAccount<SwapPositionAccount>[] = [];
   revenueTokenAccounts: ProgramAccount<RevenueTokenAccount>[] = [];
@@ -103,6 +105,9 @@ export class FakeChain implements EpochChain {
   }
   async feeIndex(): Promise<ProgramAccount<FeeIndexAccount> | null> {
     return this.feeIndexAccount ? { address: key(11), account: this.feeIndexAccount } : null;
+  }
+  async indexBallots(): Promise<ProgramAccount<IndexBallotAccount>[]> {
+    return this.ballotAccounts.map((account, i) => ({ address: key(230 + i), account }));
   }
   async withdrawRequest(seq: bigint): Promise<WithdrawRequestAccount | null> {
     return this.requests.get(seq) ?? null;

@@ -90,7 +90,10 @@ it had not stored yet, drops the program caches the event makes stale and emits 
 2. stored `IndexProposed` / `IndexFinalized` / `IndexVetoed` events: the newest event per epoch decides (finalized →
    `final`, proposed → `proposed`, vetoed → `vetoed`), so a vetoed proposal stays visible until a new one is posted for
    its epoch. Final is terminal; a veto newer than the proposal a cached account read still shows wins;
-3. `epoch_index` rows the indexer computed (Postgres): only for epochs the program has no value for, without `status`.
+3. open `IndexBallot` accounts (operator consensus): an epoch still voting, or agreed and queued until the FeeIndex
+   can take it, with no newer program fact is `voting` (value: the current weighted median, or the agreed value once
+   reached); a ballot reopened after a veto replaces the vetoed point;
+4. `epoch_index` rows the indexer computed (Postgres): only for epochs the program has no value for, without `status`.
 
 `from` / `to` (inclusive) and `limit` (1–500, default 50) apply after the merge. Without the program and without
 Postgres: `503 PROGRAM_NOT_CONFIGURED`; when the account can't be read, the events alone are used (logged).
@@ -186,7 +189,7 @@ current set; data frames carry `channel`, `data` and `at` (when the data was rea
 | `slot`     | MAINNET `{ slot, epoch, slotIndex, slotsInEpoch, leader, leaderName, source }` (leader = identity key; `leaderName` from the validator table, null when unknown; `source`: `grpc` pushed by Solami, `rpc` polled) | with `SOLAMI_TOKEN`: each confirmed slot as Solami gRPC pushes it; otherwise (or while that stream is quiet) every `STREAM_SLOT_INTERVAL_MS` when the slot moved; only while someone subscribes; the last value right away to a new subscriber |
 | `activity` | one `ActivityEvent` (as `GET /v1/activity`)                                                                                                              | each new program event the feed shows and each Predict call; events older than 10 minutes (a backfill after downtime) only appear in `GET /v1/activity`                              |
 | `vault`    | the vault provider's snapshot (`VaultSnapshot`)                                                                                                          | on subscribe, then 2 s after the last pool event (`Deposited`, `Withdraw*`, `Accrued`, `AdvanceOpened`, `Swept`, `AdvanceRepaid`, `AdvanceDefaulted`, `BondPosted`, `BondWithdrawn`) |
-| `feeIndex` | `{ points: FeeIndexPoint[16], final, proposed, avg8 }`                                                                                                   | on subscribe, then after `IndexProposed` / `IndexFinalized` / `IndexVetoed`                                                                                                          |
+| `feeIndex` | `{ points: FeeIndexPoint[16], final, proposed, avg8, ballot }` (`ballot`: the newest open `FeeIndexBallotView`, or null)                                                                                                   | on subscribe, then after `IndexProposed` / `IndexFinalized` / `IndexVetoed` and every ballot event (`IndexBallotOpened`, `IndexVoteCast`, `IndexConsensusReached`, `IndexBallotSubmitted`, `IndexBallotClosed`)                                                                                                          |
 | `launch:<mint>` | `{ type: 'snapshot' \| 'trade' \| 'market' \| 'fee', … }` (`LaunchStreamMessage`; a symbol subscribes to its mint's channel) | a snapshot on subscribe, then each trade the ingester stores, the market after them, and claim / graduation events; at most 8 keyed channels per socket (docs/pages/launch.md) |
 
 The server pings every 30 s and drops a socket that misses a pong; browsers answer pings by themselves. A dropped
@@ -626,7 +629,7 @@ for the app is [docs/pages/predict.md](../../docs/pages/predict.md); response ty
 | `POST /v1/predict/panta/submit` `{ tradeId, signedTransaction }` or `{ tradeId, signature }` | `PantaSubmitView` | SIWS session of the trade's wallet | `POST /primaryordersubmit/` (buys) |
 | `GET /v1/predict/panta/status/:tradeId` | `PantaTradeStatusView`: chain status, Panta's order status, attribution | public | `POST /primaryorderverify/` (5 s), `POST /trades/` |
 | `POST /v1/predict/panta/claim/build` `{ wallet, marketId, consent: true }` | `PantaBuildView` for a win claim | SIWS session of `wallet` | `POST /claim/build/` |
-| `GET /v1/index/epochs/:epoch` | `FeeIndexEpochView`: one MAINNET epoch's value and `status` (`pending` · `computed` · `proposed` · `final` · `vetoed`), the program epoch, the `post_index` and `finalize_index` signatures | public | — (the resolution source of our markets) |
+| `GET /v1/index/epochs/:epoch` | `FeeIndexEpochView`: one MAINNET epoch's value and `status` (`pending` · `computed` · `voting` · `proposed` · `final` · `vetoed`), the program epoch, the `post_index` (or first `cast_index_vote`) and `finalize_index` signatures, and `ballot` (`FeeIndexBallotView`: round, status, threshold, tolerance, weights, agreeing share, median, consensus, and per operator its value, deviation, agreement and inputs hash; from the live `IndexBallot`, else rebuilt from the indexed events; null without consensus) | public | — (the resolution source of our markets) |
 | `GET /v1/index/forecast` | `FeeIndexForecastCard`: the crowd forecast of the next epoch with markets, for the Terminal's Fee Index card (`available: false` with a reason instead of an error) | public | as `forecast` |
 | `WS /v1/stream` channel `predict:panta` | `PantaStreamData`: our markets' prices, implied vs model probability, and each epoch's crowd forecast (`forecasts`) | — | `GET /markets/{id}/` every `PANTA_STREAM_INTERVAL_SECONDS` (≥ 10 s) while someone listens; doubles on failure up to 5 min |
 

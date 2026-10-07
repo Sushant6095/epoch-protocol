@@ -96,6 +96,30 @@ Each tick, reading `epoch_index` rows with `posted_signature IS NULL` after the 
 
 Waits and stops are logged once, not every minute; stops are errors (`STOPPED: …`).
 
+### Operator consensus (`cast_index_vote`, operator keys): the default once consensus is on
+
+When the admin runs `initialize_index_operators`, the operator registry PDA becomes the FeeIndex's `publisher` and
+no single key can post (`docs/FEE_INDEX_METHODOLOGY.md`, "Operator consensus"). The IndexPublisher sees that and votes
+instead of posting, with every key in `INDEX_OPERATOR_KEYPAIR_PATHS` that the registry lists (without that variable,
+the `PUBLISHER_KEYPAIR_PATH` key is the one voter: the devnet setup with one operator). Several keys in one process
+are for the demo; in production each operator runs its own publisher, indexer and database with its own key, so the
+votes are independent. Each tick:
+
+1. **Unrecorded vote.** If one of our keys voted an unposted row's `inputs_hash` in a ballot that is voting, queued,
+   proposed or agreed and final, the vote landed but the database write did not: it finds the signature in that key's
+   recent history (`IndexVoteCast`) and records it. The ballots are the record, so a mainnet epoch is never voted twice.
+2. **Our open ballot.** For the lowest ballot above the last final epoch that holds one of our votes: our keys that
+   have not voted yet vote the same value and hash (a crash between two votes); otherwise it waits while the ballot
+   is `voting` (logging agreeing weight, threshold and our deviation), `queued` (cranks_app submits it) or `proposed`
+   (cranks_app finalizes it after the window), and **stops** when its proposal was vetoed. The admin decides, as in
+   legacy mode: set the row's `posted_signature` to NULL (after correcting the value if needed) and every key votes
+   again, which opens the next round; or delete the row.
+3. **Next epoch.** The same choice of row and P, the same `max_move_bps` and `slot_fees` checks as `post_index`. Every
+   registered key that has not voted in the round that counts sends `cast_index_vote(P, value, inputs_hash)` (paying
+   for itself; the first vote pays the ballot's rent, refunded when `CloseBallotsJob` closes it). A key registered
+   after the round opened is not in its snapshot: it stops and points at `reset_index_ballot`. The first vote's
+   signature becomes the row's `posted_signature`.
+
 TODO(F9, out of scope): a Switchboard On-Demand mirror of the final value (`docs/ARCHITECTURE.md` notes Switchboard
 shut down on 25 Sep 2026, so the program is its own oracle).
 
@@ -120,7 +144,8 @@ Only quotes from Epoch's maker count: set `EPOCH_MARKET_MAKER` (read by `api_app
 | --- | --- | --- |
 | `EPOCH_CLUSTER`, `EPOCH_RPC_URL`, `EPOCH_RPC_FALLBACK_URL` | devnet | the program's cluster |
 | `EPOCH_PROGRAM_ID` | required | the deployed program |
-| `PUBLISHER_KEYPAIR_PATH` | unset = IndexPublisher off | keypair FILE of the FeeIndex's `publisher`; needs `DATABASE_URL` |
+| `PUBLISHER_KEYPAIR_PATH` | unset = IndexPublisher off (unless operator keys are set) | keypair FILE of the FeeIndex's `publisher`; needs `DATABASE_URL`; the one voter once consensus is on, when `INDEX_OPERATOR_KEYPAIR_PATHS` is unset |
+| `INDEX_OPERATOR_KEYPAIR_PATHS` | unset | comma-separated keypair FILES of Fee Index operators (at most 8) that vote once consensus is on; needs `DATABASE_URL` |
 | `MAKER_KEYPAIR_PATH` | unset = QuoteMaker off | keypair FILE of Epoch's market maker (funds the collateral) |
 | `EPOCH_MARKET_MAKER` | — | the maker's public key, as the API and cranks know it |
 | `DATABASE_URL` | — | Postgres with `epoch_index` and `slot_fees` |

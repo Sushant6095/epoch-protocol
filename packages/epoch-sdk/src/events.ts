@@ -101,6 +101,83 @@ export interface EpochEventMap {
   IndexProposed: { epoch: bigint; value: bigint; inputsHash: Uint8Array; slot: bigint };
   IndexFinalized: { epoch: bigint; value: bigint; inputsHash: Uint8Array; slot: bigint };
   IndexVetoed: { epoch: bigint; value: bigint };
+  IndexOperatorsInitialized: {
+    feeIndex: PublicKey;
+    indexOperators: PublicKey;
+    thresholdBps: number;
+    toleranceBps: number;
+  };
+  IndexOperatorAdded: {
+    feeIndex: PublicKey;
+    operator: PublicKey;
+    weight: number;
+    totalWeight: bigint;
+    operatorCount: number;
+  };
+  IndexOperatorRemoved: {
+    feeIndex: PublicKey;
+    operator: PublicKey;
+    weight: number;
+    totalWeight: bigint;
+    operatorCount: number;
+  };
+  IndexOperatorWeightSet: {
+    feeIndex: PublicKey;
+    operator: PublicKey;
+    oldWeight: number;
+    weight: number;
+    totalWeight: bigint;
+  };
+  IndexConsensusSet: { feeIndex: PublicKey; thresholdBps: number; toleranceBps: number };
+  /** A ballot round opened, with the registry snapshot it votes under. */
+  IndexBallotOpened: {
+    feeIndex: PublicKey;
+    ballot: PublicKey;
+    epoch: bigint;
+    round: number;
+    operators: { key: PublicKey; weight: number }[];
+    totalWeight: bigint;
+    thresholdBps: number;
+    toleranceBps: number;
+    /** Opened by the admin's `reset_index_ballot`. */
+    reset: boolean;
+    slot: bigint;
+  };
+  /** One operator's vote and the round's tally after it. */
+  IndexVoteCast: {
+    feeIndex: PublicKey;
+    epoch: bigint;
+    round: number;
+    operator: PublicKey;
+    weight: number;
+    value: bigint;
+    inputsHash: Uint8Array;
+    deviationBps: number;
+    agrees: boolean;
+    changed: boolean;
+    late: boolean;
+    medianValue: bigint;
+    agreeingWeight: bigint;
+    totalWeight: bigint;
+    votesCast: number;
+    slot: bigint;
+  };
+  /** `proposed`: the value went into the FeeIndex in the same instruction; otherwise it is queued. */
+  IndexConsensusReached: {
+    feeIndex: PublicKey;
+    epoch: bigint;
+    round: number;
+    value: bigint;
+    inputsHash: Uint8Array;
+    agreeingWeight: bigint;
+    totalWeight: bigint;
+    thresholdBps: number;
+    votesCast: number;
+    proposed: boolean;
+    slot: bigint;
+  };
+  IndexBallotSubmitted: { feeIndex: PublicKey; epoch: bigint; round: number; value: bigint; slot: bigint };
+  IndexBallotClosed: { feeIndex: PublicKey; epoch: bigint; round: number; payer: PublicKey; lamports: bigint };
   QuotePosted: {
     quote: PublicKey;
     maker: PublicKey;
@@ -273,16 +350,27 @@ export interface EpochEventMap {
     creditsReferenceBps: number;
     maxCopyAgeSlots: number;
   };
+  /** `withdraw_quote` closed the quote; `lamports` (collateral left plus rent) went back to the maker. */
+  QuoteWithdrawn: { quote: PublicKey; maker: PublicKey; epoch: bigint; lamports: bigint };
 }
 
 /** One member per event, discriminated by `name`. */
 export type EpochEvent = { [K in EventName]: { name: K; data: EpochEventMap[K] } }[EventName];
 
+/** A JSON-safe scalar in `eventToJson`'s output. */
+export type EventJsonScalar = string | number | boolean;
+
+/**
+ * One field of `eventToJson`'s output: a scalar, or a list of flat records for an event's `Vec<struct>` field
+ * (`IndexBallotOpened.operators` → `[{ key: base58, weight: number }]`).
+ */
+export type EventJsonValue = EventJsonScalar | Record<string, EventJsonScalar>[];
+
 /** The JSON-safe form from `eventToJson`. */
 export interface EpochEventJson {
   name: EventName;
   /** A `None` Option field is left out. */
-  data: Record<string, string | number | boolean>;
+  data: Record<string, EventJsonValue>;
 }
 
 const DECODERS: { [K in EventName]: (r: BorshReader) => EpochEventMap[K] } = {
@@ -369,6 +457,98 @@ const DECODERS: { [K in EventName]: (r: BorshReader) => EpochEventMap[K] } = {
   IndexProposed: (r) => ({ epoch: r.u64(), value: r.u64(), inputsHash: r.bytes(32), slot: r.u64() }),
   IndexFinalized: (r) => ({ epoch: r.u64(), value: r.u64(), inputsHash: r.bytes(32), slot: r.u64() }),
   IndexVetoed: (r) => ({ epoch: r.u64(), value: r.u64() }),
+  IndexOperatorsInitialized: (r) => ({
+    feeIndex: r.pubkey(),
+    indexOperators: r.pubkey(),
+    thresholdBps: r.u16('thresholdBps'),
+    toleranceBps: r.u16('toleranceBps'),
+  }),
+  IndexOperatorAdded: (r) => ({
+    feeIndex: r.pubkey(),
+    operator: r.pubkey(),
+    weight: r.u32('weight'),
+    totalWeight: r.u64('totalWeight'),
+    operatorCount: r.u8('operatorCount'),
+  }),
+  IndexOperatorRemoved: (r) => ({
+    feeIndex: r.pubkey(),
+    operator: r.pubkey(),
+    weight: r.u32('weight'),
+    totalWeight: r.u64('totalWeight'),
+    operatorCount: r.u8('operatorCount'),
+  }),
+  IndexOperatorWeightSet: (r) => ({
+    feeIndex: r.pubkey(),
+    operator: r.pubkey(),
+    oldWeight: r.u32('oldWeight'),
+    weight: r.u32('weight'),
+    totalWeight: r.u64('totalWeight'),
+  }),
+  IndexConsensusSet: (r) => ({
+    feeIndex: r.pubkey(),
+    thresholdBps: r.u16('thresholdBps'),
+    toleranceBps: r.u16('toleranceBps'),
+  }),
+  IndexBallotOpened: (r) => ({
+    feeIndex: r.pubkey(),
+    ballot: r.pubkey(),
+    epoch: r.u64('epoch'),
+    round: r.u8('round'),
+    operators: Array.from({ length: r.u32('operators.length') }, () => ({
+      key: r.pubkey('operators.key'),
+      weight: r.u32('operators.weight'),
+    })),
+    totalWeight: r.u64('totalWeight'),
+    thresholdBps: r.u16('thresholdBps'),
+    toleranceBps: r.u16('toleranceBps'),
+    reset: r.bool('reset'),
+    slot: r.u64('slot'),
+  }),
+  IndexVoteCast: (r) => ({
+    feeIndex: r.pubkey(),
+    epoch: r.u64('epoch'),
+    round: r.u8('round'),
+    operator: r.pubkey(),
+    weight: r.u32('weight'),
+    value: r.u64('value'),
+    inputsHash: r.bytes(32, 'inputsHash'),
+    deviationBps: r.u32('deviationBps'),
+    agrees: r.bool('agrees'),
+    changed: r.bool('changed'),
+    late: r.bool('late'),
+    medianValue: r.u64('medianValue'),
+    agreeingWeight: r.u64('agreeingWeight'),
+    totalWeight: r.u64('totalWeight'),
+    votesCast: r.u8('votesCast'),
+    slot: r.u64('slot'),
+  }),
+  IndexConsensusReached: (r) => ({
+    feeIndex: r.pubkey(),
+    epoch: r.u64('epoch'),
+    round: r.u8('round'),
+    value: r.u64('value'),
+    inputsHash: r.bytes(32, 'inputsHash'),
+    agreeingWeight: r.u64('agreeingWeight'),
+    totalWeight: r.u64('totalWeight'),
+    thresholdBps: r.u16('thresholdBps'),
+    votesCast: r.u8('votesCast'),
+    proposed: r.bool('proposed'),
+    slot: r.u64('slot'),
+  }),
+  IndexBallotSubmitted: (r) => ({
+    feeIndex: r.pubkey(),
+    epoch: r.u64('epoch'),
+    round: r.u8('round'),
+    value: r.u64('value'),
+    slot: r.u64('slot'),
+  }),
+  IndexBallotClosed: (r) => ({
+    feeIndex: r.pubkey(),
+    epoch: r.u64('epoch'),
+    round: r.u8('round'),
+    payer: r.pubkey(),
+    lamports: r.u64('lamports'),
+  }),
   QuotePosted: (r) => ({
     quote: r.pubkey(),
     maker: r.pubkey(),
@@ -526,6 +706,7 @@ const DECODERS: { [K in EventName]: (r: BorshReader) => EpochEventMap[K] } = {
     creditsReferenceBps: r.u16(),
     maxCopyAgeSlots: r.u32(),
   }),
+  QuoteWithdrawn: (r) => ({ quote: r.pubkey(), maker: r.pubkey(), epoch: r.u64(), lamports: r.u64() }),
 };
 
 /**
@@ -589,19 +770,37 @@ function isPublicKeyLike(value: unknown): value is PublicKey {
   );
 }
 
+function scalarToJson(value: unknown, where: string): EventJsonScalar {
+  if (isPublicKeyLike(value)) return value.toBase58();
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Uint8Array) return bytesToHex(value);
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') return value;
+  throw new TypeError(`eventToJson: unsupported value for ${where}`);
+}
+
 /**
  * JSON-safe copy: pubkeys → base58, bigints → decimal strings, byte arrays → hex; numbers, booleans, enums as-is;
- * a `None` Option is left out.
+ * a `None` Option is left out. A list of structs (`IndexBallotOpened.operators`) becomes a list of flat records
+ * converted the same way.
  */
 export function eventToJson(event: EpochEvent): EpochEventJson {
-  const data: Record<string, string | number | boolean> = {};
+  const data: Record<string, EventJsonValue> = {};
   for (const [key, value] of Object.entries(event.data) as [string, unknown][]) {
     if (value === null) continue; // a `None` Option: left out
-    if (isPublicKeyLike(value)) data[key] = value.toBase58();
-    else if (typeof value === 'bigint') data[key] = value.toString();
-    else if (value instanceof Uint8Array) data[key] = bytesToHex(value);
-    else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') data[key] = value;
-    else throw new TypeError(`eventToJson: unsupported value for ${event.name}.${key}`);
+    if (Array.isArray(value)) {
+      data[key] = value.map((item: unknown, i) => {
+        if (typeof item !== 'object' || item === null || isPublicKeyLike(item)) {
+          throw new TypeError(`eventToJson: unsupported value for ${event.name}.${key}[${i}]`);
+        }
+        const record: Record<string, EventJsonScalar> = {};
+        for (const [field, v] of Object.entries(item) as [string, unknown][]) {
+          record[field] = scalarToJson(v, `${event.name}.${key}[${i}].${field}`);
+        }
+        return record;
+      });
+    } else {
+      data[key] = scalarToJson(value, `${event.name}.${key}`);
+    }
   }
   return { name: event.name, data };
 }

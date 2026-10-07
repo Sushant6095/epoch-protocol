@@ -2,6 +2,12 @@
 import {
   type FeeIndexAccount,
   type FeeQuoteAccount,
+  findFeeIndexPda,
+  findIndexOperatorsPda,
+  findPoolPda,
+  type IndexBallotAccount,
+  type IndexOperatorsAccount,
+  type IndexVote,
   type InstructionName,
   instructionNameOf,
   type PoolAccount,
@@ -14,6 +20,7 @@ import {
   type ProgramAccount,
   type PublisherChain,
   type PublisherRole,
+  type PublisherSigner,
 } from '../Chain/PublisherChain';
 import { InputsHasher, type SlotFeeInput } from '../Index/InputsHash';
 import { type EpochIndexRow, type IndexStore } from '../Repositories/EpochIndexRepository';
@@ -44,6 +51,68 @@ export const feeIndex = (overrides: Partial<FeeIndexAccount> = {}): FeeIndexAcco
   ...overrides,
 });
 
+/** The operator registry PDA of PROGRAM_ID's FeeIndex: the FeeIndex's `publisher` once consensus is on. */
+export const REGISTRY = findIndexOperatorsPda(
+  PROGRAM_ID,
+  findFeeIndexPda(PROGRAM_ID, findPoolPda(PROGRAM_ID)[0])[0],
+)[0];
+
+/** A registry of `weights.length` operators `key(60 + i)`, threshold 6,667 bps, tolerance 100 bps. */
+export const indexOperators = (weights: number[] = [1, 1, 1]): IndexOperatorsAccount => ({
+  feeIndex: key(11),
+  bump: 254,
+  thresholdBps: 6_667,
+  toleranceBps: 100,
+  operatorCount: weights.length,
+  totalWeight: BigInt(weights.reduce((a, b) => a + b, 0)),
+  operators: [
+    ...weights.map((weight, i) => ({ key: key(60 + i), weight })),
+    ...Array.from({ length: 8 - weights.length }, () => ({ key: key(0), weight: 0 })),
+  ],
+});
+
+const emptyVote = (): IndexVote => ({
+  operator: key(0),
+  weight: 0,
+  voted: false,
+  value: 0n,
+  inputsHash: new Uint8Array(32),
+  slot: 0n,
+  deviationBps: 0,
+  agrees: false,
+  late: false,
+});
+
+/** A ballot for `epoch` opened on `registry` (round 0, nobody voted); `votes` fills slots by operator index. */
+export const indexBallot = (
+  epoch: bigint,
+  registry: IndexOperatorsAccount = indexOperators(),
+  overrides: Partial<IndexBallotAccount> = {},
+  votes: Record<number, Partial<IndexVote>> = {},
+): IndexBallotAccount => ({
+  feeIndex: key(11),
+  epoch,
+  bump: 253,
+  payer: key(60),
+  round: 0,
+  openedSlot: 1n,
+  thresholdBps: registry.thresholdBps,
+  toleranceBps: registry.toleranceBps,
+  totalWeight: registry.totalWeight,
+  operatorCount: registry.operatorCount,
+  votesCast: Object.values(votes).filter((v) => v.voted).length,
+  votes: registry.operators.map((o, i) =>
+    i < registry.operatorCount ? { ...emptyVote(), operator: o.key, weight: o.weight, ...votes[i] } : emptyVote(),
+  ),
+  medianValue: 0n,
+  agreeingWeight: 0n,
+  consensusSlot: 0n,
+  consensusValue: 0n,
+  consensusInputsHash: new Uint8Array(32),
+  proposedSlot: 0n,
+  ...overrides,
+});
+
 export const pool = (overrides: Partial<PoolAccount> = {}): PoolAccount =>
   ({ paused: false, treasury: key(2), scorer: key(3), admin: key(1), ...overrides }) as PoolAccount;
 
@@ -65,7 +134,7 @@ export const quote = (overrides: Partial<FeeQuoteAccount> = {}): FeeQuoteAccount
 
 export interface PublisherCall {
   label: string;
-  role: PublisherRole;
+  role: PublisherSigner;
   name: InstructionName | null;
   instruction: TransactionInstruction;
 }
@@ -83,11 +152,29 @@ export class FakePublisherChain implements PublisherChain {
   quoteAccounts: FeeQuoteAccount[] = [];
   makerBalance = 1_000n * SOL;
   proposalSignatures = new Map<string, string>();
+  /** Configured operator keys (INDEX_OPERATOR_KEYPAIR_PATHS). */
+  operators: PublicKey[] = [];
+  registryAccount: IndexOperatorsAccount | null = null;
+  ballotAccounts: IndexBallotAccount[] = [];
+  /** `${operator}:${hex(inputsHash)}` → signature of that key's cast_index_vote. */
+  voteSignatures = new Map<string, string>();
   readonly calls: PublisherCall[] = [];
   onExecute: (call: PublisherCall) => ExecuteResult = (call) => ({ status: 'sent', signature: `sig:${call.label}` });
 
   keyOf(role: PublisherRole): PublicKey | undefined {
     return role === 'publisher' ? this.publisher : this.maker;
+  }
+  operatorKeys(): PublicKey[] {
+    return [...this.operators];
+  }
+  async indexOperators(): Promise<IndexOperatorsAccount | null> {
+    return this.registryAccount;
+  }
+  async indexBallots(): Promise<IndexBallotAccount[]> {
+    return [...this.ballotAccounts];
+  }
+  async findVoteSignature(operator: PublicKey, inputsHash: Uint8Array): Promise<string | null> {
+    return this.voteSignatures.get(`${operator.toBase58()}:${Buffer.from(inputsHash).toString('hex')}`) ?? null;
   }
   async clock(): Promise<ChainClock> {
     return { epoch: this.epoch, slot: this.slot };
@@ -115,7 +202,7 @@ export class FakePublisherChain implements PublisherChain {
   async findProposalSignature(inputsHash: Uint8Array): Promise<string | null> {
     return this.proposalSignatures.get(Buffer.from(inputsHash).toString('hex')) ?? null;
   }
-  async execute(label: string, instructions: TransactionInstruction[], role: PublisherRole): Promise<ExecuteResult> {
+  async execute(label: string, instructions: TransactionInstruction[], role: PublisherSigner): Promise<ExecuteResult> {
     const instruction = instructions[instructions.length - 1];
     const call = { label, role, name: instructionNameOf(instruction.data), instruction };
     this.calls.push(call);

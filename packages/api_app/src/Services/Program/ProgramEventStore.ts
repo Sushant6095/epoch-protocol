@@ -1,4 +1,4 @@
-import { type EventName } from '@epoch/epoch-sdk';
+import { type EventJsonValue, type EventName } from '@epoch/epoch-sdk';
 import { type EpochDb, indexerCursors, programEvents } from '@epoch/pg_models';
 import { and, asc, desc, eq, gte, inArray, lt, type SQL, sql } from 'drizzle-orm';
 
@@ -145,7 +145,7 @@ export class PgEventStore implements ProgramEventStore {
       epoch: row.epoch,
       blockTime: row.blockTime ? row.blockTime.toISOString() : null,
       name: row.kind as EventName,
-      data: row.payload as Record<string, string | number | boolean>,
+      data: row.payload as Record<string, EventJsonValue>,
     }));
   }
 

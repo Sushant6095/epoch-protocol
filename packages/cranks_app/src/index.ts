@@ -55,7 +55,11 @@ async function main(): Promise<void> {
     chain,
     data,
     hedgeMakers,
-    { pollMs: config.CRANK_POLL_SECONDS * 1_000, alertAfterMs: config.CRANK_ALERT_AFTER_MINUTES * 60_000 },
+    {
+      pollMs: config.CRANK_POLL_SECONDS * 1_000,
+      alertAfterMs: config.CRANK_ALERT_AFTER_MINUTES * 60_000,
+      indexBallotRetentionEpochs: config.INDEX_BALLOT_RETENTION_EPOCHS,
+    },
     // Revenue-token buybacks trade on the program's cluster (the tokens' Meteora pools live there too).
     buyback.BUYBACK_ENABLED
       ? {

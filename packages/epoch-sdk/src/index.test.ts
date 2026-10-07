@@ -24,6 +24,8 @@ const REQUIRED = [
   // pda
   'findPoolPda',
   'findVaultPda',
+  'findIndexOperatorsPda',
+  'findIndexBallotPda',
   'findLenderPda',
   'findWithdrawRequestPda',
   'findPositionPda',
@@ -51,6 +53,11 @@ const REQUIRED = [
   'decodeValidatorPosition',
   'decodeAdvance',
   'decodeFeeIndex',
+  'decodeIndexOperators',
+  'decodeIndexBallot',
+  'activeIndexOperators',
+  'ballotVotes',
+  'indexBallotStatus',
   'decodeFeeQuote',
   'decodeSwapPosition',
   'decodeRevenueToken',
@@ -103,6 +110,15 @@ const REQUIRED = [
   'postIndex',
   'finalizeIndex',
   'vetoIndex',
+  'initializeIndexOperators',
+  'addIndexOperator',
+  'removeIndexOperator',
+  'setIndexOperatorWeight',
+  'setIndexConsensus',
+  'castIndexVote',
+  'submitIndexBallot',
+  'resetIndexBallot',
+  'closeIndexBallot',
   'postQuote',
   'withdrawQuote',
   'openSwap',
@@ -140,6 +156,11 @@ const REQUIRED = [
   'juniorRatioBps',
   'absorbLoss',
   'takerPnl',
+  'weightedMedian',
+  'agreesWithin',
+  'deviationBps',
+  'meetsThreshold',
+  'tallyVotes',
   'swapCollateral',
   'computeScore',
   'splitSweepWithShare',
@@ -197,7 +218,7 @@ const _shapes: {
   filter: GetProgramAccountsFilter;
   ixs: TransactionInstruction[];
   deposited: Extract<sdk.EpochEvent, { name: 'Deposited' }>['data'];
-  json: { name: sdk.EventName; data: Record<string, string | number | boolean> };
+  json: { name: sdk.EventName; data: Record<string, sdk.EventJsonValue> };
   error: { code: number; name: string; message: string } | undefined;
   errors: readonly { code: number; name: string; message: string }[];
   history: sdk.IndexPoint[];

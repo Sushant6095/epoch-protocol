@@ -12,6 +12,8 @@ export type AccountName =
   | 'ValidatorPosition'
   | 'Advance'
   | 'FeeIndex'
+  | 'IndexOperators'
+  | 'IndexBallot'
   | 'FeeQuote'
   | 'SwapPosition'
   | 'RevenueToken'
@@ -45,6 +47,15 @@ export type InstructionName =
   | 'post_index'
   | 'finalize_index'
   | 'veto_index'
+  | 'initialize_index_operators'
+  | 'add_index_operator'
+  | 'remove_index_operator'
+  | 'set_index_operator_weight'
+  | 'set_index_consensus'
+  | 'cast_index_vote'
+  | 'submit_index_ballot'
+  | 'reset_index_ballot'
+  | 'close_index_ballot'
   | 'post_quote'
   | 'withdraw_quote'
   | 'open_swap'
@@ -92,6 +103,16 @@ export type EventName =
   | 'IndexProposed'
   | 'IndexFinalized'
   | 'IndexVetoed'
+  | 'IndexOperatorsInitialized'
+  | 'IndexOperatorAdded'
+  | 'IndexOperatorRemoved'
+  | 'IndexOperatorWeightSet'
+  | 'IndexConsensusSet'
+  | 'IndexBallotOpened'
+  | 'IndexVoteCast'
+  | 'IndexConsensusReached'
+  | 'IndexBallotSubmitted'
+  | 'IndexBallotClosed'
   | 'QuotePosted'
   | 'SwapOpened'
   | 'SwapSettled'
@@ -109,7 +130,8 @@ export type EventName =
   | 'PriorityFeeDistributionCopied'
   | 'StakeInfoUpdated'
   | 'ScoreRefreshed'
-  | 'ScoringConfigured';
+  | 'ScoringConfigured'
+  | 'QuoteWithdrawn';
 
 export const ACCOUNT_DISCRIMINATORS: Readonly<Record<AccountName, Uint8Array>> = Object.freeze({
   Pool: new Uint8Array([241, 154, 109, 4, 17, 177, 109, 188]),
@@ -118,6 +140,8 @@ export const ACCOUNT_DISCRIMINATORS: Readonly<Record<AccountName, Uint8Array>> =
   ValidatorPosition: new Uint8Array([149, 243, 231, 113, 234, 221, 177, 221]),
   Advance: new Uint8Array([66, 25, 217, 133, 38, 192, 224, 218]),
   FeeIndex: new Uint8Array([120, 150, 229, 157, 248, 45, 110, 249]),
+  IndexOperators: new Uint8Array([59, 20, 65, 136, 24, 75, 192, 107]),
+  IndexBallot: new Uint8Array([73, 220, 215, 30, 68, 189, 28, 83]),
   FeeQuote: new Uint8Array([228, 252, 197, 237, 1, 50, 181, 20]),
   SwapPosition: new Uint8Array([65, 203, 85, 175, 129, 154, 6, 152]),
   RevenueToken: new Uint8Array([123, 71, 28, 221, 233, 129, 80, 207]),
@@ -151,6 +175,15 @@ export const INSTRUCTION_DISCRIMINATORS: Readonly<Record<InstructionName, Uint8A
   post_index: new Uint8Array([221, 162, 38, 53, 98, 77, 183, 154]),
   finalize_index: new Uint8Array([216, 244, 132, 90, 253, 137, 153, 204]),
   veto_index: new Uint8Array([105, 183, 218, 116, 209, 85, 47, 170]),
+  initialize_index_operators: new Uint8Array([184, 53, 52, 228, 137, 109, 113, 247]),
+  add_index_operator: new Uint8Array([53, 84, 242, 152, 120, 218, 183, 112]),
+  remove_index_operator: new Uint8Array([27, 157, 232, 215, 0, 209, 204, 240]),
+  set_index_operator_weight: new Uint8Array([57, 47, 206, 94, 153, 166, 194, 241]),
+  set_index_consensus: new Uint8Array([64, 229, 225, 67, 232, 149, 171, 82]),
+  cast_index_vote: new Uint8Array([193, 124, 112, 119, 50, 188, 106, 236]),
+  submit_index_ballot: new Uint8Array([247, 68, 69, 118, 147, 65, 182, 9]),
+  reset_index_ballot: new Uint8Array([120, 242, 35, 233, 150, 55, 202, 81]),
+  close_index_ballot: new Uint8Array([230, 80, 84, 119, 35, 160, 233, 123]),
   post_quote: new Uint8Array([68, 231, 88, 224, 13, 116, 27, 84]),
   withdraw_quote: new Uint8Array([209, 209, 177, 248, 7, 105, 157, 66]),
   open_swap: new Uint8Array([109, 109, 21, 132, 201, 76, 67, 113]),
@@ -199,6 +232,16 @@ export const EVENT_DISCRIMINATORS: Readonly<Record<EventName, Uint8Array>> = Obj
   IndexProposed: new Uint8Array([34, 205, 59, 177, 150, 79, 9, 185]),
   IndexFinalized: new Uint8Array([220, 108, 152, 84, 157, 165, 201, 162]),
   IndexVetoed: new Uint8Array([79, 144, 93, 156, 122, 24, 194, 132]),
+  IndexOperatorsInitialized: new Uint8Array([242, 206, 143, 74, 3, 96, 2, 54]),
+  IndexOperatorAdded: new Uint8Array([230, 63, 118, 191, 146, 159, 195, 21]),
+  IndexOperatorRemoved: new Uint8Array([153, 75, 208, 67, 182, 8, 116, 1]),
+  IndexOperatorWeightSet: new Uint8Array([203, 103, 20, 76, 30, 148, 33, 116]),
+  IndexConsensusSet: new Uint8Array([243, 7, 217, 59, 39, 74, 172, 242]),
+  IndexBallotOpened: new Uint8Array([241, 21, 181, 209, 101, 34, 215, 152]),
+  IndexVoteCast: new Uint8Array([106, 53, 13, 151, 35, 117, 100, 224]),
+  IndexConsensusReached: new Uint8Array([50, 111, 1, 253, 151, 76, 92, 182]),
+  IndexBallotSubmitted: new Uint8Array([58, 200, 114, 238, 220, 189, 183, 57]),
+  IndexBallotClosed: new Uint8Array([138, 187, 34, 23, 34, 195, 84, 71]),
   QuotePosted: new Uint8Array([130, 69, 35, 209, 183, 130, 239, 156]),
   SwapOpened: new Uint8Array([31, 172, 136, 212, 249, 139, 42, 67]),
   SwapSettled: new Uint8Array([104, 192, 63, 194, 238, 236, 149, 85]),
@@ -217,6 +260,7 @@ export const EVENT_DISCRIMINATORS: Readonly<Record<EventName, Uint8Array>> = Obj
   StakeInfoUpdated: new Uint8Array([181, 235, 215, 27, 252, 126, 49, 81]),
   ScoreRefreshed: new Uint8Array([250, 182, 172, 112, 252, 188, 222, 234]),
   ScoringConfigured: new Uint8Array([235, 216, 69, 63, 190, 216, 94, 242]),
+  QuoteWithdrawn: new Uint8Array([201, 132, 14, 18, 98, 162, 155, 141]),
 });
 
 export const ACCOUNT_NAMES = Object.freeze(Object.keys(ACCOUNT_DISCRIMINATORS) as AccountName[]);

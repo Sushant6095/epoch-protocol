@@ -11,6 +11,7 @@ import {
   type BuybackJobOptions,
   ClaimMevJob,
   type ClaimMevJobOptions,
+  CloseBallotsJob,
   FinalizeIndexJob,
   HistoryJob,
   type HistoryJobOptions,
@@ -47,6 +48,8 @@ export interface JobRunnerOptions {
   alertAfterMs: number;
   /** Between boundaries the scorer re-checks this often, so a new hedge counts without waiting for the next epoch. */
   rescoreMs?: number;
+  /** Settled Fee Index ballots are closed this many epochs behind the last final one (CloseBallotsJob). */
+  indexBallotRetentionEpochs?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -56,15 +59,17 @@ export interface JobRunnerOptions {
  *
  * 1. **Boundary steps**, in the order the program needs, until each is done for the current program epoch:
  *    validator history (copies, stake info, refresh_score) → update scores (the fallback for validators without
- *    fresh history) → wait for Jito's MEV claims (gate, bounded) → sweep (gate: waits for epoch rewards) → mark
- *    defaults (gate) → accrue (gate). A gate that is not done yet stops the steps after it; the next tick retries it.
- *    History and scoring never block and never wait on Jito: the MEV claim wait is the first blocking step.
+ *    fresh history) → wait for Jito's MEV claims (gate, bounded) → close settled Fee Index ballots → sweep (gate:
+ *    waits for epoch rewards) → mark defaults (gate) → accrue (gate). A gate that is not done yet stops the steps
+ *    after it; the next tick retries it. History and scoring never block and never wait on Jito: the MEV claim wait
+ *    is the first blocking step.
  * 2. **Steady jobs** once every gate is done, then on every tick: process withdrawals (the queue is paid as soon as
  *    the cash is there, never before this epoch's sweep and accrual), and revenue-token buybacks (one due slice per
  *    token per tick, after the sweep has moved this epoch's share into the escrow).
- * 3. **Pollers** on every tick regardless: finalize the Fee Index after its dispute window, settle swaps; and every
- *    `rescoreMs` (30 minutes) the history job again (Jito's merkle roots land hours into the epoch; a new hedge counts
- *    at the next refresh), then the scorer, which posts only when a score or hedged flag changed.
+ * 3. **Pollers** on every tick regardless: submit a queued Fee Index ballot and finalize the index after its dispute
+ *    window, settle swaps; and every `rescoreMs` (30 minutes) the history job again (Jito's merkle roots land hours
+ *    into the epoch; a new hedge counts at the next refresh), then the scorer, which posts only when a score or
+ *    hedged flag changed.
  *
  * Every job is idempotent, so a restart mid-epoch simply re-checks the chain.
  */
@@ -112,6 +117,7 @@ export class JobRunner {
         { job: scores, gate: false },
         // The first blocking step: the sweep waits (bounded) for Jito's MEV claims; scoring never waits on Jito.
         { job: new ClaimMevJob(chain, { now: options.now, ...claimMev }), gate: true, alert: false },
+        { job: new CloseBallotsJob(chain, options.indexBallotRetentionEpochs), gate: false },
         { job: new SweepJob(chain), gate: true },
         { job: new MarkDefaultJob(chain), gate: true },
         { job: new AccrueJob(chain), gate: true },

@@ -177,6 +177,66 @@ export interface FeeIndexAccount {
   historyCount: number;
 }
 
+/** One registered Fee Index operator: its voting key and weight. */
+export interface IndexOperator {
+  key: PublicKey;
+  weight: number;
+}
+
+/** `["index_operators", fee_index]`: who votes on the Fee Index, and how much each vote weighs. */
+export interface IndexOperatorsAccount {
+  feeIndex: PublicKey;
+  bump: number;
+  /** Agreeing weight needed, bps of `totalWeight` (the share is rounded up to a whole bps). */
+  thresholdBps: number;
+  /** A vote agrees when within this many bps of the weighted median. */
+  toleranceBps: number;
+  operatorCount: number;
+  totalWeight: bigint;
+  /** All 8 slots, raw; the first `operatorCount` are registered, in the order added (`activeIndexOperators`). */
+  operators: IndexOperator[];
+}
+
+/** One operator's slot in a ballot round. */
+export interface IndexVote {
+  operator: PublicKey;
+  weight: number;
+  voted: boolean;
+  value: bigint;
+  inputsHash: Uint8Array;
+  slot: bigint;
+  /** From the weighted median before consensus, from the agreed value after it; bps rounded up. */
+  deviationBps: number;
+  agrees: boolean;
+  /** Cast after consensus: on the record, never counted. */
+  late: boolean;
+}
+
+/** `["index_ballot", fee_index, epoch]`: one program epoch's Fee Index vote. */
+export interface IndexBallotAccount {
+  feeIndex: PublicKey;
+  epoch: bigint;
+  bump: number;
+  payer: PublicKey;
+  round: number;
+  openedSlot: bigint;
+  thresholdBps: number;
+  toleranceBps: number;
+  totalWeight: bigint;
+  operatorCount: number;
+  votesCast: number;
+  /** All 8 slots, raw; the first `operatorCount` are the round's operators and their votes (`ballotVotes`). */
+  votes: IndexVote[];
+  medianValue: bigint;
+  agreeingWeight: bigint;
+  /** 0 until the threshold is met. */
+  consensusSlot: bigint;
+  consensusValue: bigint;
+  consensusInputsHash: Uint8Array;
+  /** Slot the proposal went into the FeeIndex; 0 while queued. */
+  proposedSlot: bigint;
+}
+
 export interface FeeQuoteAccount {
   pool: PublicKey;
   maker: PublicKey;
@@ -335,6 +395,8 @@ export interface EpochAccountMap {
   ValidatorPosition: ValidatorPositionAccount;
   Advance: AdvanceAccount;
   FeeIndex: FeeIndexAccount;
+  IndexOperators: IndexOperatorsAccount;
+  IndexBallot: IndexBallotAccount;
   FeeQuote: FeeQuoteAccount;
   SwapPosition: SwapPositionAccount;
   RevenueToken: RevenueTokenAccount;
@@ -353,6 +415,8 @@ export const ACCOUNT_SIZES: Readonly<Record<AccountName, number>> = Object.freez
   ValidatorPosition: 415,
   Advance: 196,
   FeeIndex: 486,
+  IndexOperators: 406,
+  IndexBallot: 936,
   FeeQuote: 151,
   SwapPosition: 133,
   RevenueToken: 503,
@@ -367,6 +431,8 @@ export const FIELD_OFFSETS = Object.freeze({
   WithdrawRequest: Object.freeze({ pool: 8, owner: 40 }),
   ValidatorPosition: Object.freeze({ pool: 8, vote: 40, operator: 104 }),
   Advance: Object.freeze({ pool: 8, vote: 40 }),
+  IndexOperators: Object.freeze({ feeIndex: 8 }),
+  IndexBallot: Object.freeze({ feeIndex: 8 }),
   FeeQuote: Object.freeze({ pool: 8, maker: 40 }),
   SwapPosition: Object.freeze({ quote: 8, taker: 40 }),
   RevenueToken: Object.freeze({ pool: 8, position: 40, vote: 72, operator: 104, mint: 136, dbcPool: 200 }),
@@ -383,6 +449,8 @@ const RESERVED: Readonly<Record<AccountName, number>> = {
   ValidatorPosition: 0,
   Advance: 16,
   FeeIndex: 32,
+  IndexOperators: 64,
+  IndexBallot: 32,
   FeeQuote: 16,
   SwapPosition: 16,
   // Its first 2 reserved bytes are `fee_floor_bps` now.
@@ -688,6 +756,89 @@ export function decodeFeeIndex(data: Uint8Array): FeeIndexAccount {
   return account;
 }
 
+export function decodeIndexOperators(data: Uint8Array): IndexOperatorsAccount {
+  const r = open('IndexOperators', data);
+  const feeIndex = r.pubkey('feeIndex');
+  const bump = r.u8('bump');
+  const thresholdBps = r.u16('thresholdBps');
+  const toleranceBps = r.u16('toleranceBps');
+  const operatorCount = r.u8('operatorCount');
+  const totalWeight = r.u64('totalWeight');
+  const slots = r.array(PROGRAM_CONSTANTS.MAX_INDEX_OPERATORS, () => ({
+    key: r.pubkey('operators.key'),
+    weight: r.u32('operators.weight'),
+  }));
+  r.skip(RESERVED.IndexOperators, '_reserved');
+  return { feeIndex, bump, thresholdBps, toleranceBps, operatorCount, totalWeight, operators: slots };
+}
+
+/** The registered operators: `IndexOperators::active` (the first `operatorCount` slots). */
+export function activeIndexOperators(account: IndexOperatorsAccount): IndexOperator[] {
+  return account.operators.slice(0, Math.min(account.operatorCount, PROGRAM_CONSTANTS.MAX_INDEX_OPERATORS));
+}
+
+export function decodeIndexBallot(data: Uint8Array): IndexBallotAccount {
+  const r = open('IndexBallot', data);
+  const head = {
+    feeIndex: r.pubkey('feeIndex'),
+    epoch: r.u64('epoch'),
+    bump: r.u8('bump'),
+    payer: r.pubkey('payer'),
+    round: r.u8('round'),
+    openedSlot: r.u64('openedSlot'),
+    thresholdBps: r.u16('thresholdBps'),
+    toleranceBps: r.u16('toleranceBps'),
+    totalWeight: r.u64('totalWeight'),
+    operatorCount: r.u8('operatorCount'),
+    votesCast: r.u8('votesCast'),
+  };
+  const slots = r.array(PROGRAM_CONSTANTS.MAX_INDEX_OPERATORS, () => ({
+    operator: r.pubkey('votes.operator'),
+    weight: r.u32('votes.weight'),
+    voted: r.bool('votes.voted'),
+    value: r.u64('votes.value'),
+    inputsHash: r.bytes(32, 'votes.inputsHash'),
+    slot: r.u64('votes.slot'),
+    deviationBps: r.u32('votes.deviationBps'),
+    agrees: r.bool('votes.agrees'),
+    late: r.bool('votes.late'),
+  }));
+  const account: IndexBallotAccount = {
+    ...head,
+    votes: slots,
+    medianValue: r.u64('medianValue'),
+    agreeingWeight: r.u64('agreeingWeight'),
+    consensusSlot: r.u64('consensusSlot'),
+    consensusValue: r.u64('consensusValue'),
+    consensusInputsHash: r.bytes(32, 'consensusInputsHash'),
+    proposedSlot: r.u64('proposedSlot'),
+  };
+  r.skip(RESERVED.IndexBallot, '_reserved');
+  return account;
+}
+
+/** The round's operators and their votes: `IndexBallot::snapshot` (the first `operatorCount` slots). */
+export function ballotVotes(account: IndexBallotAccount): IndexVote[] {
+  return account.votes.slice(0, Math.min(account.operatorCount, PROGRAM_CONSTANTS.MAX_INDEX_OPERATORS));
+}
+
+/**
+ * Where a ballot stands against the FeeIndex (`IndexBallot::status` in `state/index_ballot.rs`):
+ * `voting` (no consensus yet), `queued` (consensus waiting for the FeeIndex: an earlier proposal in its window, or a
+ * move above `max_move_bps`), `proposed` (its proposal is in the dispute window), `vetoed` (its proposal was dropped;
+ * the next vote opens a new round) or `settled` (the FeeIndex is final at or past its epoch; closable).
+ */
+export type IndexBallotStatus = 'voting' | 'queued' | 'proposed' | 'vetoed' | 'settled';
+
+export function indexBallotStatus(ballot: IndexBallotAccount, index: FeeIndexAccount): IndexBallotStatus {
+  if (index.epoch >= ballot.epoch) return 'settled';
+  if (ballot.consensusSlot === 0n) return 'voting';
+  if (ballot.proposedSlot === 0n) return 'queued';
+  const pending =
+    index.hasProposal && index.proposedEpoch === ballot.epoch && index.proposedSlot === ballot.proposedSlot;
+  return pending ? 'proposed' : 'vetoed';
+}
+
 export function decodeFeeQuote(data: Uint8Array): FeeQuoteAccount {
   const r = open('FeeQuote', data);
   const account: FeeQuoteAccount = {
@@ -815,6 +966,8 @@ const DECODERS: { [K in AccountName]: (data: Uint8Array) => EpochAccountMap[K] }
   ValidatorPosition: decodeValidatorPosition,
   Advance: decodeAdvance,
   FeeIndex: decodeFeeIndex,
+  IndexOperators: decodeIndexOperators,
+  IndexBallot: decodeIndexBallot,
   FeeQuote: decodeFeeQuote,
   SwapPosition: decodeSwapPosition,
   RevenueToken: decodeRevenueToken,

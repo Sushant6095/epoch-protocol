@@ -40,6 +40,11 @@ grep -q "^declare_id!(\"$TEST_PROGRAM_ID\");" "$LIB" || {
   exit 1
 }
 
+# Cargo treats the copy as fresh whatever changed in it (its sources live under the target dir), so a program
+# change, or a build of another copy with a different id, would leave a stale epoch.so. Forget the epoch crate's
+# fingerprint so it always recompiles (about 15 s); its dependencies stay cached.
+rm -rf "$TARGET"/sbpf-solana-solana/release/.fingerprint/epoch-*
+
 # Same Cargo.toml and Cargo.lock as the repo, so the dependency graph (and the shared build cache) match.
 CARGO_TARGET_DIR="$TARGET" cargo-build-sbf \
   --manifest-path "$SRC/programs/epoch/Cargo.toml" \

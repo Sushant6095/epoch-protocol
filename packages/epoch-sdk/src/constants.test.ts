@@ -47,6 +47,20 @@ describe('constants mirror programs/epoch/src/constants.rs', () => {
     expect(VOTE_PROGRAM_ID.toBase58()).toBe(c.VOTE_PROGRAM_ID);
   });
 
+  it('has the Fee Index consensus constants', () => {
+    const c = vectors.constants;
+    for (const name of [
+      'MAX_INDEX_OPERATORS',
+      'MAX_INDEX_TOTAL_WEIGHT',
+      'DEFAULT_INDEX_THRESHOLD_BPS',
+      'MIN_INDEX_THRESHOLD_BPS',
+      'DEFAULT_INDEX_TOLERANCE_BPS',
+      'MAX_INDEX_TOLERANCE_BPS',
+    ] as const) {
+      expect({ name, value: PROGRAM_CONSTANTS[name] }).toEqual({ name, value: c[name] });
+    }
+  });
+
   it('has the revenue-token constants and the Meteora and SPL addresses', () => {
     const c = vectors.constants;
     for (const name of [

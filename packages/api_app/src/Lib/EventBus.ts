@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-import type { EventName } from '@epoch/epoch-sdk';
+import type { EventJsonValue, EventName } from '@epoch/epoch-sdk';
 
 /** A decoded program event as stored in program_events and passed around the process. */
 export interface StoredProgramEvent {
@@ -13,8 +13,11 @@ export interface StoredProgramEvent {
   /** ISO 8601, when known. */
   blockTime: string | null;
   name: EventName;
-  /** epoch-sdk `eventToJson(event).data`: pubkeys base58, u64/i64 decimal strings, byte arrays hex. */
-  data: Record<string, string | number | boolean>;
+  /**
+   * epoch-sdk `eventToJson(event).data`: pubkeys base58, u64/i64 decimal strings, byte arrays hex; a list of structs
+   * (`IndexBallotOpened.operators`) as a list of flat records.
+   */
+  data: Record<string, EventJsonValue>;
 }
 
 /** A Predict call, for the activity feed (calls are not transactions). */

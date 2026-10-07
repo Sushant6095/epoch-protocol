@@ -5,7 +5,7 @@ use crate::{constants::*, errors::EpochError};
 /// Governance-set parameters. Every rate is in basis points.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Default, InitSpace)]
 pub struct PoolParams {
-    /// Senior tranche target coupon per epoch (4 = 0.04%/epoch ≈ 7.5%/yr at ~182 epochs).
+    /// Senior tranche target coupon per epoch (3 = 0.03%/epoch ≈ 8.1%/yr at ≈271.5 epochs a year).
     pub senior_rate_bps_per_epoch: u16,
     /// Share of realised income (fees and recoveries) paid to the treasury.
     pub protocol_fee_bps: u16,

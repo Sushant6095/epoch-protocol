@@ -305,9 +305,35 @@ it is our traction record.
 
 ### `GET /v1/index/epochs/:epoch` (resolution source)
 
-Public. One mainnet epoch's Fee Index and how settled it is: `status` = `pending` · `computed` · `proposed` · `final`
-· `vetoed`; `value` in µL/CU; `onChain.postSignature` / `onChain.finalizeSignature` (explorer links). Link it from our
-market's detail ("Resolution source"). Example in [FEE_INDEX_METHODOLOGY.md](../FEE_INDEX_METHODOLOGY.md#reading-it).
+Public. One mainnet epoch's Fee Index and how settled it is: `status` = `pending` · `computed` · `voting` · `proposed`
+· `final` · `vetoed`; `value` in µL/CU; `onChain.postSignature` / `onChain.finalizeSignature` (explorer links). Link it
+from our market's detail ("Resolution source"). Example in
+[FEE_INDEX_METHODOLOGY.md](../FEE_INDEX_METHODOLOGY.md#reading-it). Markets resolve only on `final`, as before.
+
+Operator consensus: several registered operators vote on each epoch's value, and it is proposed only when operators
+holding at least two thirds of the weight agree within the tolerance (1%). While they vote, `status` is `voting` and
+`value` is the current weighted median. `ballot` (null when a single publisher posted the value) shows who voted what:
+
+```jsonc
+"ballot": {
+  "programEpoch": 1176, "round": 0,
+  "status": "proposed",            // voting · queued · proposed · vetoed · settled
+  "thresholdBps": 6667, "toleranceBps": 100,
+  "totalWeight": 3, "agreeingWeight": 2, "agreeingBps": 6667,
+  "votesCast": 3, "operatorCount": 3,
+  "medianValue": 1004, "consensus": true, "consensusValue": 1004, "consensusSlot": 431991,
+  "votes": [
+    { "operator": "Op1…", "weight": 1, "voted": true, "value": 1000, "deviationBps": 40, "agrees": true, "late": false, "inputsHash": "…", "slot": 431990 },
+    { "operator": "Op2…", "weight": 1, "voted": true, "value": 1004, "deviationBps": 0, "agrees": true, "late": false, "inputsHash": "…", "slot": 431991 },
+    { "operator": "Op3…", "weight": 1, "voted": true, "value": 1500, "deviationBps": 4941, "agrees": false, "late": false, "inputsHash": "…", "slot": 431992 }
+  ],
+  "source": "account"              // events once the ballot account is closed
+}
+```
+
+Show it on our market's detail under the resolution source as "Agreed by 2 of 3 operators (67% ≥ 66.67%)" with one row
+per operator (value, deviation, agrees); a dissenter's deviation is part of the record. The `feeIndex` WS channel
+carries the open ballot as `ballot` and pushes on every vote, so a "Voting: 1 of 3" chip can update live.
 
 ### `GET /v1/index/forecast` (Terminal: Fee Index card)
 
@@ -391,6 +417,7 @@ refresh positions (the row becomes `claimed`).
 | Trading off | `access.tradingEnabled: false` or `503 PANTA_TRADING_DISABLED` | banner with `access.reason`; browse only |
 | Not configured | `503 PANTA_NOT_CONFIGURED` on the page | Real tab shows "Real-money markets are coming soon" and the Points tab opens by default |
 | Market closed | `tradable: false`, `409 PANTA_MARKET_CLOSED` | "Trading closed" + `resolvesAt` |
+| Resolving | resolution `status` is `voting` or `proposed` | "Operators voting: N of M" (from `ballot`) or "Agreed, final after the dispute window"; not resolved until `final` |
 | Quote expired / moved | `409 PANTA_QUOTE_EXPIRED` / `PANTA_QUOTE_STALE` | re-quote automatically and ask again |
 | Amount | `400 PANTA_AMOUNT_OUT_OF_RANGE` (`details.minUsdc`, `maxUsdc`), `400 PANTA_AMOUNT_TOO_SMALL` | inline under the amount |
 | Busy | `429 PANTA_BUSY` / `PANTA_RATE_LIMITED` / `TOO_MANY_REQUESTS` (`details.retryAfterSeconds`) | "Busy, retrying in N s" and retry once |

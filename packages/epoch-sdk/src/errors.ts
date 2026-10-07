@@ -27,7 +27,11 @@ export const EPOCH_ERRORS: readonly EpochErrorInfo[] = Object.freeze(
       message: 'Not enough cash in the vault; try again after the next sweep',
     },
     { code: 6011, name: 'JuniorLocked', message: 'Junior tranche is still locked' },
-    { code: 6012, name: 'JuniorFloorBreached', message: 'Withdrawal would push the junior tranche below its floor' },
+    {
+      code: 6012,
+      name: 'JuniorFloorBreached',
+      message: 'Senior deposit would push the junior tranche below its floor',
+    },
     {
       code: 6013,
       name: 'NotHeadOfQueue',
@@ -205,6 +209,42 @@ export const EPOCH_ERRORS: readonly EpochErrorInfo[] = Object.freeze(
     },
     { code: 6099, name: 'HistoryIsFresh', message: 'This validator has fresh on-chain history: use refresh_score' },
     { code: 6100, name: 'InvalidScoreConfig', message: 'Score configuration is out of range' },
+    {
+      code: 6101,
+      name: 'InvalidConsensusParams',
+      message: 'Threshold must be 5,001 to 10,000 bps and tolerance at most 1,000 bps',
+    },
+    {
+      code: 6102,
+      name: 'InvalidOperatorWeight',
+      message: 'Operator weight must be above zero and the total weight at most 10,000',
+    },
+    { code: 6103, name: 'IndexOperatorExists', message: 'This key is already a Fee Index operator' },
+    { code: 6104, name: 'IndexOperatorsFull', message: 'The Fee Index already has the maximum of 8 operators' },
+    { code: 6105, name: 'UnknownIndexOperator', message: 'This key is not a registered Fee Index operator' },
+    { code: 6106, name: 'NoIndexOperators', message: 'No Fee Index operators are registered' },
+    { code: 6107, name: 'NotIndexOperator', message: 'Signer is not an operator in this ballot round' },
+    { code: 6108, name: 'VoteLocked', message: "Consensus was reached: this operator's vote is locked" },
+    {
+      code: 6109,
+      name: 'IndexEpochNotStarted',
+      message: 'That epoch has not started on this cluster; vote after it starts',
+    },
+    { code: 6110, name: 'NoConsensus', message: 'The ballot has not reached consensus' },
+    {
+      code: 6111,
+      name: 'BallotAlreadyProposed',
+      message: "The ballot's proposal was already written into the Fee Index",
+    },
+    {
+      code: 6112,
+      name: 'BallotNotResettable',
+      message: 'Only a ballot that is voting, queued or vetoed can be reset; veto a pending proposal first',
+    },
+    { code: 6113, name: 'BallotNotClosable', message: "The ballot's epoch is not final yet" },
+    { code: 6114, name: 'ConsensusOff', message: 'Operator consensus is off: the Fee Index has a single publisher' },
+    { code: 6115, name: 'BallotPayerMismatch', message: 'The rent goes back to the account that paid for the ballot' },
+    { code: 6116, name: 'QuoteNotExpired', message: 'The quote has not expired and its epoch has not started' },
   ].map((e) => Object.freeze(e)),
 );
 

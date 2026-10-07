@@ -48,6 +48,26 @@ pub const VOTE_STATE_SIZE: usize = 3_762;
 /// Epochs of index history kept on-chain for readers that want a short series.
 pub const INDEX_HISTORY: usize = 16;
 
+// ── Fee index operator consensus ───────────────────────────────────────────
+/// `["index_operators", fee_index]`: the `IndexOperators` registry.
+pub const INDEX_OPERATORS_SEED: &[u8] = b"index_operators";
+/// `["index_ballot", fee_index, epoch_le]`: one `IndexBallot` per epoch.
+pub const INDEX_BALLOT_SEED: &[u8] = b"index_ballot";
+/// Most operators a registry (and so a ballot) holds.
+pub const MAX_INDEX_OPERATORS: usize = 8;
+/// Cap on the registry's total weight. Keeps the threshold's round-up to a
+/// whole bps lenient by less than 1 bps (`math::consensus::meets_threshold`).
+pub const MAX_INDEX_TOTAL_WEIGHT: u64 = 10_000;
+/// Default agreeing weight needed: two thirds of the total, in bps.
+pub const DEFAULT_INDEX_THRESHOLD_BPS: u16 = 6_667;
+/// The threshold must be a strict majority so two disjoint groups can never
+/// both reach it.
+pub const MIN_INDEX_THRESHOLD_BPS: u16 = 5_001;
+/// Default agreement tolerance around the weighted median, bps.
+pub const DEFAULT_INDEX_TOLERANCE_BPS: u16 = 100;
+/// Widest agreement tolerance the admin may set, bps.
+pub const MAX_INDEX_TOLERANCE_BPS: u16 = 1_000;
+
 // ── Revenue tokens (ADR 0006, plan F13) ────────────────────────────────────
 /// `["revenue_token", vote]`: the `RevenueToken` account.
 pub const REVENUE_TOKEN_SEED: &[u8] = b"revenue_token";

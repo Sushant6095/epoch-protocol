@@ -20,12 +20,21 @@ async function main(): Promise<void> {
   const config = loadConfig(PublisherConfigSchema);
   const publisher = config.PUBLISHER_KEYPAIR_PATH ? loadKeypair(config.PUBLISHER_KEYPAIR_PATH) : undefined;
   const maker = config.MAKER_KEYPAIR_PATH ? loadKeypair(config.MAKER_KEYPAIR_PATH) : undefined;
-  if (!publisher && !maker) {
+  // Operator keys vote once consensus is on; without INDEX_OPERATOR_KEYPAIR_PATHS the publisher key is the one voter.
+  const operators =
+    config.INDEX_OPERATOR_KEYPAIR_PATHS.length > 0
+      ? config.INDEX_OPERATOR_KEYPAIR_PATHS.map((path) => loadKeypair(path))
+      : publisher
+        ? [publisher]
+        : [];
+  const indexing = publisher !== undefined || operators.length > 0;
+  if (!indexing && !maker) {
     throw new ConfigException(
-      'Nothing to run: set PUBLISHER_KEYPAIR_PATH (Fee Index) and/or MAKER_KEYPAIR_PATH (quotes)',
+      'Nothing to run: set PUBLISHER_KEYPAIR_PATH or INDEX_OPERATOR_KEYPAIR_PATHS (Fee Index) and/or ' +
+        'MAKER_KEYPAIR_PATH (quotes)',
     );
   }
-  if (publisher && !PostgresConnectionManager.isConfigured()) {
+  if (indexing && !PostgresConnectionManager.isConfigured()) {
     throw new ConfigException('The index publisher reads epoch_index and slot_fees: set DATABASE_URL');
   }
   if (maker && config.EPOCH_MARKET_MAKER && config.EPOCH_MARKET_MAKER !== maker.publicKey.toBase58()) {
@@ -56,12 +65,13 @@ async function main(): Promise<void> {
       publisher: publisher ? new TransactionSender(connections, publisher, { beam }) : undefined,
       maker: maker ? new TransactionSender(connections, maker, { beam }) : undefined,
     },
+    operators: operators.map((operator) => new TransactionSender(connections, operator, { beam })),
     computeUnitPriceMicroLamports: config.PUBLISHER_CU_PRICE_MICROLAMPORTS,
     dryRun: config.DRY_RUN,
   });
 
   const steps: PublisherStep[] = [];
-  if (publisher) {
+  if (indexing) {
     const store = new PgIndexStore(PostgresConnectionManager.getDb());
     steps.push(new IndexPublisher(chain, store, { offset: config.FEE_INDEX_EPOCH_OFFSET }));
   }
@@ -81,6 +91,7 @@ async function main(): Promise<void> {
     cluster: config.EPOCH_CLUSTER,
     programId: programId.toBase58(),
     publisher: publisher?.publicKey.toBase58() ?? null,
+    indexOperators: operators.map((operator) => operator.publicKey.toBase58()),
     maker: maker?.publicKey.toBase58() ?? null,
     feeIndexEpochOffset: config.FEE_INDEX_EPOCH_OFFSET,
     dryRun: config.DRY_RUN,

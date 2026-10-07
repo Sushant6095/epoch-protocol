@@ -3,6 +3,7 @@
 //! and is covered by unit tests. Rounding always favours the pool.
 
 pub mod amm;
+pub mod consensus;
 pub mod credit_limit;
 pub mod history;
 pub mod revenue_token;
@@ -13,6 +14,7 @@ pub mod u256;
 pub mod waterfall;
 
 pub use amm::*;
+pub use consensus::*;
 pub use credit_limit::*;
 pub use history::*;
 pub use revenue_token::*;

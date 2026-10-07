@@ -15,6 +15,8 @@ export const SEEDS = {
   escrow: 'escrow',
   advance: 'advance',
   feeIndex: 'fee_index',
+  indexOperators: 'index_operators',
+  indexBallot: 'index_ballot',
   quote: 'quote',
   swap: 'swap',
   revenueToken: 'revenue_token',
@@ -38,6 +40,18 @@ export const PROGRAM_CONSTANTS = {
   MIN_REVENUE_HISTORY: 3,
   DEFAULT_AFTER_LATE_EPOCHS: 3,
   INDEX_HISTORY: 16,
+  // Fee Index operator consensus
+  /** Most operators a registry (and so a ballot round) holds. */
+  MAX_INDEX_OPERATORS: 8,
+  /** Cap on the registry's total weight (keeps the threshold's round-up under 1 bps). */
+  MAX_INDEX_TOTAL_WEIGHT: 10_000,
+  /** Agreeing weight needed by default: two thirds of the total, bps. */
+  DEFAULT_INDEX_THRESHOLD_BPS: 6667,
+  /** The threshold must be a strict majority. */
+  MIN_INDEX_THRESHOLD_BPS: 5001,
+  /** Default agreement tolerance around the weighted median, bps. */
+  DEFAULT_INDEX_TOLERANCE_BPS: 100,
+  MAX_INDEX_TOLERANCE_BPS: 1000,
   // Revenue tokens
   MIN_SHARE_BPS: 1,
   MAX_SHARE_BPS: 5000,

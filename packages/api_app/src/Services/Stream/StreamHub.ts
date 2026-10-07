@@ -55,6 +55,12 @@ export const FEE_INDEX_EVENTS: ReadonlySet<EventName> = new Set<EventName>([
   'IndexProposed',
   'IndexFinalized',
   'IndexVetoed',
+  // Operator consensus: every vote moves the ballot progress the frame carries.
+  'IndexBallotOpened',
+  'IndexVoteCast',
+  'IndexConsensusReached',
+  'IndexBallotSubmitted',
+  'IndexBallotClosed',
 ]);
 
 /** The `slot` channel's reads (mainnet). */

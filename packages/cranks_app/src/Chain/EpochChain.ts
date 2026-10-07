@@ -2,6 +2,7 @@ import {
   type AdvanceAccount,
   type EpochErrorInfo,
   type FeeIndexAccount,
+  type IndexBallotAccount,
   type PoolAccount,
   type RevenueTokenAccount,
   type ScoreConfigAccount,
@@ -76,6 +77,8 @@ export interface EpochChain {
   positions(): Promise<ProgramAccount<ValidatorPositionAccount>[]>;
   advance(address: PublicKey): Promise<AdvanceAccount | null>;
   feeIndex(): Promise<ProgramAccount<FeeIndexAccount> | null>;
+  /** Every Fee Index ballot not closed yet (operator consensus), in any order. */
+  indexBallots(): Promise<ProgramAccount<IndexBallotAccount>[]>;
   /** The queued withdrawal with this sequence number, or null when it does not exist (processed or never made). */
   withdrawRequest(seq: bigint): Promise<WithdrawRequestAccount | null>;
   /** Open swap positions (settled ones are closed by settle_swap), optionally only one taker's. */

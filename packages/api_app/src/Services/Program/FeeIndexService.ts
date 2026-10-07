@@ -1,4 +1,10 @@
-import { type EventName, type FeeIndexAccount, feeIndexHistory } from '@epoch/epoch-sdk';
+import {
+  type EventName,
+  type FeeIndexAccount,
+  feeIndexHistory,
+  type IndexBallotAccount,
+  indexBallotStatus,
+} from '@epoch/epoch-sdk';
 import { ServiceUnavailableException } from '@epoch/exceptions';
 import { Logger } from '@epoch/logger';
 import { type EpochDb, epochIndex } from '@epoch/pg_models';
@@ -7,11 +13,13 @@ import { and, desc, gte, lte, type SQL } from 'drizzle-orm';
 import { type StoredProgramEvent } from '../../Lib/EventBus';
 import { type ProgramAccount } from '../../Sources/EpochProgramSource';
 import {
+  type FeeIndexBallotView,
   type FeeIndexLatest,
   type FeeIndexPoint,
   type FeeIndexStatus,
   type FeeIndexStreamData,
 } from '../../types/Activity.types';
+import { ballotFromAccount } from './FeeIndexBallotView';
 import { type ProgramEventStore } from './ProgramEventStore';
 
 const logger = Logger.create('FeeIndexService');
@@ -57,6 +65,8 @@ export interface FeeIndexReader {
   readonly configured: boolean;
   /** The FeeIndex account, or null before `initialize_index`. */
   feeIndex(): Promise<ProgramAccount<FeeIndexAccount> | null>;
+  /** The FeeIndex's open IndexBallot accounts (operator consensus); absent or empty without consensus. */
+  indexBallots?(): Promise<ProgramAccount<IndexBallotAccount>[]>;
 }
 
 export interface FeeIndexServiceDeps {
@@ -91,6 +101,9 @@ const toPoint = ({ epoch, value, status }: ProgramPoint): FeeIndexPoint => ({ ep
  * - the FeeIndex account: the last final value and its 16-epoch history → `final`; a pending proposal → `proposed`;
  * - stored IndexProposed / IndexFinalized / IndexVetoed events: the newest event per epoch decides (finalized →
  *   `final`, proposed → `proposed`, vetoed → `vetoed`), so a vetoed proposal stays visible until a new one is posted;
+ * - open IndexBallot accounts (operator consensus): an epoch still voting, or agreed and queued, with no newer program
+ *   fact → `voting` (value: the agreed value once reached, else the current weighted median); a ballot reopened after
+ *   a veto replaces the vetoed point;
  * - epoch_index rows the indexer computed: kept only for epochs the program has no value for, without a status.
  * Final is terminal (the program never re-opens a finalized epoch), and program values win over computed ones.
  */
@@ -105,21 +118,25 @@ export class FeeIndexService {
   /** GET /v1/index: newest first. 503 PROGRAM_NOT_CONFIGURED without the program and the database. */
   async points(range: FeeIndexRange): Promise<FeeIndexPoint[]> {
     this.requireAvailable();
-    return this.merge(await this.programView(), range);
+    return this.merge((await this.programView()).points, range);
   }
 
   /** The last final value, the pending proposal and the 8-epoch average (FeeMarketSnapshot.index, the KPIs). */
   async latest(): Promise<FeeIndexLatest> {
     this.requireAvailable();
-    return this.latestOf(await this.programView());
+    return this.latestOf((await this.programView()).points);
   }
 
-  /** The WS `feeIndex` channel: the 16 newest points and `latest()`, from one read. */
+  /** The WS `feeIndex` channel: the 16 newest points, `latest()` and the open ballot's progress, from one read. */
   async stream(): Promise<FeeIndexStreamData> {
     this.requireAvailable();
-    const view = await this.programView();
+    const { points: view, account, ballots } = await this.programView();
     const points = await this.merge(view, { limit: STREAM_POINTS });
-    return { points, ...this.latestOf(view) };
+    const open = ballots
+      .filter(({ account: b }) => !account || indexBallotStatus(b, account) !== 'settled')
+      .sort((a, b) => (a.account.epoch < b.account.epoch ? 1 : -1))[0];
+    const ballot: FeeIndexBallotView | null = open ? ballotFromAccount(open.address, open.account, account) : null;
+    return { points, ...this.latestOf(view), ballot };
   }
 
   private requireAvailable(): void {
@@ -158,12 +175,17 @@ export class FeeIndexService {
     };
   }
 
-  private async programView(): Promise<ProgramView> {
+  private async programView(): Promise<{
+    points: ProgramView;
+    account: FeeIndexAccount | null;
+    ballots: ProgramAccount<IndexBallotAccount>[];
+  }> {
     const points: ProgramView = new Map();
-    if (!this.deps.program.configured) return points;
-    const [account, events] = await Promise.all([
+    if (!this.deps.program.configured) return { points, account: null, ballots: [] };
+    const [account, events, ballots] = await Promise.all([
       this.readAccount(),
       this.deps.events.query({ names: INDEX_EVENT_NAMES, limit: 10_000 }), // newest first
+      this.readBallots(),
     ]);
     const window = account ? Number(account.disputeWindowSlots) : null;
 
@@ -172,7 +194,7 @@ export class FeeIndexService {
       const point = fromEvent(event, window);
       if (point && points.get(point.epoch)?.status !== 'final') points.set(point.epoch, point);
     }
-    if (!account) return points;
+    if (!account) return { points, account, ballots };
 
     const finals = feeIndexHistory(account).map((p) => ({ epoch: Number(p.epoch), value: Number(p.value) }));
     if (account.finalizedSlot > 0n) finals.push({ epoch: Number(account.epoch), value: Number(account.value) });
@@ -194,7 +216,35 @@ export class FeeIndexService {
         });
       }
     }
-    return points;
+    for (const { account: ballot } of ballots) {
+      const status = indexBallotStatus(ballot, account);
+      if ((status !== 'voting' && status !== 'queued') || ballot.votesCast === 0) continue;
+      const epoch = Number(ballot.epoch);
+      const opened = Number(ballot.openedSlot);
+      const known = points.get(epoch);
+      // Only a vetoed point older than this round gives way (the round reopened after the veto).
+      if (known && !(known.status === 'vetoed' && known.slot <= opened)) continue;
+      const consensus = ballot.consensusSlot > 0n;
+      points.set(epoch, {
+        epoch,
+        value: Number(consensus ? ballot.consensusValue : ballot.medianValue),
+        status: 'voting',
+        slot: opened,
+        disputeEndsSlot: null,
+      });
+    }
+    return { points, account, ballots };
+  }
+
+  /** The open ballots, or none without consensus; a failed read degrades to no voting points (logged). */
+  private async readBallots(): Promise<ProgramAccount<IndexBallotAccount>[]> {
+    if (!this.deps.program.indexBallots) return [];
+    try {
+      return await this.deps.program.indexBallots();
+    } catch (error) {
+      logger.warn('IndexBallot accounts read failed; no voting points', { error: String(error) });
+      return [];
+    }
   }
 
   /** The account, or null before `initialize_index`; a failed read degrades to the stored events (logged). */

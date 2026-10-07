@@ -8,12 +8,13 @@ program cluster's epoch and runs:
 | 1 | `HistoryJob` | `init_validator_history`, `copy_vote_account`, `copy_tip_distribution_account`, `copy_priority_fee_distribution`, `update_stake_info`, `refresh_score` | crank (`update_stake_info`: scorer) | each boundary until done, then every 30 min | no |
 | 2 | `UpdateScoreJob` | `update_score` | scorer (crank pays) | each boundary until done, then every 30 min; only validators without fresh history | no |
 | 3 | `ClaimMevJob` | — (reads Jito's accounts) | — | each boundary until Jito's claims land, at most `MEV_CLAIM_WAIT_MINUTES` | yes (bounded, no alert) |
-| 4 | `SweepJob` | `sweep` | crank | each boundary until done | yes |
-| 5 | `MarkDefaultJob` | `mark_default` | crank | each boundary until done | yes |
-| 6 | `AccrueJob` | `accrue` | crank | each boundary until done | yes |
-| 7 | `ProcessWithdrawalsJob` | `process_withdrawal` | crank | every tick once 3–6 are done | — |
-| 8 | `FinalizeIndexJob` | `finalize_index` | crank | every tick | — |
-| 9 | `SettleSwapsJob` | `settle_swap` | crank | every tick | — |
+| 4 | `CloseBallotsJob` | `close_index_ballot` | crank | each boundary until done | no |
+| 5 | `SweepJob` | `sweep` | crank | each boundary until done | yes |
+| 6 | `MarkDefaultJob` | `mark_default` | crank | each boundary until done | yes |
+| 7 | `AccrueJob` | `accrue` | crank | each boundary until done | yes |
+| 8 | `ProcessWithdrawalsJob` | `process_withdrawal` | crank | every tick once the gates (3, 5–7) are done | — |
+| 9 | `FinalizeIndexJob` | `submit_index_ballot`, `finalize_index` | crank | every tick | — |
+| 10 | `SettleSwapsJob` | `settle_swap` | crank | every tick | — |
 
 A job answers `done` or `retry` (waiting on the chain, or a transient failure). A gate that is not done holds the
 steps after it until a later tick, so accrual always follows this epoch's sweeps and defaults, and withdrawals follow
@@ -52,7 +53,14 @@ identical simulation is repeated at most every 30 minutes). Every job is tested 
   is paid whole if `pool.cash` covers it (mirror of the program's maths); it stops at a head that waits for cash
   (`InsufficientLiquidity`) and comes back next tick, so a request is paid as soon as a sweep brings the cash.
 - **FinalizeIndexJob**: when a proposal is pending and `slot >= proposed_slot + dispute_window_slots`. Nothing else
-  calls it, and `post_index` refuses the next epoch while a proposal is pending.
+  calls it, and `post_index` refuses the next epoch while a proposal is pending. With no proposal pending and
+  operator consensus on, it sends `submit_index_ballot` for the lowest ballot whose status is `queued` (consensus
+  reached while the FeeIndex was busy or the move was above `max_move_bps`; `indexBallotStatus` in the SDK), and
+  otherwise logs the progress of a ballot still voting (agreeing weight against the threshold), once per change.
+  `IndexMoveTooLarge` is logged once as an error: the admin widens `max_move_bps` or vetoes.
+- **CloseBallotsJob**: once per epoch, `close_index_ballot` for every ballot that is `settled` (the FeeIndex is final
+  at or past its epoch) and at least `INDEX_BALLOT_RETENTION_EPOCHS` behind the last final epoch, refunding the
+  rent (≈ 0.0074 SOL) to the ballot's payer. The votes stay in the indexed events.
 - **SettleSwapsJob**: every open swap whose epoch has a final value (`feeIndexValueFor`), oldest first, cranker = the
   crank key, taker = the swap's taker (receives collateral ± P&L and the rent); at most 20 per tick. The FeeIndex keeps
   the current value plus 16 earlier ones: a swap whose value is 3 finalizations or fewer from eviction logs
@@ -118,6 +126,7 @@ is what disagrees (the program does not check the flag, it trusts the scorer).
 | `JITO_TIP_DISTRIBUTION_PROGRAM_ID` | `4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7` (mainnet) | where `ClaimMevJob` reads TDAs and ClaimStatus on the program's cluster |
 | `MEV_CLAIM_WAIT_MINUTES` | 360 | how long the sweep waits for Jito's claims after a boundary (0 = never waits) |
 | `HISTORY_WATCHLIST` | empty | comma-separated vote accounts to keep a `ValidatorHistory` for besides the onboarded ones |
+| `INDEX_BALLOT_RETENTION_EPOCHS` | 4 | settled Fee Index ballots stay this many epochs behind the last final one before `CloseBallotsJob` closes them |
 
 ```bash
 pnpm --filter @epoch/cranks_app build

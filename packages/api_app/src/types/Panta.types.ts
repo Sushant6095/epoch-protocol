@@ -3,6 +3,7 @@
 // from (GET /v1/index/epochs/:epoch). The page contract is docs/pages/predict.md. Units live in field names; USDC
 // amounts are decimal strings (never floats); prices and probabilities are 0–1 numbers.
 
+import type { FeeIndexBallotView } from './Activity.types';
 import type { Meta } from './Api.types';
 
 /**
@@ -415,10 +416,11 @@ export interface PantaStreamData {
 
 /**
  * pending: no value yet (the epoch is running, or the indexer has not computed it). computed: the indexer's value,
- * not posted on chain yet. proposed: posted, inside the on-chain dispute window. final: past the window without a
- * veto (what markets resolve from). vetoed: the posted value was vetoed; a corrected one may follow.
+ * not posted on chain yet. voting: the operators are voting on it (operator consensus), no agreed value proposed yet.
+ * proposed: posted, inside the on-chain dispute window. final: past the window without a veto (what markets resolve
+ * from). vetoed: the posted value was vetoed; a corrected one may follow.
  */
-export type FeeIndexEpochStatus = 'pending' | 'computed' | 'proposed' | 'final' | 'vetoed';
+export type FeeIndexEpochStatus = 'pending' | 'computed' | 'voting' | 'proposed' | 'final' | 'vetoed';
 
 /** The Solana Fee Index of one MAINNET epoch and how settled it is: the resolution source of Epoch's Panta markets. */
 export interface FeeIndexEpochView extends Meta {
@@ -443,5 +445,10 @@ export interface FeeIndexEpochView extends Meta {
     /** The `finalize_index` transaction (cranks_app), once final. */
     finalizeSignature: string | null;
   } | null;
+  /**
+   * Operator consensus on the program epoch (operators, weights, values, deviations, whether consensus was reached);
+   * null when the value was posted by a single publisher, or before any vote.
+   */
+  ballot: FeeIndexBallotView | null;
   methodology: string;
 }

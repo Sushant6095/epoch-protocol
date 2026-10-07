@@ -58,6 +58,8 @@ export const CranksConfigSchema = z.object({
         .filter(Boolean),
     )
     .pipe(z.array(address).max(500)),
+  /** CloseBallotsJob keeps settled Fee Index ballots this many epochs behind the last final epoch before closing them. */
+  INDEX_BALLOT_RETENTION_EPOCHS: z.coerce.number().int().min(0).max(64).default(4),
 });
 
 export type CranksConfig = z.infer<typeof CranksConfigSchema>;
