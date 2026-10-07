@@ -51,4 +51,7 @@ CARGO_TARGET_DIR="$TARGET" cargo-build-sbf \
   --sbf-out-dir "$OUT" \
   "$@"
 
+# And forget it again, so the next build of programs/epoch itself (deploy) does not take this copy's binary as fresh.
+rm -rf "$TARGET"/sbpf-solana-solana/release/.fingerprint/epoch-*
+
 echo "built $OUT/epoch.so (program id $TEST_PROGRAM_ID)"

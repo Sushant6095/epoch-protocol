@@ -1,0 +1,20 @@
+{
+  "seniorRateBpsPerEpoch": 3,
+  "protocolFeeBps": 1000,
+  "advanceBpsUnhedged": 2500,
+  "advanceBpsHedged": 4000,
+  "bondMultiplier": 4,
+  "feeBps": 200,
+  "remitBps": 5000,
+  "minScore": 6000,
+  "scoreTtlEpochs": 3,
+  "minAdvanceLamports": "1000000000",
+  "maxAdvanceLamports": "500000000000",
+  "maxPoolAssets": "5000000000000",
+  "maxUtilizationBps": 6000,
+  "minJuniorBps": 2000,
+  "juniorLockEpochs": 10,
+  "maxAdvanceEpochs": 20,
+  "voteReserveLamports": "100000000",
+  "minCommissionBps": 0
+}

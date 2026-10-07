@@ -1,0 +1,21 @@
+{
+  "name": "@epoch/devnet-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Devnet go-live kit: deploy, init, seed with real flows, the CP1 proof, budget and status (run with tsx; rehearsed on a local validator)",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src --max-warnings=0",
+    "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests",
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@epoch/epoch-sdk": "workspace:*",
+    "@epoch/meteora": "workspace:*",
+    "@solana/web3.js": "^1.98.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0"
+  }
+}

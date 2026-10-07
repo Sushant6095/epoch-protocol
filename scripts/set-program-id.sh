@@ -42,7 +42,12 @@ ENV="$ROOT/.env.example"
 sed -i.bak -E "s/^EPOCH_PROGRAM_ID=.*/EPOCH_PROGRAM_ID=$ID/" "$ENV" && rm -f "$ENV.bak"
 
 IDL="$ROOT/programs/epoch/idl/epoch.json"
-sed -i.bak -E "0,/^  \"address\": \"[^\"]*\",$/s//  \"address\": \"$ID\",/" "$IDL" && rm -f "$IDL.bak"
+# The first "address" (the program's); BSD sed has no `0,/re/` address, so node does it.
+node -e '
+  const fs = require("fs");
+  const [file, id] = process.argv.slice(1);
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/^  "address": "[^"]*",$/m, `  "address": "${id}",`));
+' "$IDL" "$ID"
 
 if [ "${2:-}" != "--no-vectors" ]; then
   # The vectors carry the declared id (Anchor passes it for an absent optional account).
