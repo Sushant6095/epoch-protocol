@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   program:
-    name: program (cargo check)
+    name: program (cargo check, unit and property tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -20,6 +20,48 @@ jobs:
           toolchain: "1.89"
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
+      # Unit tests (src/**) and the proptest suite (programs/epoch/tests/props.rs).
+      - run: cargo test --workspace --locked
+
+  program-litesvm:
+    name: program (SBF build, LiteSVM suite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AGAVE_VERSION: v4.3.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.89"
+          components: rustfmt
+      # The suite is its own workspace (programs/epoch/tests/litesvm, see tests/README.md); cache both targets.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            programs/epoch/tests/litesvm -> target
+      - name: Cache the Agave CLI and platform-tools
+        id: agave-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana
+          key: agave-${{ env.AGAVE_VERSION }}-${{ runner.os }}
+      - name: Install the Agave CLI
+        if: steps.agave-cache.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/${AGAVE_VERSION}/install)"
+      - run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      # The suite's own workspace is outside the root `cargo fmt`; fail fast, before the SBF build.
+      - name: Format check (LiteSVM suite)
+        run: cargo fmt --check --manifest-path programs/epoch/tests/litesvm/Cargo.toml
+      - name: Build the program for LiteSVM (test program id)
+        run: programs/epoch/tests/build-sbf.sh
+      # Loads target/litesvm/epoch.so (the step above).
+      # The Meteora CPI test skips itself here: the DBC / DAMM v2 dumps are not committed (tests/README.md).
+      - name: LiteSVM suite
+        run: cargo test --locked --manifest-path programs/epoch/tests/litesvm/Cargo.toml
 
   typescript:
     name: typescript (build, lint, test)

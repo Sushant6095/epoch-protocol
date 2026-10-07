@@ -1,0 +1,36 @@
+# LiteSVM integration suite for the Epoch program (see tests/README.md at the repo root).
+#
+# Its own workspace and Cargo.lock on purpose: every LiteSVM release that builds on the repo's Rust 1.89
+# (0.14-0.16, Agave 4.1/4.2) is built against the SDK crates that use `wincode` 0.5, while the program's
+# dev-dependencies (`solana-vote-interface` 7.1, `solana-pubkey` 4.4) lock the `wincode` 0.6 generation, and
+# Cargo allows one version per semver line in a lockfile. LiteSVM 0.17 (Agave 4.3) needs Rust 1.97.
+# A separate lockfile lets `epoch`'s normal dependencies resolve to the generation LiteSVM 0.15 needs
+# without touching the program's own lock.
+[package]
+name = "epoch-litesvm-tests"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+publish = false
+description = "LiteSVM full-cycle tests for the Epoch program"
+
+[workspace]
+
+[dependencies]
+anchor-lang = "=1.2.0"  # the version the program is built with (root Cargo.lock)
+base64 = "0.22"
+epoch = { path = "../..", features = ["no-entrypoint"] }
+litesvm = "=0.15.2"
+# Hold the Agave line at 4.1.2: its crates pin each other with `=`, and LiteSVM's caret requirements
+# would otherwise pull 4.3, which needs Rust 1.97.
+agave-feature-set = "=4.1.2"
+solana-program-runtime = "=4.1.2"
+solana-account = "4"
+solana-keypair = "3.1"
+solana-message = "4"
+solana-signer = "3"
+solana-system-interface = { version = "3", features = ["bincode"] }
+solana-transaction = "4"
+solana-transaction-error = "3"
+solana-instruction-error = "2"
+solana-vote-interface = { version = "6", features = ["bincode"] }
