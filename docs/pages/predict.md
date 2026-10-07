@@ -342,7 +342,10 @@ The `feeIndex` WS channel pushes on every vote, so a "Voting: 1 of 3" chip can u
 (`{ epoch, value }` or null), `proposed` (`{ epoch, value, disputeEndsSlot }` or null), `avg8`, `points` (the 16 newest,
 as `GET /v1/index?limit=16`; a point's `status` is `final`, `proposed`, `vetoed` or `voting`, and absent for an epoch
 only the indexer computed) and `ballot`: the newest ballot that is not settled, in the shape above, or null when none is
-open or consensus is off. Points with a `status` are numbered by PROGRAM epoch, like `ballot.programEpoch`.
+open or consensus is off. Every point is numbered by MAINNET epoch (`epoch` = `mainnetEpoch`) and carries
+`clusterEpoch`, the program epoch it is posted under (null on devnet until it is posted); `final`, `proposed` and
+`ballot.programEpoch` are program epochs, like the Fee Market's quotes. Label the chart with `mainnetEpoch` and link
+a point to its resolution source with `GET /v1/index/epochs/{mainnetEpoch}`.
 
 ### `GET /v1/index/latest-final` (the newest final value)
 

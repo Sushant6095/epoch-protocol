@@ -32,7 +32,7 @@ until then.
 
 | Hook (`src/lib/data/`) | Endpoint | Status | Fixture | Type | Refresh |
 | --- | --- | --- | --- | --- | --- |
-| `useFeeIndex({ from, to, limit })` | `GET /v1/index?from=&to=&limit=` → `FeeIndexPoint[]` newest first | **exists** in `packages/api_app` (no `status` field yet) | `fee-index.sample.json` | `FeeIndexSeries` | per epoch |
+| `useFeeIndex({ from, to, limit })` | `GET /v1/index?from=&to=&limit=` → `FeeIndexPoint[]` newest first | **exists** in `packages/api_app`: `{ epoch, value, status?, mainnetEpoch, clusterEpoch }`, numbered by mainnet epoch | `fee-index.sample.json` | `FeeIndexSeries` | per epoch |
 | `useNetwork()` | `GET /v1/network` | **built** 1 Oct (to deploy, #25) | `network.real.json` | `NetworkSnapshot` | 1 min; slot/epoch live over WS |
 | `useStakeHistory(64)` | `GET /v1/network/stake-history?epochs=64` | **built** 1 Oct (to deploy, #25) | `stake-history-64.real.json` | `StakeHistory` | per epoch |
 | `useValidators(query)` | `GET /v1/validators?tab=&chips=&q=&sort=&dir=&fee=&client=&country=&votes=&cursor=&limit=` | **built** 1 Oct (to deploy, #25) | `validators.real.json` (26 of 683) | `ValidatorList` | 1 min |

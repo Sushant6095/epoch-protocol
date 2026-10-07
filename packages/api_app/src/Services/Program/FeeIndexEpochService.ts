@@ -103,6 +103,8 @@ let service: FeeIndexEpochService | undefined;
 export function getFeeIndexEpochService(): FeeIndexEpochService {
   if (service) return service;
   const { program, events } = getServices();
+  // No offset and no recorded posts: its points stay numbered by PROGRAM epoch (mainnetEpoch = clusterEpoch), which is
+  // what programPoint asks it for.
   const programOnly = new FeeIndexService({ program, events, computed: null });
   const db: (() => EpochDb) | null = dbAvailable() ? () => PostgresConnectionManager.getDb() : null;
   // The IndexProposed / IndexFinalized events, re-read at most every 30 s (a post or a finalize, once found, never

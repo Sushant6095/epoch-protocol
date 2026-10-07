@@ -9,6 +9,8 @@ import {
   FeeIndexService,
   type FeeIndexReader,
   PgComputedIndexSource,
+  type PostedEpoch,
+  PgPostedEpochSource,
 } from './FeeIndexService';
 import { MemoryEventStore } from './ProgramEventStore';
 
@@ -108,6 +110,8 @@ async function build(options: {
   computed?: [number, number][] | null;
   configured?: boolean;
   ballots?: IndexBallotAccount[];
+  epochOffset?: number | 'auto';
+  posted?: PostedEpoch[];
 }) {
   const events = new MemoryEventStore();
   await events.insert(options.events ?? []);
@@ -132,7 +136,8 @@ async function build(options: {
               .slice(0, limit)
               .map(([epoch, value]) => ({ epoch, value })),
         };
-  return new FeeIndexService({ program, events, computed });
+  const posted = options.posted ? { pairs: async () => options.posted ?? [] } : null;
+  return new FeeIndexService({ program, events, computed, epochOffset: options.epochOffset, posted });
 }
 
 describe('FeeIndexService', () => {
@@ -142,8 +147,8 @@ describe('FeeIndexService', () => {
       events: [indexEvent('IndexProposed', 600, 1043, 1500), indexEvent('IndexVetoed', 700, 1043, 1500)],
     });
     expect(await vetoed.points({ limit: 5 })).toEqual([
-      { epoch: 1043, value: 1500, status: 'vetoed' },
-      { epoch: 1042, value: 1284, status: 'final' },
+      { epoch: 1043, value: 1500, status: 'vetoed', mainnetEpoch: 1043, clusterEpoch: 1043 },
+      { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1042 },
     ]);
     expect((await vetoed.latest()).proposed).toBeNull();
 
@@ -155,15 +160,17 @@ describe('FeeIndexService', () => {
         indexEvent('IndexProposed', 800, 1043, 1330),
       ],
     });
-    expect(await reproposed.points({ limit: 1 })).toEqual([{ epoch: 1043, value: 1330, status: 'proposed' }]);
+    expect(await reproposed.points({ limit: 1 })).toEqual([
+      { epoch: 1043, value: 1330, status: 'proposed', mainnetEpoch: 1043, clusterEpoch: 1043 },
+    ]);
     expect((await reproposed.latest()).proposed).toEqual({ epoch: 1043, value: 1330, disputeEndsSlot: 800 + WINDOW });
   });
 
   it('shows an epoch still voting (median, then the queued agreed value); the stream carries its ballot', async () => {
     const voting = await build({ account: account([[1042, 1284]]), ballots: [ballotAccount(1043, [1300])] });
     expect(await voting.points({ limit: 2 })).toEqual([
-      { epoch: 1043, value: 1300, status: 'voting' },
-      { epoch: 1042, value: 1284, status: 'final' },
+      { epoch: 1043, value: 1300, status: 'voting', mainnetEpoch: 1043, clusterEpoch: 1043 },
+      { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1042 },
     ]);
     const { ballot } = await voting.stream();
     expect(ballot).toMatchObject({
@@ -183,7 +190,13 @@ describe('FeeIndexService', () => {
       account: account([[1042, 1284]]),
       ballots: [ballotAccount(1043, [1300, 1302], { consensusSlot: 950n, consensusValue: 1300n })],
     });
-    expect((await queued.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1300, status: 'voting' });
+    expect((await queued.points({ limit: 1 }))[0]).toEqual({
+      epoch: 1043,
+      value: 1300,
+      status: 'voting',
+      mainnetEpoch: 1043,
+      clusterEpoch: 1043,
+    });
     expect((await queued.stream()).ballot).toMatchObject({ status: 'queued', consensus: true, agreeingBps: 6667 });
   });
 
@@ -194,24 +207,48 @@ describe('FeeIndexService', () => {
       events,
       ballots: [ballotAccount(1043, [1310], { round: 1, openedSlot: 750n })],
     });
-    expect((await reopened.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1310, status: 'voting' });
+    expect((await reopened.points({ limit: 1 }))[0]).toEqual({
+      epoch: 1043,
+      value: 1310,
+      status: 'voting',
+      mainnetEpoch: 1043,
+      clusterEpoch: 1043,
+    });
 
     const notYet = await build({
       account: account([[1042, 1284]]),
       events,
       ballots: [ballotAccount(1043, [1500, 1500], { consensusSlot: 590n, consensusValue: 1500n, proposedSlot: 600n })],
     });
-    expect((await notYet.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1500, status: 'vetoed' });
+    expect((await notYet.points({ limit: 1 }))[0]).toEqual({
+      epoch: 1043,
+      value: 1500,
+      status: 'vetoed',
+      mainnetEpoch: 1043,
+      clusterEpoch: 1043,
+    });
     expect((await notYet.stream()).ballot).toMatchObject({ status: 'vetoed' });
 
     const proposed = await build({
       account: account([[1042, 1284]], { epoch: 1043, value: 1330, slot: 800 }),
       ballots: [ballotAccount(1043, [1330, 1331], { consensusSlot: 800n, consensusValue: 1330n, proposedSlot: 800n })],
     });
-    expect((await proposed.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1330, status: 'proposed' });
+    expect((await proposed.points({ limit: 1 }))[0]).toEqual({
+      epoch: 1043,
+      value: 1330,
+      status: 'proposed',
+      mainnetEpoch: 1043,
+      clusterEpoch: 1043,
+    });
 
     const settled = await build({ account: account([[1042, 1284]]), ballots: [ballotAccount(1042, [1284])] });
-    expect((await settled.points({ limit: 1 }))[0]).toEqual({ epoch: 1042, value: 1284, status: 'final' });
+    expect((await settled.points({ limit: 1 }))[0]).toEqual({
+      epoch: 1042,
+      value: 1284,
+      status: 'final',
+      mainnetEpoch: 1042,
+      clusterEpoch: 1042,
+    });
     expect((await settled.stream()).ballot).toBeNull();
   });
 
@@ -220,7 +257,13 @@ describe('FeeIndexService', () => {
       account: account([[1042, 1284]], { epoch: 1043, value: 1330, slot: 800 }),
       events: [indexEvent('IndexProposed', 800, 1043, 1330), indexEvent('IndexVetoed', 810, 1043, 1330)],
     });
-    expect((await service.points({ limit: 1 }))[0]).toEqual({ epoch: 1043, value: 1330, status: 'vetoed' });
+    expect((await service.points({ limit: 1 }))[0]).toEqual({
+      epoch: 1043,
+      value: 1330,
+      status: 'vetoed',
+      mainnetEpoch: 1043,
+      clusterEpoch: 1043,
+    });
   });
 
   it('marks the account value and its history final, and final is never replaced', async () => {
@@ -234,11 +277,11 @@ describe('FeeIndexService', () => {
       events: [indexEvent('IndexProposed', 300, 1041, 1249), indexEvent('IndexFinalized', 400, 1039, 1260)],
     });
     expect(await service.points({ limit: 10 })).toEqual([
-      { epoch: 1042, value: 1284, status: 'final' },
-      { epoch: 1041, value: 1250, status: 'final' },
-      { epoch: 1040, value: 1190, status: 'final' },
+      { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1042 },
+      { epoch: 1041, value: 1250, status: 'final', mainnetEpoch: 1041, clusterEpoch: 1041 },
+      { epoch: 1040, value: 1190, status: 'final', mainnetEpoch: 1040, clusterEpoch: 1040 },
       // Older than the account's 16-epoch history: from its IndexFinalized event.
-      { epoch: 1039, value: 1260, status: 'final' },
+      { epoch: 1039, value: 1260, status: 'final', mainnetEpoch: 1039, clusterEpoch: 1039 },
     ]);
   });
 
@@ -254,10 +297,10 @@ describe('FeeIndexService', () => {
     });
     const points = await service.points({ limit: 10 });
     expect(points).toEqual([
-      { epoch: 1044, value: 1301 },
-      { epoch: 1043, value: 1330, status: 'proposed' },
-      { epoch: 1042, value: 1284, status: 'final' },
-      { epoch: 1041, value: 1251 },
+      { epoch: 1044, value: 1301, mainnetEpoch: 1044, clusterEpoch: 1044 },
+      { epoch: 1043, value: 1330, status: 'proposed', mainnetEpoch: 1043, clusterEpoch: 1043 },
+      { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1042 },
+      { epoch: 1041, value: 1251, mainnetEpoch: 1041, clusterEpoch: 1041 },
     ]);
     expect('status' in points[0]).toBe(false);
   });
@@ -298,7 +341,13 @@ describe('FeeIndexService', () => {
     });
     const stream = await service.stream();
     expect(stream.points).toHaveLength(10);
-    expect(stream.points[0]).toEqual({ epoch: 1042, value: 1330, status: 'proposed' });
+    expect(stream.points[0]).toEqual({
+      epoch: 1042,
+      value: 1330,
+      status: 'proposed',
+      mainnetEpoch: 1042,
+      clusterEpoch: 1042,
+    });
     expect(stream.avg8).toBe(1249);
   });
 
@@ -308,8 +357,8 @@ describe('FeeIndexService', () => {
       events: [indexEvent('IndexFinalized', 400, 1042, 1284), indexEvent('IndexProposed', 500, 1043, 1330)],
     });
     expect(await service.points({ limit: 5 })).toEqual([
-      { epoch: 1043, value: 1330, status: 'proposed' },
-      { epoch: 1042, value: 1284, status: 'final' },
+      { epoch: 1043, value: 1330, status: 'proposed', mainnetEpoch: 1043, clusterEpoch: 1043 },
+      { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1042 },
     ]);
     // Without the account the dispute window is unknown.
     expect((await service.latest()).proposed).toEqual({ epoch: 1043, value: 1330, disputeEndsSlot: null });
@@ -318,8 +367,101 @@ describe('FeeIndexService', () => {
   it('works before initialize_index and without the program', async () => {
     expect(await (await build({ account: null })).points({ limit: 5 })).toEqual([]);
     const dbOnly = await build({ configured: false, computed: [[1041, 1251]] });
-    expect(await dbOnly.points({ limit: 5 })).toEqual([{ epoch: 1041, value: 1251 }]);
+    expect(await dbOnly.points({ limit: 5 })).toEqual([
+      { epoch: 1041, value: 1251, mainnetEpoch: 1041, clusterEpoch: 1041 },
+    ]);
     expect(await dbOnly.latest()).toEqual({ final: null, proposed: null, avg8: null });
+  });
+
+  describe('one numbering: mainnet epochs, the program epoch beside', () => {
+    it('localnet and mainnet (offset 0): program and computed values meet on the same epoch', async () => {
+      const service = await build({
+        account: account([[1042, 1284]], { epoch: 1043, value: 1330, slot: 900 }),
+        computed: [
+          [1044, 1301],
+          [1043, 1329],
+          [1042, 1283],
+        ],
+      });
+      expect(await service.points({ limit: 5 })).toEqual([
+        { epoch: 1044, value: 1301, mainnetEpoch: 1044, clusterEpoch: 1044 },
+        { epoch: 1043, value: 1330, status: 'proposed', mainnetEpoch: 1043, clusterEpoch: 1043 },
+        { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1042 },
+      ]);
+    });
+
+    it('a devnet-style fixed offset: program epoch P = M + 125 lands on mainnet epoch M', async () => {
+      const service = await build({
+        epochOffset: 125,
+        // Program epochs 1167 and 1168 carry mainnet 1042 and 1043.
+        account: account([[1167, 1284]], { epoch: 1168, value: 1330, slot: 900 }),
+        computed: [
+          [1044, 1301],
+          [1043, 1329],
+          [1042, 1283],
+        ],
+      });
+      const points = await service.points({ limit: 10 });
+      expect(points).toEqual([
+        { epoch: 1044, value: 1301, mainnetEpoch: 1044, clusterEpoch: 1169 },
+        { epoch: 1043, value: 1330, status: 'proposed', mainnetEpoch: 1043, clusterEpoch: 1168 },
+        { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1167 },
+      ]);
+      // from / to are mainnet epochs, for program values too.
+      expect((await service.points({ from: 1042, to: 1043, limit: 10 })).map((p) => p.epoch)).toEqual([1043, 1042]);
+      // The stream's points are numbered the same way; final and proposed stay in program epochs (quotes use them).
+      const stream = await service.stream();
+      expect(stream.points.map((p) => [p.epoch, p.clusterEpoch])).toEqual([
+        [1044, 1169],
+        [1043, 1168],
+        [1042, 1167],
+      ]);
+      expect([stream.final?.epoch, stream.proposed?.epoch]).toEqual([1167, 1168]);
+    });
+
+    it('auto (devnet): recorded posts place program values; unposted epochs have no program epoch yet', async () => {
+      const service = await build({
+        epochOffset: 'auto',
+        posted: [{ mainnetEpoch: 1042, clusterEpoch: 1176 }],
+        account: account([[1176, 1284]]),
+        // A value posted by hand under program epoch 1180: no recorded post, so no mainnet epoch.
+        events: [indexEvent('IndexProposed', 600, 1180, 1500), indexEvent('IndexVetoed', 700, 1180, 1500)],
+        computed: [
+          [1043, 1329],
+          [1042, 1283],
+        ],
+      });
+      expect(await service.points({ limit: 10 })).toEqual([
+        { epoch: 1043, value: 1329, mainnetEpoch: 1043, clusterEpoch: null },
+        { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1176 },
+      ]);
+    });
+
+    it('a recorded post wins over a fixed offset, and a failed read of the posts falls back to the offset', async () => {
+      const posted = await build({
+        epochOffset: 125,
+        posted: [{ mainnetEpoch: 1042, clusterEpoch: 1170 }],
+        account: account([[1170, 1284]]),
+      });
+      expect(await posted.points({ limit: 1 })).toEqual([
+        { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1170 },
+      ]);
+      const events = new MemoryEventStore();
+      const program: FeeIndexReader = {
+        configured: true,
+        feeIndex: async () => ({ address: 'fee-index', account: account([[1167, 1284]]) }),
+      };
+      const failing = new FeeIndexService({
+        program,
+        events,
+        computed: null,
+        epochOffset: 125,
+        posted: { pairs: () => Promise.reject(new Error('db down')) },
+      });
+      expect(await failing.points({ limit: 1 })).toEqual([
+        { epoch: 1042, value: 1284, status: 'final', mainnetEpoch: 1042, clusterEpoch: 1167 },
+      ]);
+    });
   });
 
   it('answers 503 PROGRAM_NOT_CONFIGURED without the program and the database', async () => {
@@ -354,6 +496,33 @@ const TEST_DB = process.env.TEST_DATABASE_URL;
       .catch((error: unknown) => {
         if (!(error instanceof TransactionRollbackError)) throw error;
       });
+
+  it('maps each recorded post to the program epoch of its IndexProposed or IndexVoteCast', () =>
+    inRollback(async (db) => {
+      await db.delete(epochIndex);
+      await db.insert(epochIndex).values([
+        { epoch: 1051, value: 1400, postedSignature: 'sigVote' },
+        { epoch: 1050, value: 1390, postedSignature: 'sigPost' },
+        { epoch: 1049, value: 1380, postedSignature: 'sigUnknown' },
+        { epoch: 1052, value: 1410 },
+      ]);
+      const events = new MemoryEventStore();
+      const event = (signature: string, name: StoredProgramEvent['name'], epoch: number): StoredProgramEvent => ({
+        signature,
+        ix: 0,
+        slot: 1,
+        epoch: null,
+        blockTime: null,
+        name,
+        data: { epoch: String(epoch), value: '1' },
+      });
+      await events.insert([event('sigVote', 'IndexVoteCast', 1176), event('sigPost', 'IndexProposed', 1175)]);
+      const pairs = await new PgPostedEpochSource(db, events).pairs();
+      expect(pairs.sort((a, b) => a.mainnetEpoch - b.mainnetEpoch)).toEqual([
+        { mainnetEpoch: 1050, clusterEpoch: 1175 },
+        { mainnetEpoch: 1051, clusterEpoch: 1176 },
+      ]);
+    }));
 
   it('reads epoch_index newest first within the range', () =>
     inRollback(async (db) => {

@@ -95,7 +95,7 @@ PROGRAM_NOT_CONFIGURED` without `EPOCH_PROGRAM_ID`. Programs read the same accou
 (`docs/FEE_INDEX_METHODOLOGY.md`, "Reading the index on chain").
 
 **Fee Index** (`GET /v1/index`, `Services/Program/FeeIndexService.ts`). A bare `FeeIndexPoint[]`, newest first, each
-`{ epoch, value, status? }` in µL/CU, merged from:
+`{ epoch, value, status?, mainnetEpoch, clusterEpoch }` in µL/CU, merged from:
 
 1. the FeeIndex account: the last final value and its 16-epoch history are `final`; a pending proposal is `proposed`;
 2. stored `IndexProposed` / `IndexFinalized` / `IndexVetoed` events: the newest event per epoch decides (finalized →
@@ -106,9 +106,17 @@ PROGRAM_NOT_CONFIGURED` without `EPOCH_PROGRAM_ID`. Programs read the same accou
    reached); a ballot reopened after a veto replaces the vetoed point;
 4. `epoch_index` rows the indexer computed (Postgres): only for epochs the program has no value for, without `status`.
 
-`from` / `to` (inclusive) and `limit` (1–500, default 50) apply after the merge. Without the program and without
+One numbering: every point is numbered by MAINNET epoch (`epoch` = `mainnetEpoch`, the index's own numbering), and
+`clusterEpoch` is the program-cluster epoch the value is (or will be) posted under, which quotes, swaps and ballots use.
+The program's values come keyed by program epoch and are mapped the way publisher_app posts them
+(`Index/EpochMapping.ts`): a recorded post first (`epoch_index.posted_signature` → its `IndexProposed` or
+`IndexVoteCast` → the program epoch), then `FEE_INDEX_EPOCH_OFFSET` (`P = M + offset`). With the offset 0 (mainnet,
+localnet) both numbers are equal. With `auto` (devnet) only recorded posts are known: a computed epoch not posted yet
+has `clusterEpoch: null`, and a program value without a recorded post (posted by hand) is left out.
+
+`from` / `to` (inclusive, mainnet epochs) and `limit` (1–500, default 50) apply after the merge. Without the program and without
 Postgres: `503 PROGRAM_NOT_CONFIGURED`; when the account can't be read, the events alone are used (logged).
-`FeeIndexService.latest()` gives `{ final: { epoch, value } | null, proposed: { epoch, value, disputeEndsSlot } | null,
+`FeeIndexService.latest()` (in PROGRAM epochs, like the quotes it is read with) gives `{ final: { epoch, value } | null, proposed: { epoch, value, disputeEndsSlot } | null,
 avg8 }` (the program cluster's slot when anyone can finalize; `avg8` = mean of the last 8 final values, rounded, null
 before the first) for the Fee Market snapshot.
 
@@ -323,6 +331,7 @@ value, the junior lock), its open requests (`queued`) and requests the crank bou
 | `EPOCH_RPC_URL` · `EPOCH_RPC_FALLBACK_URL` | `https://api.devnet.solana.com` | The program's cluster (not mainnet).                                                  |
 | `EPOCH_PROGRAM_ID`                         | —                               | Unset: 503 `PROGRAM_NOT_CONFIGURED` (the not-onboarded estimate answers as a sample). |
 | `EPOCH_MARKET_MAKER`                       | —                               | Epoch's maker key; unset: `/v1/market` lists no quote.                                |
+| `FEE_INDEX_EPOCH_OFFSET`                   | `0`                             | mainnet ↔ program epochs for the Fee Index points (`P = M + offset`, or `auto`); the same value publisher_app posts by |
 | `DATABASE_URL`                             | —                               | `program_events` survive restarts and `pool_snapshots` feed the Vault series.         |
 
 ## One validator: `GET /v1/validators/:vote`

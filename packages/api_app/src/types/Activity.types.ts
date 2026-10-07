@@ -98,10 +98,21 @@ export interface FeeIndexBallotView {
   source: 'account' | 'events';
 }
 
-/** The contract's FeeIndexPoint: the computed point plus the program's status (request #3). */
+/**
+ * The contract's FeeIndexPoint: the computed point plus the program's status (request #3). Every point is numbered by
+ * MAINNET epoch (`epoch` = `mainnetEpoch`), the index's own numbering, also on a program cluster whose epochs differ
+ * (devnet); `clusterEpoch` is the program epoch the value is (or will be) posted under (publisher_app's EpochMapping).
+ */
 export interface FeeIndexPoint extends ComputedFeeIndexPoint {
   /** Set when the value comes from the program; absent for epochs only the indexer computed (epoch_index). */
   status?: FeeIndexStatus;
+  /** The Solana mainnet epoch the value describes; always equal to `epoch`. */
+  mainnetEpoch: number;
+  /**
+   * The program-cluster epoch it is posted under (quotes, swaps and ballots use it): `mainnetEpoch +
+   * FEE_INDEX_EPOCH_OFFSET`, or the recorded post's epoch; null when not posted yet with the `auto` offset.
+   */
+  clusterEpoch: number | null;
 }
 
 /** The newest program values: what the Fee Market KPIs and `FeeMarketSnapshot.index` need. */

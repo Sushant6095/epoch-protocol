@@ -20,7 +20,7 @@ import { PgPredictCallSource } from '../Activity/PredictCallSource';
 import { ValidatorNames } from '../Activity/ValidatorNames';
 import { getServices } from '../index';
 import { StreamHub } from '../Stream/StreamHub';
-import { FeeIndexService, PgComputedIndexSource } from './FeeIndexService';
+import { FeeIndexService, PgComputedIndexSource, PgPostedEpochSource } from './FeeIndexService';
 import { PoolSnapshotRecorder, PgPoolSnapshotRepo } from './PoolSnapshotRecorder';
 import { ProgramEventIngester } from './ProgramEventIngester';
 
@@ -56,6 +56,8 @@ export function getProgramEventServices(): ProgramEventServices {
     program,
     events,
     computed: db ? new PgComputedIndexSource(db) : null,
+    epochOffset: config.FEE_INDEX_EPOCH_OFFSET,
+    posted: db ? new PgPostedEpochSource(db, events) : null,
   });
   const activity = new ActivityService({
     program,

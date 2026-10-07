@@ -1,7 +1,7 @@
 import { z } from '@epoch/common/pkg/zod';
 
 import { computeUnitPrice } from './Cranks.config';
-import { EpochProgramConfigSchema } from './EpochProgram.config';
+import { EpochProgramConfigSchema, feeIndexEpochOffset } from './EpochProgram.config';
 
 const flag = (fallback: 'true' | 'false') =>
   z
@@ -10,17 +10,6 @@ const flag = (fallback: 'true' | 'false') =>
     .transform((value) => value === 'true');
 
 const address = z.string().min(32).max(44);
-
-/**
- * Which program-cluster epoch the Fee Index of a finished mainnet epoch is posted under: `P = M + offset`, or `auto`
- * (the program cluster's current epoch − 1 at posting time). See packages/publisher_app/README.md.
- */
-export const feeIndexEpochOffset = z
-  .string()
-  .trim()
-  .default('0')
-  .refine((value) => value === 'auto' || /^-?\d+$/.test(value), 'a whole number or "auto"')
-  .transform((value): number | 'auto' => (value === 'auto' ? 'auto' : Number(value)));
 
 /**
  * Comma-separated keypair paths of the Fee Index operators this process votes for (cast_index_vote), at most 8 (the
