@@ -1,6 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 
-import { EpochProgramSource, toWsUrl } from './EpochProgramSource';
+import { EpochProgramSource, solamiWsUrl, toWsUrl } from './EpochProgramSource';
 
 const config = {
   EPOCH_CLUSTER: 'devnet' as const,
@@ -36,5 +36,16 @@ describe('EpochProgramSource', () => {
   it('turns an http RPC url into its websocket url', () => {
     expect(toWsUrl('https://api.devnet.solana.com')).toBe('wss://api.devnet.solana.com');
     expect(toWsUrl('http://127.0.0.1:8899')).toBe('ws://127.0.0.1:8899');
+  });
+
+  it("sends a Solami RPC url to Solami's websocket host, keeping the region and the key", () => {
+    // solami.dev/docs, "Endpoints and regions": RPC https://rpc.solami.dev/sol, WebSocket wss://ws.solami.dev/ws/sol,
+    // both `?api_key=`; a region prefixes the host (fra.rpc… ↔ fra.ws…).
+    expect(toWsUrl('https://rpc.solami.dev/sol?api_key=k1')).toBe('wss://ws.solami.dev/ws/sol?api_key=k1');
+    expect(toWsUrl('https://fra.rpc.solami.dev/sol?api_key=k1')).toBe('wss://fra.ws.solami.dev/ws/sol?api_key=k1');
+    expect(toWsUrl('https://rpc.solami.dev/sol/')).toBe('wss://ws.solami.dev/ws/sol');
+    expect(solamiWsUrl('https://api.mainnet-beta.solana.com')).toBeUndefined();
+    expect(solamiWsUrl('https://rpc.solami.dev.evil.example/sol')).toBeUndefined();
+    expect(solamiWsUrl('http://rpc.solami.dev/sol')).toBeUndefined();
   });
 });

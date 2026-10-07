@@ -14,6 +14,7 @@ import { Connection } from '@solana/web3.js';
 import { getLaunchServices } from '.';
 import { getServices } from '..';
 import { dbAvailable } from '../../Lib/Db';
+import { solamiWsUrl } from '../../Sources/EpochProgramSource';
 import { RateLimiter } from '../../Lib/RateLimiter';
 import { optional } from '../MarketData';
 import { type StreamHub } from '../Stream/StreamHub';
@@ -77,7 +78,11 @@ export function launchRealtimeSource(
     });
   }
   return new WebsocketRealtimeSource(
-    new Connection(launch.LAUNCH_RPC_URL, { commitment: 'confirmed', wsEndpoint: config.LAUNCH_RPC_WS_URL }),
+    new Connection(launch.LAUNCH_RPC_URL, {
+      commitment: 'confirmed',
+      // Unset: web3.js swaps the scheme, which misses Solami's separate websocket host.
+      wsEndpoint: config.LAUNCH_RPC_WS_URL ?? solamiWsUrl(launch.LAUNCH_RPC_URL),
+    }),
   );
 }
 

@@ -29,4 +29,8 @@ The three special pages (Live, Predict, Launch), with their routes, WS channels 
 What is left to go live with real money (keys, funds, deploy order, decisions, submission checklist):
 [GO_LIVE_SIDE_TRACKS.md](GO_LIVE_SIDE_TRACKS.md).
 
+Every call to a sponsor, checked against the sponsor's current docs, with the doc line and the test that cover it
+(round 4, 7 Oct 2026): [Meteora](side-tracks/meteora-verification.md), [Panta](side-tracks/panta-verification.md),
+[Solami](side-tracks/solami-verification.md).
+
 Superteam India is not entered (decided 6 Oct 2026). Its backend (`/v1/india`) stays in the code but has no page.

@@ -1,6 +1,8 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+import { CpAmmIdl } from '@meteora-ag/cp-amm-sdk';
+import { DynamicBondingCurveIdl } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { PublicKey } from '@solana/web3.js';
 
 import { base58Decode } from './base58';
@@ -232,5 +234,44 @@ describe('launchFeeEventsFromTransaction', () => {
 
   it('has nothing for a plain trade', () => {
     expect(feeEvents('dbc-buy')).toEqual([]);
+  });
+});
+
+describe('the events we read exist in the pinned SDKs’ IDLs', () => {
+  interface IdlEvents {
+    events: { name: string }[];
+    types: { name: string; type: { fields?: { name: string }[] } }[];
+  }
+  const dbcIdl = DynamicBondingCurveIdl as unknown as IdlEvents;
+  const cpAmmIdl = CpAmmIdl as unknown as IdlEvents;
+  const names = (idl: IdlEvents) => idl.events.map((e) => e.name);
+  const fields = (idl: IdlEvents, event: string) =>
+    idl.types.find((t) => t.name === event)?.type.fields?.map((f) => f.name) ?? [];
+
+  // A renamed or removed event would never match the switch in events.ts and drop trades or claims silently.
+  it('has every DBC event events.ts maps', () => {
+    expect(names(dbcIdl)).toEqual(
+      expect.arrayContaining([
+        'EvtSwap',
+        'EvtSwap2',
+        'EvtClaimTradingFee',
+        'EvtClaimCreatorTradingFee',
+        'EvtWithdrawMigrationFee',
+        'EvtPartnerWithdrawSurplus',
+        'EvtCreatorWithdrawSurplus',
+        'EvtWithdrawLeftover',
+        'EvtCurveComplete',
+      ]),
+    );
+  });
+
+  it('has every DAMM v2 event events.ts maps, with the fields it reads', () => {
+    expect(names(cpAmmIdl)).toEqual(expect.arrayContaining(['EvtSwap2', 'EvtClaimPositionFee', 'EvtInitializePool']));
+    expect(fields(cpAmmIdl, 'EvtClaimPositionFee')).toEqual(
+      expect.arrayContaining(['owner', 'fee_a_claimed', 'fee_b_claimed']),
+    );
+    expect(fields(cpAmmIdl, 'EvtInitializePool')).toEqual(
+      expect.arrayContaining(['creator', 'token_a_amount', 'token_b_amount']),
+    );
   });
 });

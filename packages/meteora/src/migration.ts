@@ -12,7 +12,24 @@ import { toBigInt } from './units';
 
 export type MigrationReadiness =
   | { ready: true; dammConfig: string; dammPool: string }
-  | { ready: false; reason: 'NOT_FOUND' | 'CURVE_INCOMPLETE' | 'ALREADY_MIGRATED' | 'NOT_DAMM_V2' | 'NO_DAMM_CONFIG' };
+  | {
+      ready: false;
+      reason:
+        'NOT_FOUND' | 'CURVE_INCOMPLETE' | 'LOCKER_REQUIRED' | 'ALREADY_MIGRATED' | 'NOT_DAMM_V2' | 'NO_DAMM_CONFIG';
+    };
+
+/**
+ * DBC `VirtualPool.migration_progress` (docs.meteora.ag, DBC program accounts, `MigrationProgress`: 0 pre-bonding curve,
+ * 1 post-bonding curve, 2 locked vesting, 3 created pool). At the threshold a curve with locked vesting moves to
+ * PostBondingCurve and needs DBC `create_locker` first; any other curve moves straight to LockedVesting, the only state
+ * in which the DAMM pool can be created (core-products/dbc/accounts-and-permissions, "Migration progress").
+ */
+export const MIGRATION_PROGRESS = {
+  PreBondingCurve: 0,
+  PostBondingCurve: 1,
+  LockedVesting: 2,
+  CreatedPool: 3,
+} as const;
 
 /** Whether `migration_damm_v2` can run now for a DBC pool, and the DAMM v2 config and pool it would use. */
 export async function migrationReadiness(
@@ -22,10 +39,17 @@ export async function migrationReadiness(
   const accounts = await readCurveAccounts(connection, dbcPool);
   if (!accounts) return { ready: false, reason: 'NOT_FOUND' };
   const { pool, config } = accounts;
-  if (pool.poolState.isMigrated === 1) return { ready: false, reason: 'ALREADY_MIGRATED' };
+  const progress = pool.poolState.migrationProgress;
+  if (pool.poolState.isMigrated === 1 || progress === MIGRATION_PROGRESS.CreatedPool) {
+    return { ready: false, reason: 'ALREADY_MIGRATED' };
+  }
   if (config.migrationOption !== 1) return { ready: false, reason: 'NOT_DAMM_V2' };
   const threshold = toBigInt(config.migrationQuoteThreshold);
-  if (toBigInt(pool.poolState.quoteReserve) < threshold) return { ready: false, reason: 'CURVE_INCOMPLETE' };
+  if (toBigInt(pool.poolState.quoteReserve) < threshold || progress === MIGRATION_PROGRESS.PreBondingCurve) {
+    return { ready: false, reason: 'CURVE_INCOMPLETE' };
+  }
+  // Locked vesting: the curve waits in PostBondingCurve until someone sends `create_locker`; migrating now would fail.
+  if (progress !== MIGRATION_PROGRESS.LockedVesting) return { ready: false, reason: 'LOCKER_REQUIRED' };
   const dammConfig = DAMM_V2_MIGRATION_FEE_ADDRESS[config.migrationFeeOption];
   if (!dammConfig) return { ready: false, reason: 'NO_DAMM_CONFIG' };
   // The pool address `migration_damm_v2` derives: (DAMM v2 config, base mint, quote mint).

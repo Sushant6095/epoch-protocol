@@ -67,7 +67,10 @@ it had not stored yet, drops the program caches the event makes stale and emits 
   resumes where it stopped. A transaction the RPC lists but cannot return holds the cursor for up to three passes,
   then is skipped with an error log.
 - _Live_: `logsSubscribe` (mentions = the program, `confirmed`) on a dedicated connection to `EPOCH_RPC_WS_URL` (or
-  `EPOCH_RPC_URL` with `https` → `wss`; set it for localnet, whose websocket is on port 8900). Logs are parsed directly
+  `EPOCH_RPC_URL` with `https` → `wss`; a Solami RPC URL, `https://[<region>.]rpc.solami.dev/sol?api_key=…`, maps to
+  Solami's websocket host `wss://[<region>.]ws.solami.dev/ws/sol?api_key=…` as its docs list it, and the Launch page's
+  realtime connection does the same when `LAUNCH_RPC_WS_URL` is unset; set it for localnet, whose websocket is on port
+  8900). Logs are parsed directly
   (block time = arrival time). Live events never move the cursor, so the next poll still walks every signature after
   it: a dropped websocket loses nothing, and `(signature, ix)` dedupes. When a poll finds transactions the websocket
   never delivered, the ingester reconnects and resubscribes.

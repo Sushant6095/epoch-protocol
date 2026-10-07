@@ -82,8 +82,24 @@ const STALE_AFTER: Partial<Record<EventName, CacheKey[]>> = {
   TreasuryClaimed: ['pool'],
 };
 
-/** `https://x` → `wss://x`, `http://x` → `ws://x` (web3.js does the same when no wsEndpoint is given). */
-export const toWsUrl = (httpUrl: string): string => httpUrl.replace(/^http/, 'ws');
+/** `https://[<region>.]rpc.solami.dev/sol[?api_key=…]`: Solami's JSON-RPC endpoint, global or region-pinned. */
+const SOLAMI_RPC_URL = /^https:\/\/((?:[a-z]+\.)?)rpc\.solami\.dev\/sol\/?(\?.*)?$/;
+
+/**
+ * Solami's websocket for one of its RPC URLs, or `undefined` for any other URL. Solami serves JSON-RPC on
+ * `rpc.solami.dev/sol` but the websocket (`logsSubscribe`) on `wss://ws.solami.dev/ws/sol`, region prefix and
+ * `?api_key=` the same (solami.dev/docs, "Endpoints and regions": the table), so the scheme swap alone is wrong there.
+ */
+export const solamiWsUrl = (httpUrl: string): string | undefined => {
+  const match = SOLAMI_RPC_URL.exec(httpUrl);
+  return match ? `wss://${match[1]}ws.solami.dev/ws/sol${match[2] ?? ''}` : undefined;
+};
+
+/**
+ * `https://x` → `wss://x`, `http://x` → `ws://x` (web3.js does the same when no wsEndpoint is given); a Solami RPC URL
+ * → Solami's websocket host.
+ */
+export const toWsUrl = (httpUrl: string): string => solamiWsUrl(httpUrl) ?? httpUrl.replace(/^http/, 'ws');
 
 /**
  * Reads the Epoch program's accounts on its own cluster (devnet for now) through epoch-sdk decoders, with short
