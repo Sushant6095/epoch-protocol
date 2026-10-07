@@ -286,6 +286,10 @@ _Illustrative_ row (a made-up Mumbai validator from the tests), so the table can
   computed from today's stake, commission and APY while the profile loads (say "estimated").
 - `credit` is **always an estimate** (`estimate: true`): label it "Estimated Epoch advance", show the hedged figure as
   "with a fee hedge", and print `note` small. Rupees are at the live price.
+- `mevCommissionPct` is the validator table's: from the validator's mainnet TipDistributionAccount first (the
+  indexer's MEV scan, round 4), else Jito Kobe, else Stakewiz; `null` when the validator does not run Jito. While the
+  scan has rows, `source` also lists `Jito tip distribution accounts (mainnet)`. With `basis: 'table-estimate'`,
+  `revenue` and `credit` use this commission for the tips share.
 - `city` is `Unknown` when Stakewiz has no city. `status: 'unknown'` (Stakewiz has no country data): India's figures
   are `null`; say "Can't tell where validators are hosted right now", not "0".
 - Errors: 400 `BAD_REQUEST` for a bad query (e.g. `sort=nonsense`).

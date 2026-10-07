@@ -16,6 +16,7 @@ on 3 Oct 2026 (mainnet epoch 1048) from a smoke run of `indexer_app` in RPC samp
 | Header: data source, live badge, tip / processed slot, lag, epoch progress | `GET /v1/live/summary`, then WS `index:live` | load, then every push (≈ 2 s) |
 | Big number: running index for the epoch, coverage, last finished epoch | same | same |
 | Slot strip: the newest blocks, one bar per slot (median, p25–p75 band, counts) | `GET /v1/live/slots?limit=60`, then WS `slots` | load, then one frame per block (≈ 2.5 per second with `grpc`) |
+| Fee mix: base fees, priority fees and Jito tips for this epoch and the last, and per block on the strip | `summary.fees`, `summary.lastEpochFees` (REST, then WS `index:live`); `slots[].fees` (REST, then WS `slots`) | with the header and the strip |
 | Leaders table: per-leader median, slots, stake, rank, which leader sets the index | `GET /v1/live/leaders?limit=50` | load, then every 30 s |
 | Distribution: histogram of this epoch's slot medians, index marker | `GET /v1/live/epochs/{epoch}/distribution` | load, then every 60 s |
 | "Powered by Solami" panel: which Solami products run, their health, bytes, latency, Beam landings and tips | `GET /v1/live/solami` | load, then every 10 s |
@@ -27,7 +28,7 @@ on 3 Oct 2026 (mainnet epoch 1048) from a smoke run of `indexer_app` in RPC samp
   "schemaVersion": 1,
   "kind": "real",
   "asOf": "2026-10-03T19:19:02+05:30",
-  "source": "indexer_app via Postgres (fee_index_live, epoch_index)",
+  "source": "indexer_app via Postgres (fee_index_live, epoch_index, epoch_fee_mix)",
   "live": true,
   "dataSource": "RPC polling (api.mainnet-beta.solana.com)",
   "stream": {

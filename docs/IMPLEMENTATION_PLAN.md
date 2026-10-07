@@ -4,6 +4,28 @@
 
 This plan has five parts: where the repo is today, the target structure, the two parallel workstreams, a spec for every feature, and a day-by-day schedule.
 
+## Status on 7 Oct 2026, 22:00 IST (main `455ce03`)
+
+| Feature | Status | Where |
+| --- | --- | --- |
+| F0 Tooling and CI | done | `.github/workflows/ci.yml`: program unit and property tests, the LiteSVM suite (SBF build at a test id), TypeScript packages, the app |
+| F1 CP1 mechanism proof | built and rehearsed on a local validator (all 8 steps); the public-cluster run is part of the devnet go-live | `pnpm devnet cp1`, `docs/runbooks/devnet.md` |
+| F2 Pool | done | `instructions/pool/`, LiteSVM `pool.rs`, `withdrawals.rs` |
+| F3 Credit | done; scores now come from on-chain validator history, the scorer posts stake only | `instructions/credit/`, `instructions/history/`, LiteSVM `credit.rs`, `history.rs`, `scripts/e2e/history-to-advance.mts` |
+| F4 Indexer and database | done; adds Jito fee composition and MEV per validator (migrations 0004, 0005) | `packages/indexer_app`, `packages/pg_models` |
+| F5 API and Terminal | API done (every route in `packages/api_app/README.md`); the Terminal UI is built from `app/handover/` | `packages/api_app` |
+| F6 Validator Console and Vault UI | API done (`/v1/vault`, `/v1/validators/:vote/position`, `/history`, `/v1/wallets/:address/lender`); UI from `app/handover/` | `packages/api_app` |
+| F7 Fee Market v1 | program done (quotes, swaps, the hedge rule on chain); API `/v1/market`; UI from `app/handover/` | `instructions/market/`, LiteSVM `market.rs` |
+| F8 Cranks | done: history, scores, MEV claim gate, ballot close, sweep, defaults, accrual, withdrawals, buybacks, claims, finalize and ballot submit, swap settlement | `packages/cranks_app` |
+| F9 Publisher + Switchboard | publisher done, with operator consensus (each operator key votes); the Switchboard mirror is not built (Switchboard shut down 25 Sep); readers use the FeeIndex account, `get_sfi` or `GET /v1/index/latest-final` | `packages/publisher_app`, `docs/FEE_INDEX_METHODOLOGY.md` |
+| F10 Panta bot | built; off until Panta's API key is configured (the devnet template also sets `PANTA_DRY_RUN=true`) | `packages/panta_bot_app`, `packages/panta` |
+| F11 Security hardening | revenue-token and treasury review done; LiteSVM wrong-signer matrix for every role | `docs/security/`, `docs/THREAT_MODEL.md`, LiteSVM `roles.rs` |
+| F12 Mainnet launch and submission | not started: needs the mainnet deploy, the Squads multisig, hosting, a paid RPC and the partner validator | — |
+| F13 Revenue tokens on Meteora | program, API and Launch page done; the devnet launch is in the devnet seed | `instructions/revenue/`, `instructions/treasury/`, `app/src/app/launch` |
+
+The devnet go-live kit (`scripts/devnet`) deploys, initialises (with three Fee Index operators), seeds and runs CP1;
+it was rehearsed end to end on a devnet-shaped local validator and waits for devnet SOL.
+
 ---
 
 ## 1. Repo analysis: where we are (27 Sep)

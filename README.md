@@ -56,7 +56,7 @@ flowchart LR
 | --- | --- |
 | **Epoch Credit** | Revenue-based advances to validators, repaid at source each epoch. Lenders choose senior (paid first) or junior (first loss) tranches. |
 | **Epoch Fee Market** | Per-epoch fixed-for-floating swaps on the Solana Fee Index. Validators lock in income; heavy fee payers cap costs. |
-| **Epoch Score** | On-chain credit score from uptime, commission history, age and revenue. Sets advance size and price. |
+| **Epoch Score** | Credit score computed on chain from what the vote account and Jito's accounts prove (credits, commission history, delinquency, tenure) plus the stake the scorer posts. Sets advance size and price. |
 | **Epoch Terminal** | Public live dashboard of the fee index, validator health and every loan. |
 
 **Credit limit (v1):** `min(a × revenue over last 10 epochs, 2 × bond, cap)` where `a` is 25% unhedged or 40% hedged; 2% flat fee; 50% of each epoch's revenue goes to repayment.
@@ -79,10 +79,10 @@ flowchart TB
     Users --> APP --> PRG
     IDX --> API --> APP
     CR --> PRG
-    PUB -->|post_index| PRG
+    PUB -->|operator votes: cast_index_vote| PRG
 ```
 
-All funds live in program-owned accounts. Every off-chain component is read-only or permissionless, except the v1 Fee Index publisher, whose values are bounded per epoch, held for a dispute window and can be vetoed before they are final. Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · Diagrams: [`docs/diagrams/`](docs/diagrams/) · Threats: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+All funds live in program-owned accounts. Every off-chain component is read-only or permissionless, except two signed inputs: the Fee Index, which registered operators vote on (proposed only when two thirds of their weight agree within 1%, bounded per epoch, held for a dispute window and vetoable), and validators' stake and superminority bit, which the scorer posts. Details and the trust model: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · Every instruction, account and event: [`docs/PROGRAM_REFERENCE.md`](docs/PROGRAM_REFERENCE.md) · Diagrams: [`docs/diagrams/`](docs/diagrams/) · Threats: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 
 ## Repository layout
 
@@ -91,15 +91,17 @@ programs/epoch/               Anchor program (Rust)
 packages/
   epoch-sdk/                  TypeScript client generated from the IDL
   indexer_app/                Yellowstone gRPC → Solana Fee Index + revenue → Postgres
-  cranks_app/                 Epoch-boundary jobs: claim, score, sweep, settle, accrue
-  publisher_app/              Posts the Solana Fee Index on-chain (self-published oracle)
+  cranks_app/                 Epoch-boundary jobs: history, score, MEV claim gate, sweep, defaults, accrual, finalize, settle
+  publisher_app/              Votes the Solana Fee Index on chain with each operator key; Epoch's market-maker quotes
   panta_bot_app/              Creates real-money (USDC) Panta markets on the fee index
-  api_app/                    REST API for the Terminal
+  api_app/                    REST API and websocket for the app
+  meteora/ panta/             Meteora DBC / DAMM v2 and Panta clients
   common/ logger/ exceptions/ config-sdk/ common_http_server/ pg_models/ solana/
                               Shared libraries every app is built from
-app/                          Next.js: Terminal, Validator Console, Vault, Fee Market
+app/                          Next.js: Live, Launch, Predict, Integrations; handover for the Terminal, Console and Vault
+scripts/devnet/ scripts/e2e/  Devnet go-live kit; end-to-end runs on a local validator
 deployments/  pm2.config.js   Containers and single-box process config
-tests/                        Anchor + LiteSVM epoch-boundary tests
+programs/epoch/tests/         Property tests and the LiteSVM suite (tests/README.md)
 docs/                         Architecture, threat model, plan, ADRs
 ```
 
@@ -117,10 +119,12 @@ pnpm db:up && pnpm db:migrate
 pnpm dev:api          # http://localhost:4000/health
 pnpm dev:app          # http://localhost:3000
 
-anchor keys sync      # generates the program ID
-anchor build
-anchor test
+cargo test --workspace                               # program unit and property tests
+programs/epoch/tests/build-sbf.sh && \
+  cargo test --manifest-path programs/epoch/tests/litesvm/Cargo.toml   # every instruction on the SBF build
 ```
+
+Devnet: `pnpm devnet budget --url devnet`, then deploy, init, seed and cp1 ([`docs/runbooks/devnet.md`](docs/runbooks/devnet.md)).
 
 Before a PR: `pnpm lint && pnpm test && pnpm ccd`. Conventions: [`docs/REPO_STRUCTURE.md`](docs/REPO_STRUCTURE.md).
 
@@ -130,7 +134,10 @@ Before a PR: `pnpm lint && pnpm test && pnpm ccd`. Conventions: [`docs/REPO_STRU
 - [x] Program phases 1–4: pool, credit, Fee Index, fee swaps (29 instructions)
 - [x] Revenue tokens on Meteora: register, buyback at source on DBC and DAMM v2, redeem, treasury fee claims to lenders (11 more instructions, 82 unit tests; end to end on a local validator running Meteora's mainnet programs)
 - [x] Side tracks: Live (Solami), Predict with real USDC (Panta), Launch (Meteora): backend, program and pages
-- [ ] Mechanism proof on testnet: PDA as vote-account withdrawer
+- [x] Validator history on chain and a permissionless Epoch Score (vote accounts and Jito's accounts; the scorer posts stake only)
+- [x] Fee Index operator consensus (TipRouter-style ballots), the cluster-epoch bound and `get_sfi`, the CPI read (57 instructions in all)
+- [x] LiteSVM suite covering every instruction (41 scenarios); devnet go-live kit, rehearsed end to end
+- [ ] Mechanism proof on a public cluster (CP1, with the devnet go-live): PDA as vote-account withdrawer
 - [ ] Credit: onboard → advance → sweep → release on devnet
 - [ ] Indexer + Terminal live on mainnet (Solami gRPC)
 - [ ] Security review; caps and pause; Squads multisig upgrade authority

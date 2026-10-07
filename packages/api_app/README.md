@@ -28,7 +28,7 @@ known yet" and the app shows "—".
 | `GET /v1/market`                                                                           | `FeeMarketSnapshot`             | 5 s   | the Epoch program                                             |
 | `GET /v1/launches`                                                                         | `LaunchList`                    | 60 s  | launch registry, DBC and DAMM v2 pools on devnet (see Launch) |
 | `GET /v1/launches/:mint`                                                                   | `LaunchDetail`                  | 60 s  | as `/v1/launches`, plus `launch_price_samples`                |
-| `GET /v1/launches/:mint/page` · `/market` · `/trades` · `/candles` · `/holders` · `/fees` | the Launch page (see below)     | 0–60 s | the pools, `launch_trades`, `launch_fee_events` (plan F13)   |
+| `GET /v1/launches/:mint/page` · `/market` · `/trades` · `/candles` · `/holders` · `/fees` · `/indexed` | the Launch page (see below) | 0–60 s | the pools, `launch_trades`, `launch_fee_events` (plan F13); `/indexed`: Meteora's DAMM v2 data API for a graduated pool |
 | `POST /v1/launches/:mint/quote` · `POST /v1/launches/:mint/build`                          | `LaunchQuoteResponse`, `LaunchBuildResponse` | — | Meteora DBC / DAMM v2 via `@epoch/meteora`; unsigned transactions |
 | `POST /v1/auth/siws/nonce` · `POST /v1/auth/siws/verify` · `POST /v1/auth/logout` · `GET /v1/auth/session` | sign-in (SIWS), session cookie | — | Postgres `auth_nonces`, `sessions`; roles from mainnet stake accounts and the program |
 | `GET` · `PUT /v1/me/watchlist`, `GET` · `PUT /v1/me/alerts`, `POST /v1/me/alerts/telegram-link`, `POST /v1/me/alerts/test` | `Watchlist`, `AlertPrefs` | — | Postgres `watchlists`, `alert_prefs` |
@@ -202,6 +202,9 @@ current set; data frames carry `channel`, `data` and `at` (when the data was rea
 | `vault`    | the vault provider's snapshot (`VaultSnapshot`)                                                                                                          | on subscribe, then 2 s after the last pool event (`Deposited`, `Withdraw*`, `Accrued`, `AdvanceOpened`, `Swept`, `AdvanceRepaid`, `AdvanceDefaulted`, `BondPosted`, `BondWithdrawn`) |
 | `feeIndex` | `{ points: FeeIndexPoint[16], final, proposed, avg8, ballot }` (`ballot`: the newest open `FeeIndexBallotView`, or null)                                                                                                   | on subscribe, then after `IndexProposed` / `IndexFinalized` / `IndexVetoed` and every ballot event (`IndexBallotOpened`, `IndexVoteCast`, `IndexConsensusReached`, `IndexBallotSubmitted`, `IndexBallotClosed`)                                                                                                          |
 | `launch:<mint>` | `{ type: 'snapshot' \| 'trade' \| 'market' \| 'fee', … }` (`LaunchStreamMessage`; a symbol subscribes to its mint's channel) | a snapshot on subscribe, then each trade the ingester stores, the market after them, and claim / graduation events; at most 8 keyed channels per socket (docs/pages/launch.md) |
+| `slots` | one `LiveSlot` (as `/v1/live/slots`) | each block processed live, with a database (see "Live" below) |
+| `index:live` | the whole `LiveSummary` | on subscribe and on each estimate write, with a database (see "Live" below) |
+| `predict:panta` | `PantaStreamData`: our markets' prices and forecasts | while someone listens, with Panta configured (see "Real-money Predict" below) |
 
 The server pings every 30 s and drops a socket that misses a pong; browsers answer pings by themselves. A dropped
 socket keeps nothing: reconnect, then subscribe again (the `vault` and `feeIndex` channels send their current value).

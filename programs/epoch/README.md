@@ -6,23 +6,34 @@ them through senior and junior tranches; the program publishes the Solana Fee
 Index and settles fee swaps against it; validators can sell a share of their
 revenue as a revenue token on Meteora that the program buys back and burns
 every epoch, and the program claims Epoch's own Meteora fees (as the curves'
-partner) into the pool as lender income (ADR 0006).
+partner) into the pool as lender income (ADR 0006). Validator scores come from
+on-chain history (vote accounts and Jito's distribution accounts), and the Fee
+Index is agreed by a set of registered operators (ballots) before its dispute
+window.
+
+Every instruction, account and event, with signers, arguments and seeds:
+[docs/PROGRAM_REFERENCE.md](../../docs/PROGRAM_REFERENCE.md).
 
 ## Layout
 
 | Path | What lives there |
 | --- | --- |
 | `src/lib.rs` | Dispatch only |
-| `src/state/` | One account per file: `Pool`, `LenderShares`, `WithdrawRequest`, `ValidatorPosition`, `Advance`, `FeeIndex`, `FeeQuote`, `SwapPosition`, `RevenueToken` |
-| `src/math/` | Pure arithmetic with unit tests: tranche shares with virtual offsets, sweep and income waterfalls, credit limit, Epoch Score, the revenue-share waterfall and buyback schedule (`revenue_token.rs`), Meteora DBC / DAMM v2 buy quotes (`amm.rs`) on a small 256-bit integer (`u256.rs`), what DBC owes the partner (`treasury.rs`: surplus, migration fee, leftover) |
+| `src/state/` | One account per file: `Pool`, `LenderShares`, `WithdrawRequest`, `ValidatorPosition`, `Advance`, `FeeIndex`, `IndexOperators`, `IndexBallot`, `FeeQuote`, `SwapPosition`, `RevenueToken`, `ValidatorHistory`, `ScoreConfig` |
+| `src/math/` | Pure arithmetic with unit tests: tranche shares with virtual offsets, sweep and income waterfalls, credit limit, Epoch Score, the score inputs from history and the hedge rule (`history.rs`), the Fee Index consensus (weighted median, agreement, deviation, threshold: `consensus.rs`), the revenue-share waterfall and buyback schedule (`revenue_token.rs`), Meteora DBC / DAMM v2 buy quotes (`amm.rs`) on a small 256-bit integer (`u256.rs`), what DBC owes the partner (`treasury.rs`: surplus, migration fee, leftover) |
 | `src/meteora_account.rs` | Read-only views of DBC `VirtualPool` / `PoolConfig` (and its partner terms), DAMM v2 `Pool` / `Config` / `Position`, SPL mint / token accounts and Token-2022 accounts (position NFTs), owner- and discriminator-checked; offsets pinned by tests on real mainnet accounts |
-| `src/vote_account.rs` | Reads the head of a vote account (v1.14.11, v3, v4) without deserialising the tower; layout pinned by tests against `solana-vote-interface` |
-| `src/cpi/vote.rs` | Vote-program instruction encoders, byte-for-byte checked against the upstream crate in tests |
-| `src/cpi/system.rs` | Lamport transfers out of program-derived system accounts; PDA account creation that survives a pre-funded address |
-| `src/cpi/meteora.rs` | DBC and DAMM v2 `swap2` instructions, checked byte for byte against real mainnet swaps; the partner claims (DBC `claim_trading_fee`, `partner_withdraw_surplus`, `withdraw_migration_fee`, `withdraw_leftover`, DAMM v2 `claim_position_fee`), checked slot by slot against the IDLs |
-| `src/cpi/token.rs` | SPL Token `InitializeAccount3`, `CloseAccount`, `Burn`; associated token account `CreateIdempotent` |
-| `src/instructions/` | One file per instruction, grouped: `pool/`, `credit/`, `market/`, `revenue/`, `treasury/` |
+| `src/vote_account.rs` | Reads the head of a vote account (v1.14.11, v3, v4) without deserialising the tower, and its voting record (newest vote, credit history); layout pinned by tests against `solana-vote-interface` and real mainnet vote accounts |
+| `src/jito_account.rs` | Reads Jito's `TipDistributionAccount` and `PriorityFeeDistributionAccount` (commission, merkle-root total, lamports transferred); pinned by real mainnet accounts in `fixtures/mainnet/` |
+| `src/cpi/vote.rs` (module `outbound::vote`) | Vote-program instruction encoders, byte-for-byte checked against the upstream crate in tests |
+| `src/cpi/system.rs` (module `outbound::system`) | Lamport transfers out of program-derived system accounts; PDA account creation that survives a pre-funded address |
+| `src/cpi/meteora.rs` (module `outbound::meteora`) | DBC and DAMM v2 `swap2` instructions, checked byte for byte against real mainnet swaps; the partner claims (DBC `claim_trading_fee`, `partner_withdraw_surplus`, `withdraw_migration_fee`, `withdraw_leftover`, DAMM v2 `claim_position_fee`), checked slot by slot against the IDLs |
+| `src/cpi/token.rs` (module `outbound::token`) | SPL Token `InitializeAccount3`, `CloseAccount`, `Burn`; associated token account `CreateIdempotent` |
+| `src/instructions/` | One file per instruction (or a few related ones), grouped: `pool/`, `credit/`, `market/` (Fee Index, operator consensus, quotes, swaps, `get_sfi`), `history/`, `revenue/`, `treasury/` |
 | `src/events.rs` | One event per state change; the indexer replays these |
+| `tests/props.rs`, `tests/litesvm/` | Property tests of the math; the LiteSVM suite running every instruction against the SBF build ([tests/README.md](../../tests/README.md)) |
+
+The CPI encoders live in `src/cpi/` but the Rust module is `outbound`: under the `cpi` feature Anchor generates
+`epoch::cpi`, the client other programs use to call Epoch (`get_sfi` among them).
 
 ## Build phases
 
@@ -32,9 +43,11 @@ partner) into the pool as lender income (ADR 0006).
 | 2 | Pool: deposit, FIFO withdrawal queue (request, cancel, process), epoch accrual with senior→junior waterfall | done |
 | 3 | Credit: onboard (one-tx authority handover), collectors, score, bonds, advance, sweep, default with bond-first write-off and 100% recovery, release, covenant-gated commission and identity changes | done |
 | 4 | Fee Index (propose → dispute window → finalize, bounded moves, admin veto, 16-epoch history) and fee swaps (maker quotes, bounded payoff, permissionless settlement) | done |
-| 5 | LiteSVM epoch-warp tests, fuzzing, invariants, program keys, IDL to `epoch-sdk`, devnet | next |
+| 5 | LiteSVM epoch-warp tests (41 scenarios, every instruction), property tests, IDL to `epoch-sdk`, devnet go-live kit | done; devnet deployment waits for SOL (`docs/runbooks/devnet.md`) |
 | 6 | Revenue tokens (ADR 0006): register, share on sweep, buybacks on DBC and DAMM v2 with burn, sync after graduation, redeem, configure, close; release and commission covenants | done (localnet against the real Meteora programs) |
 | 7 | Partner treasury claims (ADR 0006 amendment): DBC trading fees, surplus, migration fee and leftover, DAMM v2 LP fees; SOL to pool income, tokens burned | done (localnet against the real Meteora programs) |
+| 8 | Validator history on chain and the permissionless score: vote-account and Jito copies, stake info, `refresh_score` with the hedge rule from swaps | done (LiteSVM, local-validator e2e) |
+| 9 | Fee Index operator consensus: registry, per-epoch ballots, weighted median within a tolerance, threshold of the total weight; the cluster-epoch bound; `get_sfi` | done (LiteSVM, local-validator e2e) |
 
 ## Invariants
 
@@ -105,7 +118,9 @@ partner's share of it rounds to zero (`NothingToClaim`, checked on both launches
 ## Commands
 
 ```bash
-cargo test -p epoch                          # unit tests (incl. Meteora layouts on real mainnet accounts)
+cargo test -p epoch                          # unit and property tests (incl. Meteora, vote and Jito layouts on real mainnet accounts)
 cargo clippy -p epoch --all-targets -- -D warnings
-anchor build                                 # needs the Solana toolchain
+programs/epoch/tests/build-sbf.sh            # SBF build at the LiteSVM test id
+cargo test --manifest-path programs/epoch/tests/litesvm/Cargo.toml
+scripts/build-idl.sh                         # regenerate the IDL
 ```

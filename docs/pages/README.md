@@ -17,13 +17,15 @@ The track details (prizes, eligibility, deadlines) are in [docs/SIDE_TRACKS.md](
 
 | Page | Track | Contract | Routes | WS channels |
 | --- | --- | --- | --- | --- |
-| Live | Solami | [live.md](live.md) | `GET /v1/live/summary`, `/slots`, `/leaders`, `/epochs/:epoch/distribution` | `slots`, `index:live` |
-| Predict | Panta | [predict.md](predict.md) | `/v1/predict/panta/*` (markets, positions, quote, build, submit, status, claims); resolution from `GET /v1/index/epochs/:epoch` | `predict:panta` (with `feeIndex`) |
-| Launch | Meteora | [launch.md](launch.md) | `/v1/launches/:mint/page`, `/market`, `/trades`, `/candles`, `/holders`, `/fees`, `/buybacks`; `POST /quote`, `/build` | `launch:<mint>` |
+| Live | Solami | [live.md](live.md) | `GET /v1/live/summary`, `/slots`, `/leaders`, `/epochs/:epoch/distribution`, `/solami` | `slots`, `index:live` |
+| Predict | Panta | [predict.md](predict.md) | `/v1/predict/panta/*` (markets, market detail, categories, positions, stats, forecast, market image, quote, build, submit, status, claims); resolution from `GET /v1/index/epochs/:epoch` and `GET /v1/index/latest-final`; chart from `GET /v1/index`; sign-in `POST /v1/auth/siws/nonce`, `/verify`; points tab `GET /v1/predict/markets`, `POST /calls`, `GET /leaderboard` | `predict:panta`, `feeIndex` (with `ballot`) |
+| Launch | Meteora | [launch.md](launch.md) | `GET /v1/launches`, `/:mint`, `/:mint/page`, `/market`, `/trades`, `/candles`, `/holders`, `/fees`, `/indexed`, `/buybacks`; `POST /quote`, `/build` | `launch:<mint>`, `activity` (kind `buyback`, with `mint`) |
+| Score (Manage tab) | none | [score.md](score.md) | `GET /v1/validators/:vote/position` (`scoreBreakdown`, `mev`), `GET /v1/validators/:vote/history`; `GET /v1/validators/:vote` (`mevHistory`) | `activity` (kind `score`) |
+| India (no page) | Superteam India, not entered | [india.md](india.md) | `GET /v1/india/summary`, `/price`, `/validators`, `/wallets/:address/rewards`, `/wallets/:address/rewards.csv` | none |
 
 The validator score's on-chain inputs (round 4) have their own contract, used by the Manage tab rather than a track
-page: [score.md](score.md) (`GET /v1/validators/:vote/history`, `scoreBreakdown` on `GET /v1/validators/:vote/position`,
-`activity` rows of kind `score`).
+page: [score.md](score.md) (`GET /v1/validators/:vote/history`, `scoreBreakdown` and `mev` on
+`GET /v1/validators/:vote/position`, `activity` rows of kind `score`).
 
 ## Live (Solami)
 
@@ -33,7 +35,7 @@ Yellowstone gRPC → Postgres) through `api_app`.
 
 | Routes | WS | Contract |
 | --- | --- | --- |
-| `GET /v1/live/summary` · `GET /v1/live/slots?limit=60` · `GET /v1/live/leaders?epoch=&limit=50` · `GET /v1/live/epochs/:epoch/distribution` | `slots` (one frame per block) · `index:live` (the whole summary, about every 2 s) | [live.md](live.md) |
+| `GET /v1/live/summary` (with the epoch's fee mix: `fees`, `lastEpochFees`) · `GET /v1/live/slots?limit=60` (each block's `fees`) · `GET /v1/live/leaders?epoch=&limit=50` · `GET /v1/live/epochs/:epoch/distribution` · `GET /v1/live/solami` ("Powered by Solami" panel) | `slots` (one frame per block) · `index:live` (the whole summary, about every 2 s) | [live.md](live.md) |
 
 What makes it special for the Solami judges:
 
@@ -51,12 +53,13 @@ markets on the Fee Index ("Will the Solana Fee Index for epoch N close above X �
 
 | Routes | WS | Contract |
 | --- | --- | --- |
-| `GET /v1/predict/panta/markets` · `/markets/:marketId` · `/categories` · `/positions?wallet=` · `/stats` · `/status/:tradeId` · `POST /v1/predict/panta/quote` · `/build` · `/submit` · `/claim/build` · resolution: `GET /v1/index/epochs/:epoch` · `GET /v1/index/latest-final` · points tab: `/v1/predict/markets`, `/calls`, `/leaderboard` | `predict:panta` (prices of our markets, about every 15 s) · `feeIndex` (the live index next to the price) | [predict.md](predict.md) |
+| `GET /v1/predict/panta/markets` · `/markets/:marketId` · `/categories` · `/positions?wallet=` · `/stats` · `/forecast?epoch=` · `/market-image.png` · `/status/:tradeId` · `POST /v1/predict/panta/quote` · `/build` · `/submit` · `/claim/build` · resolution: `GET /v1/index/epochs/:epoch` (with `ballot`) · `GET /v1/index/latest-final` · chart: `GET /v1/index` · sign-in: `POST /v1/auth/siws/nonce`, `/verify` · points tab: `GET /v1/predict/markets`, `POST /v1/predict/calls`, `GET /v1/predict/leaderboard` | `predict:panta` (prices of our markets, about every 15 s) · `feeIndex` (the live index next to the price, and the open ballot's progress on every vote) | [predict.md](predict.md) |
 
 What makes it special for the Panta judges:
 
 - Epoch's bot creates a market on Panta every epoch, on Epoch's own number: the Fee Index. Each market resolves from
-  Epoch's endpoint (`GET /v1/index/epochs/{N}`), whose value counts once it is final: posted on chain and past its
+  Epoch's endpoint (`GET /v1/index/epochs/{N}`), whose value counts once it is final: posted on chain (with operator
+  consensus on, only once operators holding two thirds of the weight agree; `status: "voting"` until then) and past its
   dispute window.
 - Every trade goes through Panta's API and is attributed to Epoch; the app never sees Panta's key.
 - The "Powered by Panta" badge appears wherever Panta data is shown, as Panta's terms require.
@@ -69,7 +72,7 @@ the token back out of the validator's revenue and burns it.
 
 | Routes | WS | Contract |
 | --- | --- | --- |
-| `GET /v1/launches/:mint/page` (first paint) · `/market` · `/trades` · `/candles` · `/holders` · `/fees` · `/buybacks` · `POST /v1/launches/:mint/quote` · `/build` · `GET /v1/launches`, `/v1/launches/:mint` | `launch:<mint>` (`snapshot`, then `trade`, `market` and `fee` frames); buyback events also appear on `activity` | [launch.md](launch.md) |
+| `GET /v1/launches/:mint/page` (first paint) · `/market` · `/trades` · `/candles` · `/holders` · `/fees` · `/indexed` · `/buybacks` · `POST /v1/launches/:mint/quote` · `/build` · `GET /v1/launches`, `/v1/launches/:mint` | `launch:<mint>` (`snapshot`, then `trade`, `market` and `fee` frames); buyback events also appear on `activity` (kind `buyback`, with the token's `mint`) | [launch.md](launch.md) |
 
 The track is judged on depth of Meteora integration, technical execution, originality and taste, impact potential (a
 new class of assets), and traction and volume on mainnet. What the page shows for each:

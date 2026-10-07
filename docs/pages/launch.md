@@ -86,11 +86,13 @@ checks passed, plus pause, redeem and close checks
 2. `GET` the bundle's `links.buybacks` (the mint, not the symbol) for the buyback block.
 3. Open `WS /v1/stream?channels=launch:<mint>`, or send `{ "op": "subscribe", "channels": ["launch:<mint>"] }` on the
    page's existing socket. The first frame is a `snapshot`; then `trade`, `market` and `fee` frames as they happen.
+   Add `activity` to the channels for the buyback events (kind `buyback`, filtered on `mint`).
 4. Fetch more as needed:
    - `/trades?before=…` for older trades;
    - `/candles?interval=…` for other chart ranges;
    - `/holders` and `/fees` again when a `fee` frame arrives, or every 30–60 s while the page is visible;
-   - `/buybacks` again every 60 s while visible, and after a `trade` frame whose `trader` is the buyback escrow.
+   - `/buybacks` again every 60 s while visible, after a `trade` frame whose `trader` is the buyback escrow, and after
+     an `activity` frame of kind `buyback` whose `mint` is this token.
 5. On a WS reconnect, subscribe again: the new `snapshot` replaces the market and the newest trades.
 
 ## Endpoints
@@ -108,6 +110,7 @@ checks passed, plus pause, redeem and close checks
 | `POST /v1/launches/:mint/quote` | `LaunchQuoteResponse` | `no-store` | Rate-limited per IP (30/min) |
 | `POST /v1/launches/:mint/build` | `LaunchBuildResponse` | `no-store` | Needs `consent: true`; rate-limited per IP |
 | `WS /v1/stream`, channel `launch:<mint>` | frames, below | — | Snapshot on subscribe, then live |
+| `WS /v1/stream`, channel `activity` | `ActivityEvent` rows | — | Protocol-wide; rows of kind `buyback` carry `mint` (request #29) |
 
 `GET /v1/launches` (the list) and `GET /v1/launches/:mint` (the detail: token, curve, escrow, risks, price series) are
 unchanged; the first-paint bundle includes the detail. The detail's `escrow.balanceSol` counts the escrow only while the
@@ -232,7 +235,7 @@ On the curve (`rLOC`), the same block reads:
 | `raise` | The curve's quote reserve against DBC `migrationQuoteThreshold`. `complete` once the threshold is reached. |
 | `marketCapSol` | Fully diluted: price × (supply − burned). |
 | `liquiditySol` | SOL in the pool now: the curve's reserve, or the DAMM v2 pool's SOL. |
-| `shareRevenuePerEpochSol` | The live estimate of what the buyback gets each epoch: the mainnet validator table's inflation and MEV commission × share. Use it for the implied yield. `0` while unknown (a vote account that is not a mainnet validator with stake). |
+| `shareRevenuePerEpochSol` | The live estimate of what the buyback gets each epoch: the mainnet validator table's inflation and MEV commission × share. The MEV commission is the table's `mevCommissionPct`: from the validator's mainnet TipDistributionAccount first, else Jito Kobe, else Stakewiz (`mevSource` on `GET /v1/validators`). Use it for the implied yield. `0` while unknown (a vote account that is not a mainnet validator with stake). |
 | `pricedAtShareRevenuePerEpochSol` | What the curve was priced from at launch: the 10-epoch average, including sampled block revenue, × share. Show it as "priced at", next to the live figure. The two differ when block revenue is not part of what the program sweeps. |
 | `impliedYieldPctPerEpoch` | `shareRevenuePerEpochSol ÷ marketCapSol × 100`, in **% per epoch**. `null` without a market cap or share revenue. |
 | `graduation.state` | `upcoming` (no pool) · `curve` (trading on the curve) · `complete` (raise in, migration pending: Epoch's crank migrates it on its next pass, as Meteora's keepers only take 10 SOL raises) · `migrated` (DAMM v2 live). |

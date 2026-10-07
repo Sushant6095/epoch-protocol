@@ -19,6 +19,7 @@ simulator (`src/__fixtures__/ProgramSim.ts`), trimmed where marked `…`.
 | Score, where it came from (on-chain history or the scorer's fallback) and its inputs            | `GET /v1/validators/:vote/position` → `scoreBreakdown` | with the Manage tab (cache 10 s) |
 | Per-epoch history: credits vs the maximum, commissions, MEV, priority fees, revenue, stake rank | `GET /v1/validators/:vote/history` → `entries`         | on open (cache 10 s)             |
 | Freshness badge ("fresh this epoch", "stale", "no copies yet")                                  | `GET /v1/validators/:vote/history` → `freshness`       | same                             |
+| Jito MEV commission per mainnet epoch: tips, the validator's share, claim and sweep             | `GET /v1/validators/:vote/position` → `mev`            | with the Manage tab (cache 10 s) |
 | Live rows: history opened, copies, stake posts, refreshes                                       | WS `/v1/stream`, channel `activity`, `kind: "score"`   | each push                        |
 
 ## `GET /v1/validators/:vote/position` → `scoreBreakdown`
@@ -48,10 +49,57 @@ simulator (`src/__fixtures__/ProgramSim.ts`), trimmed where marked `…`.
 - `creditsOfMaxPct`: vote credits over the last 10 finished epochs as a share of the most possible (16 per slot).
   `creditsVsClusterPct`: the same against the cluster average (`scoring.creditsReferencePct` of the maximum = 100%);
   this is the formula's input and may exceed 100.
-- `commissionPct`: the highest of the inflation and MEV commissions over the window and this epoch (a one-epoch drop
-  does not erase last week's 100%).
+- `commissionPct`: the highest of the inflation and MEV commissions over the window and this epoch, plus the block
+  commission when `scoring.countBlockCommission` is true (a one-epoch drop does not erase last week's 100%).
 - `scoreBreakdown` is `null` for a validator that is not onboarded; `history` is `null` before anyone created the
   account.
+
+## `GET /v1/validators/:vote/position` → `mev`
+
+The validator's Jito MEV commission per mainnet epoch (request #5b), from `indexer_app`'s hourly scan of the mainnet
+TipDistributionAccounts and their claims. This example is the API's test data (`OperatorPositionService.test.ts`): a
+700 bps validator's mainnet epochs 1050 and 1051 on 7 Oct 2026, on a mainnet program onboarded in epoch 1050.
+
+```json
+{
+  "commissionBps": 700,
+  "lastEpoch": 1051,
+  "epochs": [
+    {
+      "epoch": 1050,
+      "tipsSol": 106.7004,
+      "final": true,
+      "validatorShareSol": 7.469,
+      "estimated": false,
+      "claimStatus": "claimed",
+      "sweptIn": 1051
+    },
+    {
+      "epoch": 1051,
+      "tipsSol": 32.9203,
+      "final": false,
+      "validatorShareSol": 2.3044,
+      "estimated": true,
+      "claimStatus": "pending",
+      "sweptIn": null
+    }
+  ],
+  "pendingSol": 2.3044
+}
+```
+
+- `mev` is `null` without the scan (the API has no Postgres) or when the validator has no TipDistributionAccount.
+- `commissionBps` is the newest account's MEV commission in bps (700 = 7%), not a `…Pct`.
+- `epochs` are oldest first: the epochs since onboarding when the program runs on mainnet, else the last 10 mainnet
+  epochs (devnet epochs are not mainnet's, so `sweptIn` stays `null` there).
+- `tipsSol` is the epoch's whole tip pot once Jito uploaded the merkle root (`final: true`), else the tips so far.
+  `validatorShareSol` is the claimed amount, else ⌊tips × bps ÷ 10,000⌋ with `estimated: true`.
+- `claimStatus`: `claimed`, `pending` (claims land a few hours after the epoch ends), `none` (0% commission: never
+  claimed) or `expired` (closed unclaimed).
+- `sweptIn` is the program epoch whose sweep took the commission in. The cranks hold an epoch's sweep until Jito's
+  claim lands (`ClaimMevJob`, bounded wait), so epoch X's commission is normally swept at X + 1.
+- `pendingSol` is commission not in the vote account yet (claims pending), plus, on a mainnet program, commission
+  claimed but not swept yet. Copy: "2.3044 SOL of MEV commission on its way".
 
 ## `GET /v1/validators/:vote/history`
 
@@ -145,6 +193,11 @@ simulator (`src/__fixtures__/ProgramSim.ts`), trimmed where marked `…`.
   backfills them). The current epoch's credits are partial. On devnet there is no Jito, so the MEV and priority-fee
   fields stay `null`; on mainnet `mevEarnedSol` is the epoch's whole tip pot (`merkle_root.max_total_claim`) and
   appears once Jito uploads the merkle root, a few hours into the next epoch.
+- Mainnet MEV figures for a validator page while the program runs on devnet: `mev` above, or the profile's
+  `mevHistory` (`GET /v1/validators/:vote`, oldest first: chain rows for the last 20 epochs, Jito Kobe before that).
+  Each row has `epoch`, `source` (`chain` or `kobe`), `commissionBps`, `tipsSol`, `final`, `validatorShareSol`,
+  `estimated`, `claimStatus`, `claimedSlot`, and Jito's priority-fee distribution where the validator has one
+  (`pfCommissionBps`, `pfTransferredSol`, `pfClaimStatus`; `null` for almost everyone).
 - `sources` says what filled an entry: `vote` (this epoch's vote-account copy), `credits` (the credit list), `tip`,
   `priorityFee` (Jito) and `stake` (the scorer's oracle post, the only signed input).
 - `freshness.status`: `fresh` = copied this epoch; `stale` = the newest copy is older (the keepers have not run this

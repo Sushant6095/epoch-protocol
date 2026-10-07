@@ -312,10 +312,12 @@ from our market's detail ("Resolution source"). Example in
 
 Operator consensus: several registered operators vote on each epoch's value, and it is proposed only when operators
 holding at least two thirds of the weight agree within the tolerance (1%). While they vote, `status` is `voting` and
-`value` is the current weighted median. `ballot` (null when a single publisher posted the value) shows who voted what:
+`value` is the current weighted median (the agreed value once consensus is reached and the value is queued for the
+FeeIndex). `ballot` (null when a single publisher posted the value, or before any vote) shows who voted what:
 
 ```jsonc
 "ballot": {
+  "address": "…",                  // the IndexBallot account, PDA ["index_ballot", fee_index, epoch]
   "programEpoch": 1176, "round": 0,
   "status": "proposed",            // voting · queued · proposed · vetoed · settled
   "thresholdBps": 6667, "toleranceBps": 100,
@@ -332,8 +334,15 @@ holding at least two thirds of the weight agree within the tolerance (1%). While
 ```
 
 Show it on our market's detail under the resolution source as "Agreed by 2 of 3 operators (67% ≥ 66.67%)" with one row
-per operator (value, deviation, agrees); a dissenter's deviation is part of the record. The `feeIndex` WS channel
-carries the open ballot as `ballot` and pushes on every vote, so a "Voting: 1 of 3" chip can update live.
+per operator (value, deviation, agrees); a dissenter's deviation is part of the record. `late: true` marks a vote cast
+after consensus: it is on the record but never counted. `round` goes up by one each time a vetoed or stuck ballot
+reopens.
+
+The `feeIndex` WS channel pushes on every vote, so a "Voting: 1 of 3" chip can update live. Its `data` is `final`
+(`{ epoch, value }` or null), `proposed` (`{ epoch, value, disputeEndsSlot }` or null), `avg8`, `points` (the 16 newest,
+as `GET /v1/index?limit=16`; a point's `status` is `final`, `proposed`, `vetoed` or `voting`, and absent for an epoch
+only the indexer computed) and `ballot`: the newest ballot that is not settled, in the shape above, or null when none is
+open or consensus is off. Points with a `status` are numbered by PROGRAM epoch, like `ballot.programEpoch`.
 
 ### `GET /v1/index/latest-final` (the newest final value)
 
@@ -342,6 +351,7 @@ any resolver or outside reader that wants the newest settled number without walk
 
 ```json
 {
+  "schemaVersion": 1, "kind": "real", "asOf": "…", "source": "The Epoch program's FeeIndex account",
   "epoch": 1176, "value": 1400, "unit": "µL/CU",
   "finalizedSlot": 451000123, "inputsHash": "<64 hex>",
   "cluster": "devnet", "programId": "<Epoch program id>", "feeIndexAccount": "<FeeIndex PDA>",
@@ -349,8 +359,11 @@ any resolver or outside reader that wants the newest settled number without walk
 }
 ```
 
-`epoch` is the PROGRAM epoch (equal to the mainnet epoch on mainnet). 404 until a value is final. Programs read the same
-account on chain ([FEE_INDEX_METHODOLOGY.md](../FEE_INDEX_METHODOLOGY.md#reading-the-index-on-chain)).
+`epoch` is the PROGRAM epoch (equal to the mainnet epoch on mainnet). `finalizedSlot` is the program cluster's slot
+`finalize_index` ran in; `inputsHash` is the hex sha256 of the value's inputs. Nothing comes from events or Postgres, so
+a value still voting or proposed never shows here. Cached 15 s. 404 `NOT_FOUND` until a value is final; 503
+`PROGRAM_NOT_CONFIGURED` without the program. Programs read the same account on chain
+([FEE_INDEX_METHODOLOGY.md](../FEE_INDEX_METHODOLOGY.md#reading-the-index-on-chain)).
 
 ### `GET /v1/index/forecast` (Terminal: Fee Index card)
 
