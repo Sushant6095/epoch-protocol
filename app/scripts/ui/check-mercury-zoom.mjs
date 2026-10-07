@@ -1,0 +1,31 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+const browser = await chromium.launch();
+for (const width of [1440, 390]) {
+ const page = await browser.newPage({viewport:{width,height:900},reducedMotion:'no-preference'});
+ await page.goto('http://localhost:3100', {waitUntil:'networkidle'});
+ await page.waitForTimeout(1600);
+ const read = () => page.locator('.zoom-terminal').evaluate(e=>({width:e.getBoundingClientRect().width,top:e.getBoundingClientRect().top}));
+ const before=await read();
+ assert.equal(await page.locator('.zoom-product-caption').evaluate(e=>getComputedStyle(e).visibility),'hidden');
+ await page.screenshot({path:`design/screens/impl/zoom-start-${width}.png`});
+ const length=await page.locator('.mercury-journey').evaluate(e=>e.offsetHeight-innerHeight);
+ await page.evaluate(y=>window.scrollTo(0,y),length/2); await page.waitForTimeout(1100);
+ const middle=await read(); await page.screenshot({path:`design/screens/impl/zoom-middle-${width}.png`});
+ await page.evaluate(y=>window.scrollTo(0,y),length); await page.waitForTimeout(1100);
+ const after=await read();
+ assert.equal(await page.locator('.zoom-copy').evaluate(e=>getComputedStyle(e).visibility),'hidden');
+ assert.equal(await page.locator('.zoom-product-caption').evaluate(e=>getComputedStyle(e).visibility),'visible'); await page.screenshot({path:`design/screens/impl/zoom-end-${width}.png`});
+ assert.ok(after.width>before.width*1.2,'Terminal grows significantly');
+ assert.ok(middle.width>before.width && middle.width<after.width,'Continuous zoom');
+ assert.ok(after.top<180 && after.top>=90,'Terminal stays pinned under header');
+ assert.equal(await page.locator('.editorial-sculpture').count(),0);
+ await page.evaluate(()=>window.scrollTo(0,0)); await page.waitForTimeout(1100);
+ assert.ok(Math.abs((await read()).width-before.width)<3,'Reverse scroll restores scene');
+ await page.getByRole('button',{name:'Pause animations',exact:true}).click();
+ assert.equal(await page.locator('.zoom-sticky').evaluate(e=>getComputedStyle(e).position),'relative');
+ console.log(width, {before,middle,after});
+ await page.close();
+}
+await browser.close();
+console.log('PASS: desktop/mobile continuous zoom, sticky placement, reversal and static pause.');

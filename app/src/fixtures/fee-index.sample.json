@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "GET /v1/index shape ({epoch, value}); status is an extension (see BACKEND-REQUESTS)",
+  "note": "Sample. Epoch 1044 is in progress, so it has no index yet; 1043 is proposed (in its dispute window); 1042 and older are final. The Terminal KPI shows the latest FINAL value (epoch 1042).",
+  "unit": "µL/CU",
+  "unitLong": "microlamports per compute unit (stake-weighted median priority fee)",
+  "points": [
+    {
+      "epoch": 1043,
+      "value": 1330,
+      "status": "proposed"
+    },
+    {
+      "epoch": 1042,
+      "value": 1284,
+      "status": "final"
+    },
+    {
+      "epoch": 1041,
+      "value": 1250,
+      "status": "final"
+    },
+    {
+      "epoch": 1040,
+      "value": 1190,
+      "status": "final"
+    },
+    {
+      "epoch": 1039,
+      "value": 1260,
+      "status": "final"
+    },
+    {
+      "epoch": 1038,
+      "value": 1310,
+      "status": "final"
+    },
+    {
+      "epoch": 1037,
+      "value": 1230,
+      "status": "final"
+    },
+    {
+      "epoch": 1036,
+      "value": 1170,
+      "status": "final"
+    },
+    {
+      "epoch": 1035,
+      "value": 1290,
+      "status": "final"
+    },
+    {
+      "epoch": 1034,
+      "value": 1380,
+      "status": "final"
+    },
+    {
+      "epoch": 1033,
+      "value": 1450,
+      "status": "final"
+    },
+    {
+      "epoch": 1032,
+      "value": 1330,
+      "status": "final"
+    },
+    {
+      "epoch": 1031,
+      "value": 1210,
+      "status": "final"
+    },
+    {
+      "epoch": 1030,
+      "value": 1260,
+      "status": "final"
+    },
+    {
+      "epoch": 1029,
+      "value": 1390,
+      "status": "final"
+    },
+    {
+      "epoch": 1028,
+      "value": 1570,
+      "status": "final"
+    },
+    {
+      "epoch": 1027,
+      "value": 1840,
+      "status": "final"
+    },
+    {
+      "epoch": 1026,
+      "value": 1960,
+      "status": "final"
+    },
+    {
+      "epoch": 1025,
+      "value": 1720,
+      "status": "final"
+    },
+    {
+      "epoch": 1024,
+      "value": 1480,
+      "status": "final"
+    },
+    {
+      "epoch": 1023,
+      "value": 1350,
+      "status": "final"
+    },
+    {
+      "epoch": 1022,
+      "value": 1210,
+      "status": "final"
+    },
+    {
+      "epoch": 1021,
+      "value": 1180,
+      "status": "final"
+    },
+    {
+      "epoch": 1020,
+      "value": 1290,
+      "status": "final"
+    },
+    {
+      "epoch": 1019,
+      "value": 1520,
+      "status": "final"
+    },
+    {
+      "epoch": 1018,
+      "value": 1630,
+      "status": "final"
+    },
+    {
+      "epoch": 1017,
+      "value": 1410,
+      "status": "final"
+    },
+    {
+      "epoch": 1016,
+      "value": 990,
+      "status": "final"
+    },
+    {
+      "epoch": 1015,
+      "value": 1105,
+      "status": "final"
+    },
+    {
+      "epoch": 1014,
+      "value": 1320,
+      "status": "final"
+    },
+    {
+      "epoch": 1013,
+      "value": 1240,
+      "status": "final"
+    },
+    {
+      "epoch": 1012,
+      "value": 1180,
+      "status": "final"
+    }
+  ]
+}

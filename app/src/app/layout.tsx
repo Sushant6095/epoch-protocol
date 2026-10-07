@@ -1,45 +1,36 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
-import type { ReactNode } from "react";
-
-import { SiteFooter } from "@/components/shell/site-footer";
-import { SiteHeader } from "@/components/shell/site-header";
-import "@/styles/globals.css";
-
-import { Providers } from "./providers";
-
-const sans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
-const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-instrument-serif" });
-
-export const metadata: Metadata = {
-  title: { default: "Epoch · the revenue desk for Solana validators", template: "%s · Epoch" },
-  description:
-    "Validators borrow against their future commission, lenders earn the fees, the Solana Fee Index prices block space, and validator revenue trades as tokens on Meteora.",
-};
-
-export const viewport: Viewport = {
-  themeColor: "#050e0c",
-  colorScheme: "dark",
-};
-
+import type { ReactNode } from 'react';
+import { Bricolage_Grotesque, Geist, Geist_Mono, Instrument_Serif } from 'next/font/google';
+import { Providers } from '@/components/providers';
+import '@/styles/globals.css';
+const sans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
+const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
+const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-display', axes: ['opsz', 'wdth'] });
+const serif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  style: 'italic',
+  variable: '--font-instrument-serif',
+});
+export const metadata = { title: 'Epoch', description: 'The revenue desk for Solana validators' };
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" data-theme="emerald" className={`dark ${sans.variable} ${mono.variable} ${serif.variable}`}>
-      <body className="flex min-h-dvh flex-col">
-        <Providers>
-          <a
-            href="#main"
-            className="sr-only z-50 rounded-md bg-ep-accent px-3 py-2 text-ep-accent-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
-          >
-            Skip to content
-          </a>
-          <SiteHeader />
-          <main id="main" className="flex-1">
-            {children}
-          </main>
-          <SiteFooter />
-        </Providers>
+    <html
+      lang="en"
+      data-theme="horizon"
+      className={`${sans.variable} ${mono.variable} ${serif.variable} ${display.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        {/* Decide before first paint whether the landing's opening sequence plays (once per session, never
+            with reduced motion), so returning visitors never see a flash of the intro screen. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(location.pathname==='/'&&(/[?&](intro|freeze)/.test(location.search)||sessionStorage.getItem('epoch.intro')!=='1')&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.dataset.intro='on'}catch(e){}`,
+          }}
+        />
+      </head>
+      <body>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

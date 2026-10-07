@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-09-29T00:30:00+05:30",
+  "source": "Solana mainnet RPC, Jito Kobe, Stakewiz, validators.app",
+  "kind": "real",
+  "name": "NTT DOCOMO GLOBAL",
+  "vote": "FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk",
+  "identity": "AmjX7CerZbHrU814UeBp2gJC7gANNG3KrP4c3RyD7TSD",
+  "tags": [
+    "Agave 4.3.0",
+    "Frankfurt, Germany",
+    "Cherry Servers",
+    "Jito tips · 10% fee",
+    "Foundation-backed",
+    "164 epochs active"
+  ],
+  "gauges": {
+    "epochScore": 100,
+    "voteCreditsPct": 99.96,
+    "skippedBlocksPct": 0,
+    "uptime30dPct": 100
+  },
+  "tiles": {
+    "activeStakeSol": 193097,
+    "stakeChangeThisEpochSol": 1121,
+    "apyPct": 4.94,
+    "stakingApyPct": 4.8,
+    "tipsApyPct": 0.14,
+    "delegators": 1988,
+    "biggestDelegatorSharePct": 42.1,
+    "blocksPerDay": 135
+  },
+  "commission": {
+    "inflationPct": 5,
+    "jitoTipsPct": 10,
+    "unchangedEpochs": 30
+  },
+  "stakeByEpoch": [
+    [
+      1037,
+      176425
+    ],
+    [
+      1038,
+      190556
+    ],
+    [
+      1039,
+      191218
+    ],
+    [
+      1040,
+      191208
+    ],
+    [
+      1041,
+      191465
+    ],
+    [
+      1042,
+      191615
+    ],
+    [
+      1043,
+      192610
+    ],
+    [
+      1044,
+      193097
+    ]
+  ],
+  "voteCreditsByEpoch": {
+    "max": 6912000,
+    "rows": [
+      [
+        1037,
+        6906623
+      ],
+      [
+        1038,
+        6907816
+      ],
+      [
+        1039,
+        6907360
+      ],
+      [
+        1040,
+        6906002
+      ],
+      [
+        1041,
+        6906270
+      ],
+      [
+        1042,
+        6906409
+      ],
+      [
+        1043,
+        6909541
+      ]
+    ]
+  },
+  "jitoTipsTotalByEpochSol": [
+    [
+      1037,
+      0.62
+    ],
+    [
+      1038,
+      1.13
+    ],
+    [
+      1039,
+      1.42
+    ],
+    [
+      1040,
+      0.8
+    ],
+    [
+      1041,
+      5.11
+    ],
+    [
+      1042,
+      1.82
+    ],
+    [
+      1043,
+      1.47
+    ]
+  ],
+  "revenueEpoch1043Sol": {
+    "inflationCommission": 1.74,
+    "tipsCommission": 0.15,
+    "blockFeesEstimate": 2.4,
+    "voteFees": -2.16,
+    "netEstimate": 2.1
+  },
+  "delegatorSplit": [
+    {
+      "source": "Solana Foundation",
+      "pct": 42.1,
+      "sol": 81300
+    },
+    {
+      "source": "Liquid-staking pools",
+      "pct": 28.3,
+      "sol": 54600
+    },
+    {
+      "source": "1,986 other wallets",
+      "pct": 29.6,
+      "sol": 57200
+    }
+  ],
+  "ifBiggestDelegatorLeftSol": 111800,
+  "medianWalletSol": 1.86,
+  "thisEpoch": {
+    "arrivingSol": 1127,
+    "leavingSol": 5.8,
+    "netSol": 1121
+  },
+  "creditEstimate": {
+    "sweepablePerEpochSol": 1.89,
+    "sweepableLast10EpochsSol": 18.9,
+    "limitUnhedgedSol": 4.7,
+    "limitHedgedSol": 7.6,
+    "note": "limit = min(25% or 40% of 10 epochs' swept revenue, 4 x bond, cap)"
+  },
+  "stakeMoves": [
+    {
+      "epoch": 1044,
+      "direction": "in",
+      "sol": 1094.54,
+      "from": "Solana Foundation",
+      "wallet": "4ZJh…kbPY",
+      "stakeAccountShort": "9RWq…2bDu",
+      "stakeAccount": "9RWqn8e9jQ9LGMntXxMcxFqpM7PbjUZsrkJNin272bDu",
+      "orb": "https://orbmarkets.io/address/9RWqn8e9jQ9LGMntXxMcxFqpM7PbjUZsrkJNin272bDu"
+    },
+    {
+      "epoch": 1044,
+      "direction": "in",
+      "sol": 17,
+      "from": "dzSOL stake pool",
+      "wallet": "4cpn…iwJt",
+      "stakeAccountShort": "5Et4…81Pe",
+      "stakeAccount": "5Et4gW2p45rcyRnCp8r4hg8GUAJy61bsHDj2GexK81Pe",
+      "orb": "https://orbmarkets.io/address/5Et4gW2p45rcyRnCp8r4hg8GUAJy61bsHDj2GexK81Pe"
+    },
+    {
+      "epoch": 1044,
+      "direction": "in",
+      "sol": 5.35,
+      "from": "Wallet",
+      "wallet": "BVPW…KZei",
+      "stakeAccountShort": "99v3…qiLg",
+      "stakeAccount": "99v3RW14L9AED2sJp9FPKS2NacME5oN8pjbDw5cfqiLg",
+      "orb": "https://orbmarkets.io/address/99v3RW14L9AED2sJp9FPKS2NacME5oN8pjbDw5cfqiLg"
+    },
+    {
+      "epoch": 1044,
+      "direction": "in",
+      "sol": 5,
+      "from": "Wallet",
+      "wallet": "7cgg…VebH",
+      "stakeAccountShort": "4kiM…MShb",
+      "stakeAccount": "4kiMQ55QP2z68YptsGYFpjPKCGCWy8j6Ta5fjKCEMShb",
+      "orb": "https://orbmarkets.io/address/4kiMQ55QP2z68YptsGYFpjPKCGCWy8j6Ta5fjKCEMShb"
+    },
+    {
+      "epoch": 1044,
+      "direction": "out",
+      "sol": 3.19,
+      "from": "Wallet",
+      "wallet": "7cgg…VebH",
+      "stakeAccountShort": "EB7e…2FdU",
+      "stakeAccount": "EB7eAt9oQjgNEQzFgL1nDUVzWqaz3R1isDjs6GmZ2FdU",
+      "orb": "https://orbmarkets.io/address/EB7eAt9oQjgNEQzFgL1nDUVzWqaz3R1isDjs6GmZ2FdU"
+    },
+    {
+      "epoch": 1044,
+      "direction": "out",
+      "sol": 1.53,
+      "from": "Wallet",
+      "wallet": "8CsA…hzz3",
+      "stakeAccountShort": "SBLK…c2QY",
+      "stakeAccount": "SBLK55MqTHvVXABnH3ebkbGEvWZVT3qSLyZMWqLc2QY",
+      "orb": "https://orbmarkets.io/address/SBLK55MqTHvVXABnH3ebkbGEvWZVT3qSLyZMWqLc2QY"
+    },
+    {
+      "epoch": 1043,
+      "direction": "in",
+      "sol": 80727.7,
+      "from": "Solana Foundation",
+      "wallet": "4ZJh…kbPY",
+      "stakeAccountShort": "5B4T…BAPp",
+      "stakeAccount": "5B4TzjQMFBtX4nfPjEhjRVgNcSe5GukNFC7eau7yBAPp",
+      "orb": "https://orbmarkets.io/address/5B4TzjQMFBtX4nfPjEhjRVgNcSe5GukNFC7eau7yBAPp"
+    },
+    {
+      "epoch": 1043,
+      "direction": "in",
+      "sol": 393.24,
+      "from": "Wallet",
+      "wallet": "BVPW…KZei",
+      "stakeAccountShort": "B3VK…vKWe",
+      "stakeAccount": "B3VKmXMNTH5orGBMX1MAUVkMAqMEdFTSjS75t5rovKWe",
+      "orb": "https://orbmarkets.io/address/B3VKmXMNTH5orGBMX1MAUVkMAqMEdFTSjS75t5rovKWe"
+    }
+  ]
+}

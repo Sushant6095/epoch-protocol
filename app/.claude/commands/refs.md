@@ -1,7 +1,7 @@
 ---
 description: Pull and write up the locked Refero references for one Epoch page (no code)
 ---
-Page: $ARGUMENTS   (one of: landing, sign-in, terminal, fee-market, validators, validator, my-stake, predict, vault, launch)
+Page: $ARGUMENTS   (one of: landing, sign-in, terminal, validators, validator, my-stake, predict, vault)
 
 Use the refero-design skill's method with the Refero MCP, starting from the reference lock — do not
 research from scratch:

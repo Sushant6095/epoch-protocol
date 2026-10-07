@@ -38,7 +38,7 @@ Run `/refs my-stake` first: it pulls these images through the Refero MCP and wri
 | 5 | Rewards per epoch | 12 bars (epochs 1033–1044, the current one pending) + per epoch, per month, per year in the chosen unit | `perEpochSol`, `monthSol`, `yearSol` (API: per-epoch rewards) | Mercury balance card chart |
 | 6 | Where your stake sits | 60 / 25 / 15 split bar with a TOP-18 badge and one paragraph on why concentration matters | derived | — |
 | 7 | Healthier homes for your 15 SOL | Three real suggestions (Solana Mobile Validator, polkachu.com, ParaFi Technologies): 0% fee, above break-even, not top-18, no downtime; picking one shows the two-signature move plan and its cost (≈ 0.003 SOL, one epoch of rewards) → TxPreview | `suggestions[]` | — |
-| 8 | Predict | its own page since 30 Sep: `/predict` (`pages/predict.md`); My Stake links there, `/me#predict` redirects | `usePredict` | Stocktwits poll card |
+| 8 | Predict | see `pages/predict.md` (`#predict`) | `usePredict` | Stocktwits poll card |
 | 9 | Alerts | Four switches (goes offline, fee goes up, starts losing money, rewards landed) + channel: Email, Telegram, Browser | `alerts[]` | Mercury transactions filter row style for the channel picker |
 | 10 | Lend to validators (with your vault shares) | One row per tranche the wallet holds: SOL value, shares × share price, since epoch, Junior lock; empty: "No vault shares yet"; the target and not-staked note; Manage in the Vault → | `useLenderPosition(address)` (request #8d), `useVault().tranches` | Mercury Home small cards |
 

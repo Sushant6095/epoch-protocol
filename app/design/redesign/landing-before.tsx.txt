@@ -1,0 +1,274 @@
+'use client';
+import { useRef } from 'react';
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import { ArrowUpRight, ArrowRight, Circle, ShieldCheck, Code2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { useNetwork } from '@/lib/data/useNetwork';
+import { useValidators } from '@/lib/data/useValidators';
+import { Source, compact, fmt } from '@/components/epoch/shared';
+import { gsap, useGSAP, withMotion } from '@/lib/gsap';
+const HeroObject = dynamic(() => import('@/components/epoch/hero-object'), { ssr: false });
+const faq = [
+  [
+    'What does Epoch do?',
+    'Epoch brings validator health, stake flows and revenue-backed working capital into one place. Stakers can research operators. Validators can explore borrowing against collected revenue. Lenders can inspect the vault’s risks and lending activity.',
+  ],
+  [
+    'Does my staked SOL move into the vault?',
+    'No. Your native stake stays in your own stake account. Lending through the Vault is a separate action. Vault SOL is not staked; unlent SOL earns nothing.',
+  ],
+  [
+    'Where does a lender’s yield come from?',
+    'From fees paid on validator advances. Senior has a target rate, paid only from available fees. Junior receives the residual and takes losses before Senior, after each borrower’s bond. Returns are not guaranteed.',
+  ],
+  [
+    'Is Epoch ready for real deposits?',
+    'Real deposits are unavailable in this preview. Epoch is pre-alpha and unaudited. The interface labels historical network snapshots and sample protocol figures. Review the connected network, current program parameters and transaction details before any action.',
+  ],
+];
+export default function Home() {
+  const network = useNetwork(),
+    validators = useValidators();
+  const n = network.data;
+  const root = useRef<HTMLDivElement>(null);
+  useGSAP(
+    () => {
+      const media = withMotion(() => {
+        gsap.from('.hero-reveal', { opacity: 0, y: 20, duration: 0.7, stagger: 0.09 });
+      });
+      return () => media.revert();
+    },
+    { scope: root },
+  );
+  return (
+    <div ref={root} className="landing-page">
+      <header className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-4 px-5 lg:px-10">
+        <Link href="/" className="flex items-center gap-3 text-2xl font-medium tracking-tight">
+          <Circle className="size-8 text-primary" />
+          epoch<span className="label-caps self-end pb-1">/</span>
+        </Link>
+        <nav className="hidden gap-8 text-sm text-muted-foreground md:flex">
+          <Link className="hover:text-foreground" href="/terminal">
+            Terminal
+          </Link>
+          <Link className="hover:text-foreground" href="/validators">
+            Validators
+          </Link>
+          <Link className="hover:text-foreground" href="/vault">
+            Vault
+          </Link>
+        </nav>
+        <Button render={<Link href="/me" />} nativeButton={false} className="rounded-full px-5">
+          Launch app
+          <ArrowUpRight />
+        </Button>
+      </header>
+      <main id="main-content">
+        <section className="landing-hero relative mx-auto grid max-w-7xl items-center gap-4 overflow-hidden px-5 pb-16 pt-12 lg:grid-cols-2 lg:px-10 lg:pb-24 lg:pt-20">
+          <div className="relative z-10">
+            <p className="hero-reveal label-caps mb-8 flex items-center gap-3">
+              <span className="h-px w-8 bg-primary" />
+              Built for the next epoch
+            </p>
+            <h1 className="hero-reveal text-5xl font-normal leading-none tracking-tight sm:text-6xl lg:text-7xl">
+              The revenue desk for <em className="accent-serif text-primary">Solana validators.</em>
+            </h1>
+            <p className="hero-reveal mt-8 max-w-md text-base leading-relaxed text-muted-foreground">
+              See where your stake goes. Understand what it earns. Give the operators behind Solana room to grow.
+            </p>
+            <div className="hero-reveal mt-9 flex flex-wrap gap-3">
+              <Button render={<Link href="/me" />} nativeButton={false} className="h-13 rounded-full px-7">
+                Check my stake
+                <ArrowRight />
+              </Button>
+              <Button
+                render={<Link href="/terminal" />}
+                nativeButton={false}
+                variant="outline"
+                className="h-13 rounded-full px-7"
+              >
+                Open the Terminal
+                <ArrowUpRight />
+              </Button>
+            </div>
+            <p className="hero-reveal mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck className="size-4" />
+              Your staked SOL stays in your own stake account.
+            </p>
+          </div>
+          <div className="hero-reveal relative aspect-square w-full">
+            <HeroObject />
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <p className="label-caps">One network. Every epoch.</p>
+              <p className="num mt-3 text-5xl tracking-tight">{n?.epoch.number ?? '—'}</p>
+              <p className="num mt-3 text-xs text-primary">
+                {n ? fmt((n.epoch.slotIndex / n.epoch.slotsInEpoch) * 100, 1) : '—'}% at capture
+              </p>
+            </div>
+            <div className="absolute inset-x-6 bottom-3 flex justify-between border-t border-border pt-4 text-xs text-muted-foreground">
+              <span className="num">{compact(n?.stake.totalSol)} SOL staked</span>
+              <Source data={n} />
+            </div>
+          </div>
+        </section>
+        <section className="border-y border-border bg-card">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-10 lg:grid-cols-4 lg:px-10">
+            {[
+              ['Network validators', fmt(n?.validators.total)],
+              ['SOL securing the network', compact(n?.stake.totalSol)],
+              ['Delegator wallets', compact(n?.delegators?.wallets)],
+              ['Median staking APY', `${fmt(n?.stake.medianApyPct, 2)}%`],
+            ].map(([label, value]) => (
+              <div key={label} title={`${n?.source} · ${n?.asOf}`}>
+                <p className="num text-3xl tracking-tight lg:text-4xl">{value}</p>
+                <p className="mt-3 text-xs text-muted-foreground">{label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="mx-auto max-w-7xl px-5 py-20 lg:px-10 lg:py-28">
+          <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <p className="label-caps mb-4">A better view of the network</p>
+              <h2 className="max-w-xl text-3xl leading-tight tracking-tight lg:text-4xl">
+                Healthy validators.
+                <br />A stronger Solana.
+              </h2>
+            </div>
+            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+              Follow the entire cycle, from delegation to validator revenue and the capital that keeps operators
+              running.
+            </p>
+          </div>
+          <div className="grid gap-8 lg:grid-cols-3">
+            {[
+              [
+                '01',
+                'Stake with understanding',
+                'Compare health, fees, concentration and rewards before you choose an operator.',
+                '/validators',
+                'Explore validators',
+              ],
+              [
+                '02',
+                'Bridge the revenue gap',
+                'Validators can borrow against future paychecks, with repayments collected at the source.',
+                '/validators/FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk',
+                'See validator economics',
+              ],
+              [
+                '03',
+                'Know what funds your return',
+                'Inspect the advances behind the Vault, the repayment history and the order of protection.',
+                '/vault',
+                'Explore the Vault',
+              ],
+            ].map(([step, title, copy, href, cta]) => (
+              <div className="border-t border-ep-line-strong pt-6" key={step}>
+                <span className="num text-sm text-primary">{step} /</span>
+                <h3 className="mb-4 mt-8 text-xl">{title}</h3>
+                <p className="min-h-20 text-sm leading-relaxed text-muted-foreground">{copy}</p>
+                <Link href={href} className="mt-5 inline-flex min-h-11 items-center gap-3 text-sm text-primary">
+                  {cta}
+                  <ArrowUpRight className="size-4" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-10">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="label-caps mb-4">Beyond the APY</p>
+              <h2 className="text-3xl tracking-tight">Meet the operators.</h2>
+            </div>
+            <Link href="/validators" className="inline-flex min-h-11 items-center gap-2 text-sm text-primary">
+              View all validators
+              <ArrowUpRight className="size-4" />
+            </Link>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {validators.data?.rows
+              .filter((r) => !r.top18 && r.health === 'healthy')
+              .slice(0, 4)
+              .map((r) => (
+                <Link
+                  key={r.vote}
+                  href={`/validators/${r.vote}`}
+                  className="group rounded-xl border border-border bg-card p-6 transition-transform duration-200 hover:-translate-y-1"
+                >
+                  <div className="mb-8 flex items-center justify-between">
+                    <span className="flex size-11 items-center justify-center rounded-full border border-ep-line-strong text-sm text-primary">
+                      {r.name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <ArrowUpRight className="size-4 text-muted-foreground group-hover:text-primary" />
+                  </div>
+                  <h3 className="truncate text-base" title={r.name}>
+                    {r.name}
+                  </h3>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {r.client} · {r.country}
+                  </p>
+                  <p className="num mt-8 text-3xl">
+                    {fmt(r.apyPct, 2)}
+                    <span className="text-base text-muted-foreground">%</span>
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Historical APY · score <span className="num">{r.epochScore}/100</span>
+                  </p>
+                </Link>
+              ))}
+          </div>
+          <p className="mt-5 text-xs text-muted-foreground">
+            Source: handover’s 29 September 2026 mainnet snapshot. Historical returns are not a promise.
+          </p>
+        </section>
+        <section className="mx-auto grid max-w-7xl gap-10 border-t border-border px-5 py-20 lg:grid-cols-2 lg:px-10">
+          <div>
+            <p className="label-caps mb-4">Know before you act</p>
+            <h2 className="text-3xl tracking-tight">
+              Clear answers.
+              <br />
+              Open by design.
+            </h2>
+          </div>
+          <Accordion>
+            {faq.map(([question, answer], i) => (
+              <AccordionItem value={i} key={question}>
+                <AccordionTrigger className="py-6 text-base">{question}</AccordionTrigger>
+                <AccordionContent className="pb-6 leading-relaxed text-muted-foreground">{answer}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </section>
+        <section className="border-t border-border bg-ep-accent-soft">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-8 px-5 py-20 lg:px-10">
+            <div>
+              <p className="label-caps mb-5">Make your next move an informed one</p>
+              <h2 className="text-4xl tracking-tight lg:text-5xl">Is your validator healthy?</h2>
+            </div>
+            <Button render={<Link href="/me" />} nativeButton={false} className="h-13 rounded-full px-8">
+              Check my stake
+              <ArrowUpRight />
+            </Button>
+          </div>
+        </section>
+      </main>
+      <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-5 py-10 text-xs text-muted-foreground lg:px-10">
+        <p>Epoch · Pre-alpha · Unaudited. Targets are not guarantees.</p>
+        <a
+          className="inline-flex min-h-11 items-center gap-2 hover:text-primary"
+          href="https://github.com/Sushant6095/epoch-protocol"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Code2 className="size-4" />
+          Read the code
+          <ArrowUpRight className="size-3" />
+        </a>
+      </footer>
+    </div>
+  );
+}

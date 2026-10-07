@@ -1,0 +1,135 @@
+/*
+ * Epoch design tokens — THE ONLY FILE THAT MAY CONTAIN RAW COLOUR VALUES.
+ * Copy to app/src/styles/tokens.css. Components use the semantic variables (or the Tailwind
+ * utilities mapped in globals.css), never a hex, never an arbitrary value.
+ *
+ * Two dark themes share one set of names. Switch with <html data-theme="emerald|graphite">.
+ *   emerald  (default) deep green-black + mint accent. From the Refero style "Hyper Foundation"
+ *            (hyperliquid.xyz, style 54511793) and docs/UI_SOURCES.md §3 (real terminals avoid
+ *            near-black + acid green).
+ *   graphite the palette of the first design canvas (near-black + lime). Kept so the team can
+ *            compare; see handover/10-OPEN-DECISIONS.md #1.
+ *
+ * Prefix `--ep-` keeps our names clear of shadcn's own variables (shadcn's --muted and --accent are
+ * BACKGROUNDS; ours are text/brand colours). globals.css maps shadcn's variables onto these.
+ *
+ * Meaning never changes between themes:
+ *   --ep-accent  primary action, positive change, live, senior tranche, focus ring
+ *   --ep-info    second chart series, info, junior tranche
+ *   --ep-warn    watch, late, top-18, Sample badge, losses (Epoch uses no red at all)
+ * Contrast (checked): text ≥ 11:1, muted ≥ 6.4:1, accent/info/warn ≥ 7.9:1 on every surface;
+ * field borders ≥ 3:1 (WCAG 1.4.11).
+ */
+
+:root,
+:root[data-theme='emerald'] {
+  color-scheme: dark;
+
+  /* surfaces, darkest to lightest */
+  --ep-bg: #050e0c; /* page */
+  --ep-bg-bar: #040b09; /* footer strip, ticker */
+  --ep-inset: #07120f; /* wells inside cards, input fill */
+  --ep-surface: #0a1714; /* cards, tiles, menus, table body */
+  --ep-hover: #0e1f1b; /* row hover, pressed ghost button */
+  --ep-raised: #10241f; /* popovers, dialogs, the sticky action panel */
+
+  /* lines */
+  --ep-line: #15302a; /* card borders, dividers, empty bar tracks */
+  --ep-line-strong: #23524c; /* pills, chips, ghost buttons */
+  --ep-field-border: #3e8276; /* inputs, selects, checkboxes (3:1 on surface) */
+
+  /* text */
+  --ep-text: #e8f1ee; /* primary */
+  --ep-text-2: #c2d3ce; /* body copy on cards */
+  --ep-muted: #8aa59e; /* labels, captions, axis text */
+
+  /* meaning */
+  --ep-accent: #97fcd7; /* mint */
+  --ep-accent-ink: #03201a; /* text on an accent fill */
+  --ep-accent-soft: #0f2a24; /* selected chip, success panel fill */
+  --ep-accent-line: #2b5e52; /* selected chip / success panel border */
+  --ep-info: #7db9ff;
+  --ep-info-soft: #0d1b2b;
+  --ep-info-line: #1f3a5c;
+  --ep-warn: #f5a55b;
+  --ep-warn-soft: #1f170d;
+  --ep-warn-line: #5a3a1a;
+
+  /* charts (lightweight-charts and Recharts read these through getComputedStyle) */
+  --ep-chart-1: var(--ep-accent);
+  --ep-chart-2: var(--ep-info);
+  --ep-chart-3: var(--ep-warn);
+  --ep-chart-4: #5f7d76;
+  --ep-chart-grid: #11261f;
+  --ep-chart-crosshair: #3e8276;
+
+  /* the one glow allowed (landing hero card only) */
+  --ep-glow: 0 0 24px 2px rgb(151 252 215 / 0.18);
+}
+
+:root[data-theme='graphite'] {
+  color-scheme: dark;
+  --ep-bg: #0a0d10;
+  --ep-bg-bar: #0b0f13;
+  --ep-inset: #0e1318;
+  --ep-surface: #10151a;
+  --ep-hover: #121a20;
+  --ep-raised: #151c23;
+  --ep-line: #1e2730;
+  --ep-line-strong: #2a3642;
+  --ep-field-border: #5b6e80;
+  --ep-text: #e8ecea;
+  --ep-text-2: #c9d2d6;
+  --ep-muted: #93a0a8;
+  --ep-accent: #a3e35f;
+  --ep-accent-ink: #0a1205;
+  --ep-accent-soft: #1b2a14;
+  --ep-accent-line: #2e4a1e;
+  --ep-info: #6cb2ff;
+  --ep-info-soft: #0d1a2a;
+  --ep-info-line: #1f3a5c;
+  --ep-warn: #f59e4b;
+  --ep-warn-soft: #1a130b;
+  --ep-warn-line: #5a3a1a;
+  --ep-chart-1: var(--ep-accent);
+  --ep-chart-2: var(--ep-info);
+  --ep-chart-3: var(--ep-warn);
+  --ep-chart-4: #5d6b75;
+  --ep-chart-grid: #161e26;
+  --ep-chart-crosshair: #5b6e80;
+  --ep-glow: 0 0 24px 2px rgb(163 227 95 / 0.16);
+}
+
+/* Shape, space, type and motion — identical in both themes. */
+:root {
+  --ep-radius-card: 12px;
+  --ep-radius-control: 10px; /* buttons, inputs */
+  --ep-radius-chip: 8px;
+  --ep-radius-pill: 9999px;
+
+  --ep-gutter: 32px; /* page gutter at ≥ 1024 px; 16 px on phones (set in globals.css) */
+  --ep-header-h: 64px;
+  --ep-footer-h: 44px;
+  --ep-control-h: 44px; /* nothing clickable smaller on touch */
+  --ep-control-h-lg: 52px; /* primary buttons in heroes and action panels */
+
+  --ep-font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --ep-font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', monospace;
+  --ep-font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
+
+  /* motion (mirrors design/motion.ts) */
+  --ep-dur-fast: 150ms;
+  --ep-dur: 200ms;
+  --ep-dur-slow: 250ms;
+  --ep-flash: 180ms; /* value-changed tint */
+  --ep-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ep-dur-fast: 0ms;
+    --ep-dur: 0ms;
+    --ep-dur-slow: 0ms;
+    --ep-flash: 0ms;
+  }
+}

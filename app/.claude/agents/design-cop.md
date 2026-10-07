@@ -37,10 +37,7 @@ LOOK at every image before scoring. Score EVERY line; the screen passes only if 
    badge; missing values show "—"; units on every number; explorer links resolve; the read-out-loud test
    finds no contradictions (two epoch numbers, a live dot over stale data, totals that do not add up).
 8. COPY — sentence case, plain verbs, units; Predict never says bet/gamble/wager/odds and shows
-   "18+ · where allowed" and its cap; the Fee Market never says bet/gamble/wager/odds/long/short and says its quotes
-   come from Epoch's seeded maker; Launch never says investment/dividend/guaranteed/APY/profit, shows "Devnet demo.
-   Nothing here is an offer.", labels market cap "fully diluted" and implied yield "per epoch"; the senior rate is
-   called a target; vault SOL "is not staked".
+   "18+ · where allowed" and its cap; the senior rate is called a target; vault SOL "is not staked".
 
 Output, in this order:
 - Write `design/verdicts/<page>-<yyyy-mm-dd>-r<round>.md` with the eight lines (PASS/FAIL + one reason

@@ -25,8 +25,7 @@ behaviour) and its board render in `handover/design/boards/` (which content and 
 - `pnpm-lock.yaml` (repo root) changes only as the result of `pnpm --filter app add|remove …`; commit it with
   `app/package.json` every time (CI installs with `--frozen-lockfile`).
 - Need a backend change (an endpoint, a field, an SDK helper)? Add it to `handover/BACKEND-REQUESTS.md`
-  with the exact shape, build against a fixture, and tell the human. Never implement it yourself. What the
-  API, SDK and program have today, per screen: `handover/13-BACKEND-AND-PROGRAM-MAP.md`.
+  with the exact shape, build against a fixture, and tell the human. Never implement it yourself.
 - Never commit keypairs, seed phrases, API keys, tokens or `.env` files. MCP keys live in env vars only.
 - Reference screenshots from Refero or other products never get committed (`design/screens/**/ref-*` is ignored).
 
@@ -56,8 +55,7 @@ behaviour) and its board render in `handover/design/boards/` (which content and 
   or the utilities mapped in `globals.css` (`bg-ep-surface`, `text-ep-muted`, `border-ep-line`,
   `text-ep-accent`…) and shadcn's semantic classes (`bg-card`, `text-muted-foreground`). A raw hex, an
   arbitrary Tailwind value (`bg-[#…]`, `p-[13px]`) or a stock `zinc-/neutral-/gray-/slate-` class is a bug.
-- Theme `emerald` (deep green-black + mint) is final for v1 (decision 1, 1 Oct); `graphite` stays in the code
-  as an unused alternative. Both are dark; no light theme before submission.
+- Default theme `emerald` (deep green-black + mint); `graphite` is the alternative. Both are dark.
   Meaning never changes: `--ep-accent` = primary action, positive, live, senior tranche; `--ep-info` = second
   series, info, junior tranche; `--ep-warn` = watch, late, top-18, Sample badge, losses. No red anywhere.
   Colour never carries meaning alone: every badge has words, every change has a sign.
@@ -112,22 +110,13 @@ behaviour) and its board render in `handover/design/boards/` (which content and 
 - All data goes through typed hooks in `src/lib/data/` (one per resource — the full list is in
   `handover/07-DATA-CONTRACTS.md`: `useNetwork`, `useStakeHistory`, `useValidators`, `useTopValidators`,
   `useValidator(vote)`, `useOperatorPosition(vote)`, `useBiggestDelegators`, `useRetailMagnets`, `useFeeIndex`,
-  `useActivity`, `useVault`, `useMyStake(wallet)`, `usePredict`, `useSession`, `useFeeMarket`, `useLaunches`,
-  `useLaunch(mint)`), backed by TanStack Query. api_app wraps every response as `{ ok, data }`: `apiGet` unwraps it.
+  `useActivity`, `useVault`, `useMyStake(wallet)`, `usePredict`, `useSession`), backed by TanStack Query.
   Types: `handover/contracts/epoch-data.ts` → `src/lib/data/types.ts`.
 - Until an endpoint exists, its hook reads `handover/fixtures/*.json` (copied to `src/fixtures/`). The switch
-  to the API is one line per hook. `GET /v1/index` (Fee Index) already exists in `packages/api_app`;
-  `/v1/network`, `/v1/network/stake-history`, `/v1/validators` and the two delegator endpoints were built on 1 Oct
-  for the branch `feat/api-network-validators-delegators` and switch on once Sushant deploys them.
+  to the API is one line per hook. `GET /v1/index` (Fee Index) already exists in `packages/api_app`.
 - Protocol parameters (20% junior minimum, 60% cap, 10-epoch lock, 2% fee…) come from data, never literals.
-- Networks (decision 6, 1 Oct): the Epoch program runs on devnet for the demo and the 5 Oct gate
-  (`NEXT_PUBLIC_EPOCH_RPC_URL`); the Terminal, Validators and My Stake read live mainnet data, and native
-  staking (stake, move, unstake) stays on mainnet (`NEXT_PUBLIC_SOLANA_RPC_URL`). The footer's network badge
-  reads mainnet. Every screen that uses the Epoch program (Vault, Validator → Manage, onboarding and Borrow,
-  the Fee Market, Launch) shows a "Devnet" network badge and one line: "Epoch's program runs on devnet for now. Switch
-  your wallet to devnet to sign."
-- `sample`/`demo` data shows a small "Sample" badge; program badges disappear once the devnet accounts exist.
-  Never label sample data as live. A missing number renders "—", never 0. Every number has a
+- `sample`/`demo` data shows a small "Sample" badge. Production shows a network badge (mainnet or devnet) in
+  the footer. Never label sample data as live. A missing number renders "—", never 0. Every number has a
   timestamp tooltip. A dropped live feed keeps the last value and greys the live dot: "updated N min ago".
 
 ## Web3 law
@@ -138,14 +127,8 @@ behaviour) and its board render in `handover/design/boards/` (which content and 
 
 ## Copy law
 - Sentence case, plain verbs, units on every number (SOL, %, µL/CU, epochs).
-- Fee Market: say "swap", "fixed rate", "notional", "collateral", "hedge", "settle", "Pay fixed", "Receive fixed".
-  Never "bet", "gamble", "wager", "odds", "long" or "short". Launch: say "revenue token", "share", "term", "curve",
-  "raise", "graduate", "buyback", "burn", "backing"; never "investment", "dividend", "guaranteed", "APY" or "profit";
-  "Devnet demo. Nothing here is an offer." on every Launch surface.
-- Predict: say "call", "market", "pool", "payout", "points". Never "bet", "gamble", "wager" or "odds" in UI
-  copy, code names or comments. Predict is points only (decisions 2 and 3): no SOL amount, fee or Panta on any
-  Predict surface while `PREDICT_REAL_SOL` is off. Show "Points only · no cash value", "18+ · where allowed"
-  and the call sizes (10–100 points, 100 an epoch) on every Predict surface.
+- Predict: say "call", "market", "pool", "payout". Never "bet", "gamble", "wager" or "odds" in UI copy, code
+  names or comments. Show "18+ · where allowed" and the per-call cap on every Predict surface.
 - Vault: the senior rate is always a "target"; say plainly that vault SOL is not staked.
 
 ## Git law (details: handover/08-GIT-WORKFLOW.md)

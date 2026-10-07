@@ -1,4 +1,4 @@
-"use client";
+'use client';
 // Central GSAP setup for Epoch. Copy to app/src/lib/gsap.ts and import gsap, useGSAP and the
 // plugins ONLY from here, so plugins register once and every tween inherits the motion tokens.
 //
@@ -8,21 +8,21 @@
 //   data pages:    DrawSVGPlugin for the score ring / epoch ring first draw. No ScrollTrigger.
 // Reduced motion: wrap every choreography in `withMotion` (gsap.matchMedia) so it is skipped for
 // prefers-reduced-motion users; the end state must still render.
-import { gsap } from "gsap";
-import { useGSAP } from "@gsap/react";
-import { CustomEase } from "gsap/CustomEase";
-import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { SplitText } from "gsap/SplitText";
-import motion from "@/design/motion";
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
+import { CustomEase } from 'gsap/CustomEase';
+import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { SplitText } from 'gsap/SplitText';
+import motion from '@/design/motion';
 
 gsap.registerPlugin(useGSAP, CustomEase, DrawSVGPlugin, ScrollTrigger, SplitText);
 
 // Same curve as CSS and Motion: one motion law across all three libraries.
 const [x1, y1, x2, y2] = motion.easeOut;
-CustomEase.create("epoch", `M0,0 C${x1},${y1} ${x2},${y2} 1,1`);
+CustomEase.create('epoch', `M0,0 C${x1},${y1} ${x2},${y2} 1,1`);
 
-gsap.defaults({ duration: motion.transition / 1000, ease: "epoch" });
+gsap.defaults({ duration: motion.transition / 1000, ease: 'epoch' });
 
 /**
  * Run choreography only when the user allows motion. Returns the matchMedia context so callers
@@ -32,7 +32,7 @@ gsap.defaults({ duration: motion.transition / 1000, ease: "epoch" });
  */
 export function withMotion(run: () => void | (() => void)) {
   const mm = gsap.matchMedia();
-  mm.add("(prefers-reduced-motion: no-preference)", run);
+  mm.add('(prefers-reduced-motion: no-preference)', run);
   return mm;
 }
 
