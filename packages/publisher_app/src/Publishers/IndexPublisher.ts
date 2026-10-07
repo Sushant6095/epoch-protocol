@@ -56,8 +56,9 @@ type Choice = { row: EpochIndexRow; programEpoch: bigint } | { wait: string };
  *    the last final value is within `max_move_bps` (otherwise it stops: the admin decides), and M has slot_fees rows
  *    to hash (`inputs_hash`, see Index/InputsHash.ts).
  *
- * TODO(F9, out of scope): mirror each final value to a Switchboard On-Demand feed as a separate PublisherStep. Check
- * first: docs/ARCHITECTURE.md records that Switchboard shut down on 25 Sep 2026, so the program is its own oracle.
+ * No Switchboard mirror (plan F9, not built): Switchboard shut down on 25 Sep 2026. The FeeIndex account is the oracle;
+ * readers use it directly or `GET /v1/index/latest-final` (docs/FEE_INDEX_METHODOLOGY.md, "Reading the index on
+ * chain").
  */
 export class IndexPublisher implements PublisherStep {
   readonly name = 'IndexPublisher';

@@ -19,7 +19,8 @@ description = "LiteSVM full-cycle tests for the Epoch program"
 [dependencies]
 anchor-lang = "=1.2.0"  # the version the program is built with (root Cargo.lock)
 base64 = "0.22"
-epoch = { path = "../..", features = ["no-entrypoint"] }
+# `cpi`: tests/scenarios/read_index.rs compiles the reader example against `epoch::cpi`.
+epoch = { path = "../..", features = ["cpi"] }
 litesvm = "=0.15.2"
 # Hold the Agave line at 4.1.2: its crates pin each other with `=`, and LiteSVM's caret requirements
 # would otherwise pull 4.3, which needs Rust 1.97.

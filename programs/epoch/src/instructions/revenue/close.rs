@@ -2,14 +2,14 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::{
-        system::transfer_from_pda,
-        token::{burn, close_account},
-    },
     errors::EpochError,
     events::RevenueTokenClosed,
     instructions::treasury::common::credit_pool_income,
     meteora_account::SplTokenAccount,
+    outbound::{
+        system::transfer_from_pda,
+        token::{burn, close_account},
+    },
     state::*,
 };
 

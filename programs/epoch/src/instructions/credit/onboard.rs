@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::{system::transfer_from_signer, vote},
     errors::EpochError,
     events::ValidatorOnboarded,
+    outbound::{system::transfer_from_signer, vote},
     state::*,
     vote_account::VoteHeader,
 };

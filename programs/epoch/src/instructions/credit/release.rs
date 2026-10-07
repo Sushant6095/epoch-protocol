@@ -2,12 +2,12 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::{
+    errors::EpochError,
+    events::ValidatorReleased,
+    outbound::{
         system::transfer_from_pda,
         vote::{self, CommissionKind},
     },
-    errors::EpochError,
-    events::ValidatorReleased,
     state::*,
     vote_account::{VoteHeader, VoteStateVersion},
 };

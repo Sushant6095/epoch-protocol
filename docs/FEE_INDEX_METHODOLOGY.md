@@ -123,8 +123,79 @@ Known limits:
 }
 ```
 
-`status` is one of `pending`, `computed`, `proposed`, `final`, `vetoed`. Only `final` settles anything: Epoch's fee
-swaps (`settle_swap`) and Epoch's Panta markets. `GET /v1/index?from=&to=` lists many epochs at once.
+`status` is one of `pending`, `computed`, `voting`, `proposed`, `final`, `vetoed`. Only `final` settles anything:
+Epoch's fee swaps (`settle_swap`) and Epoch's Panta markets. `GET /v1/index?from=&to=` lists many epochs at once.
+
+### The latest final value
+
+`GET /v1/index/latest-final` answers the newest final value straight from the FeeIndex account, nothing from events or
+a database, so it can be checked against the chain: `epoch` (the program epoch), `value` (µL/CU), `finalizedSlot`,
+`inputsHash` (hex), `cluster`, `programId` and `feeIndexAccount`. It is 404 until a value is final and never shows a
+pending proposal. There is no Switchboard (or other oracle network) mirror: Switchboard shut down on 25 Sep 2026, and
+the FeeIndex account is itself the oracle.
+
+### Reading the index on chain
+
+**The account.** `FeeIndex`, an Anchor account owned by the Epoch program, at the PDA `["fee_index", pool]` where `pool`
+is `["pool"]`, both under Epoch's program id. Check both the address and the owner before trusting the data.
+
+**Which fields to trust.**
+
+| Field | Trust it? | Meaning |
+| --- | --- | --- |
+| `epoch`, `value`, `inputs_hash`, `finalized_slot` | yes, when `finalized_slot > 0` | The last final point: its program epoch, the value in µL/CU, the sha256 of its inputs and the slot `finalize_index` ran in |
+| `history[..history_count]` | yes | The 16 final points before it (`IndexPoint { epoch, value }`, a ring) |
+| `proposed_*`, `has_proposal` | no | A proposal inside its dispute window: it can still be vetoed |
+| `publisher`, `dispute_window_slots`, `max_move_bps` | configuration | Who proposes (the operator registry PDA when consensus is on), the window, the move bound |
+
+**How to check a value is final.** A value for epoch `E` is final when `finalized_slot > 0` and `epoch == E`, or when `E`
+is one of `history[..history_count]`. Nothing else is: a proposal reaches these fields only through `finalize_index`,
+after its full dispute window without a veto. `FeeIndex::value_for(E)` does exactly this check. An epoch older than the
+16 kept points has left the account; its value lives on in the `IndexFinalized` event.
+
+**The CPI read, `get_sfi(epoch)`.** One read-only account (`fee_index`), no signer. It returns the final value as the
+instruction's return data (u64, little-endian) and fails with `IndexMissing` (6047) when `epoch` is not final or has
+left the history. Anchor programs depend on the crate with `epoch = { features = ["cpi"] }`; others build the
+instruction by hand: data = the discriminator `[80, 163, 154, 169, 99, 61, 181, 129]` followed by `epoch` as u64
+little-endian, then read the 8 bytes from `get_return_data()` after checking its program id is Epoch's. The Epoch
+program account must be in the calling instruction's accounts.
+
+The example below is `consumer` in `programs/epoch/tests/litesvm/tests/scenarios/read_index.rs`: the LiteSVM suite
+compiles it against the program crate and runs the direct read on a real `FeeIndex` account, next to `get_sfi` itself.
+
+```rust
+use anchor_lang::prelude::*;
+use epoch::state::FeeIndex;
+
+/// The FeeIndex PDA: `["fee_index", pool]`, the pool being `["pool"]`, both under Epoch's program id.
+pub fn fee_index_address(epoch_program: &Pubkey) -> Pubkey {
+    let (pool, _) = Pubkey::find_program_address(&[b"pool"], epoch_program);
+    Pubkey::find_program_address(&[b"fee_index", pool.as_ref()], epoch_program).0
+}
+
+/// Read the account directly: check the address and the owner, then take only a final value.
+pub fn final_value(account: &AccountInfo, epoch_program: &Pubkey, epoch: u64) -> Result<Option<u64>> {
+    require_keys_eq!(account.key(), fee_index_address(epoch_program));
+    require_keys_eq!(*account.owner, *epoch_program);
+    let index = FeeIndex::try_deserialize(&mut &account.try_borrow_data()?[..])?;
+    Ok(index.value_for(epoch))
+}
+
+/// Or ask the program: `get_sfi(epoch)` returns the final value and fails with `IndexMissing` otherwise.
+pub fn final_value_by_cpi<'info>(
+    epoch_program: &Pubkey,
+    fee_index: AccountInfo<'info>,
+    epoch: u64,
+) -> Result<u64> {
+    let accounts = epoch::cpi::accounts::GetSfi { fee_index };
+    let value = epoch::cpi::get_sfi(CpiContext::new(*epoch_program, accounts), epoch)?;
+    Ok(value.get())
+}
+```
+
+The direct read costs no CPI and works for any epoch still in the account; `get_sfi` keeps the reader independent of
+the account layout. Either way, the epoch to ask for is the PROGRAM epoch: on mainnet it is the mainnet epoch, on
+devnet `P = M + FEE_INDEX_EPOCH_OFFSET` (the API's `onChain.programEpoch`).
 
 ### Verified end to end
 

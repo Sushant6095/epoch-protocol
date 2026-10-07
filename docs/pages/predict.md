@@ -335,6 +335,23 @@ Show it on our market's detail under the resolution source as "Agreed by 2 of 3 
 per operator (value, deviation, agrees); a dissenter's deviation is part of the record. The `feeIndex` WS channel
 carries the open ballot as `ballot` and pushes on every vote, so a "Voting: 1 of 3" chip can update live.
 
+### `GET /v1/index/latest-final` (the newest final value)
+
+Public, provider-neutral (no Switchboard mirror: Switchboard shut down). The FeeIndex account's last final point, for
+any resolver or outside reader that wants the newest settled number without walking epochs:
+
+```json
+{
+  "epoch": 1176, "value": 1400, "unit": "µL/CU",
+  "finalizedSlot": 451000123, "inputsHash": "<64 hex>",
+  "cluster": "devnet", "programId": "<Epoch program id>", "feeIndexAccount": "<FeeIndex PDA>",
+  "methodology": "https://github.com/Sushant6095/epoch-protocol/blob/main/docs/FEE_INDEX_METHODOLOGY.md"
+}
+```
+
+`epoch` is the PROGRAM epoch (equal to the mainnet epoch on mainnet). 404 until a value is final. Programs read the same
+account on chain ([FEE_INDEX_METHODOLOGY.md](../FEE_INDEX_METHODOLOGY.md#reading-the-index-on-chain)).
+
 ### `GET /v1/index/forecast` (Terminal: Fee Index card)
 
 Public, for the Terminal's Fee Index card (not the Predict page): the same forecast, compact.

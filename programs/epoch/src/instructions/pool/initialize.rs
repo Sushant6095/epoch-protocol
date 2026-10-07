@@ -41,7 +41,7 @@ pub fn initialize_pool(ctx: Context<InitializePool>, params: PoolParams) -> Resu
     // Keep the vault rent-exempt forever.
     let rent_min = Rent::get()?.minimum_balance(0);
     let top_up = rent_min.saturating_sub(ctx.accounts.vault.lamports());
-    crate::cpi::system::transfer_from_signer(
+    crate::outbound::system::transfer_from_signer(
         &ctx.accounts.admin.to_account_info(),
         &ctx.accounts.vault.to_account_info(),
         &ctx.accounts.system_program.to_account_info(),

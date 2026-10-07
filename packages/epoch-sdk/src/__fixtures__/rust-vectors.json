@@ -4935,6 +4935,39 @@
         {"pubkey": "GdV37ZcjK2744EDrwtxSM5GQMyV9KgF2e6ghfkf8ZsQc", "isSigner": false, "isWritable": true},
         {"pubkey": "HWcb4UhWKtHcgaVPB8kQbvizEEX91F6y5P43mCWqGVU", "isSigner": false, "isWritable": false}
       ]
+    },
+    {
+      "name": "get_sfi",
+      "label": "epoch_0",
+      "programId": "3qbR1eZRqXUWroWKKYhbDmR3FfqTHfqSU8zZSxtANzYh",
+      "discriminator": "50a39aa9633db581",
+      "data": "50a39aa9633db5810000000000000000",
+      "args": {"epoch": "0"},
+      "accounts": {"fee_index": "GdV37ZcjK2744EDrwtxSM5GQMyV9KgF2e6ghfkf8ZsQc"},
+      "context": {},
+      "metas": [{"pubkey": "GdV37ZcjK2744EDrwtxSM5GQMyV9KgF2e6ghfkf8ZsQc", "isSigner": false, "isWritable": false}]
+    },
+    {
+      "name": "get_sfi",
+      "label": "epoch_813",
+      "programId": "3qbR1eZRqXUWroWKKYhbDmR3FfqTHfqSU8zZSxtANzYh",
+      "discriminator": "50a39aa9633db581",
+      "data": "50a39aa9633db5812d03000000000000",
+      "args": {"epoch": "813"},
+      "accounts": {"fee_index": "GdV37ZcjK2744EDrwtxSM5GQMyV9KgF2e6ghfkf8ZsQc"},
+      "context": {},
+      "metas": [{"pubkey": "GdV37ZcjK2744EDrwtxSM5GQMyV9KgF2e6ghfkf8ZsQc", "isSigner": false, "isWritable": false}]
+    },
+    {
+      "name": "get_sfi",
+      "label": "epoch_18446744073709551615",
+      "programId": "3qbR1eZRqXUWroWKKYhbDmR3FfqTHfqSU8zZSxtANzYh",
+      "discriminator": "50a39aa9633db581",
+      "data": "50a39aa9633db581ffffffffffffffff",
+      "args": {"epoch": "18446744073709551615"},
+      "accounts": {"fee_index": "GdV37ZcjK2744EDrwtxSM5GQMyV9KgF2e6ghfkf8ZsQc"},
+      "context": {},
+      "metas": [{"pubkey": "GdV37ZcjK2744EDrwtxSM5GQMyV9KgF2e6ghfkf8ZsQc", "isSigner": false, "isWritable": false}]
     }
   ],
   "events": [

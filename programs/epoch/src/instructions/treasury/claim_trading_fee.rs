@@ -3,9 +3,9 @@ use anchor_lang::prelude::*;
 use super::common::{credit_pool_income, ClaimSigner, DbcSource};
 use crate::{
     constants::*,
-    cpi::meteora::{dbc_claim_trading_fee_ix, invoke_claim, DbcClaimKeys},
     errors::EpochError,
     events::{TreasuryClaimKind, TreasuryClaimed},
+    outbound::meteora::{dbc_claim_trading_fee_ix, invoke_claim, DbcClaimKeys},
     state::*,
 };
 

@@ -2281,6 +2281,57 @@
       "args": []
     },
     {
+      "name": "get_sfi",
+      "docs": [
+        "The final Fee Index value for `epoch` as return data (other programs CPI into this)."
+      ],
+      "discriminator": [
+        80,
+        163,
+        154,
+        169,
+        99,
+        61,
+        181,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "fee_index",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_index.pool",
+                "account": "FeeIndex"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        }
+      ],
+      "returns": "u64"
+    },
+    {
       "name": "init_validator_history",
       "discriminator": [
         15,

@@ -3,10 +3,10 @@ use solana_sysvar::epoch_rewards::EpochRewards;
 
 use crate::{
     constants::*,
-    cpi::{system::transfer_from_pda, vote},
     errors::EpochError,
     events::{AdvanceRepaid, RevenueShareSwept, Swept},
     math::{attribute_repayment, split_sweep_with_share},
+    outbound::{system::transfer_from_pda, vote},
     state::*,
     vote_account::VoteHeader,
 };

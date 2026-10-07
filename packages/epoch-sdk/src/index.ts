@@ -194,6 +194,8 @@ export {
   executeBuyback,
   type ExecuteBuybackInput,
   finalizeIndex,
+  getSfi,
+  type GetSfiInput,
   type FinalizeIndexInput,
   findMeteoraVaultPda,
   hedgeSwapAccounts,

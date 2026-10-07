@@ -120,8 +120,9 @@ votes are independent. Each tick:
    after the round opened is not in its snapshot: it stops and points at `reset_index_ballot`. The first vote's
    signature becomes the row's `posted_signature`.
 
-TODO(F9, out of scope): a Switchboard On-Demand mirror of the final value (`docs/ARCHITECTURE.md` notes Switchboard
-shut down on 25 Sep 2026, so the program is its own oracle).
+No Switchboard mirror (plan F9, not built): Switchboard shut down on 25 Sep 2026. The FeeIndex account is the oracle:
+programs read it on chain and off-chain readers use `GET /v1/index/latest-final` (`docs/FEE_INDEX_METHODOLOGY.md`,
+"Reading the index on chain").
 
 ## QuoteMaker (`post_quote` / `withdraw_quote`, MAKER key)
 

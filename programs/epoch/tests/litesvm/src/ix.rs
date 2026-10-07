@@ -447,6 +447,16 @@ pub fn finalize_index(cranker: Pubkey) -> Instruction {
     )
 }
 
+/// `get_sfi(epoch)`: the final value comes back as return data; no signer.
+pub fn get_sfi(epoch: u64) -> Instruction {
+    build(
+        a::GetSfi {
+            fee_index: pda::fee_index(),
+        },
+        i::GetSfi { epoch },
+    )
+}
+
 pub fn veto_index(admin: Pubkey) -> Instruction {
     build(
         a::VetoIndex {

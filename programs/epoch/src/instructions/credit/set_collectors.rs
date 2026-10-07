@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::vote::{self, CommissionKind},
     errors::EpochError,
     events::CollectorsSet,
+    outbound::vote::{self, CommissionKind},
     state::*,
     vote_account::VoteHeader,
 };

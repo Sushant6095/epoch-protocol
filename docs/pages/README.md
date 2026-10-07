@@ -51,7 +51,7 @@ markets on the Fee Index ("Will the Solana Fee Index for epoch N close above X �
 
 | Routes | WS | Contract |
 | --- | --- | --- |
-| `GET /v1/predict/panta/markets` · `/markets/:marketId` · `/categories` · `/positions?wallet=` · `/stats` · `/status/:tradeId` · `POST /v1/predict/panta/quote` · `/build` · `/submit` · `/claim/build` · resolution: `GET /v1/index/epochs/:epoch` · points tab: `/v1/predict/markets`, `/calls`, `/leaderboard` | `predict:panta` (prices of our markets, about every 15 s) · `feeIndex` (the live index next to the price) | [predict.md](predict.md) |
+| `GET /v1/predict/panta/markets` · `/markets/:marketId` · `/categories` · `/positions?wallet=` · `/stats` · `/status/:tradeId` · `POST /v1/predict/panta/quote` · `/build` · `/submit` · `/claim/build` · resolution: `GET /v1/index/epochs/:epoch` · `GET /v1/index/latest-final` · points tab: `/v1/predict/markets`, `/calls`, `/leaderboard` | `predict:panta` (prices of our markets, about every 15 s) · `feeIndex` (the live index next to the price) | [predict.md](predict.md) |
 
 What makes it special for the Panta judges:
 

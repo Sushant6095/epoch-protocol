@@ -6,6 +6,7 @@ mod credit;
 mod history;
 mod market;
 mod pool;
+mod read_index;
 mod revenue;
 mod roles;
 mod treasury;

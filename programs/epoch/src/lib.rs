@@ -23,13 +23,16 @@
 use anchor_lang::prelude::*;
 
 pub mod constants;
-pub mod cpi;
 pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod jito_account;
 pub mod math;
 pub mod meteora_account;
+/// The CPIs Epoch makes (vote, system, SPL Token, Meteora). Not named `cpi`: under the `cpi` feature Anchor generates
+/// `epoch::cpi`, the client other programs use to call Epoch (`get_sfi` among them).
+#[path = "cpi/mod.rs"]
+pub mod outbound;
 pub mod state;
 #[cfg(test)]
 mod test_fixtures;
@@ -343,5 +346,10 @@ pub mod epoch {
 
     pub fn configure_scoring(ctx: Context<ConfigureScoring>, params: ScoringParams) -> Result<()> {
         instructions::configure_scoring(ctx, params)
+    }
+
+    /// The final Fee Index value for `epoch` as return data (other programs CPI into this).
+    pub fn get_sfi(ctx: Context<GetSfi>, epoch: u64) -> Result<u64> {
+        instructions::get_sfi(ctx, epoch)
     }
 }

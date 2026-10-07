@@ -7,10 +7,10 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::system::transfer_from_signer,
     errors::EpochError,
     events::{SwapOpened, SwapSettled},
     math::bps_of,
+    outbound::system::transfer_from_signer,
     state::*,
 };
 

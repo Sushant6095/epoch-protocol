@@ -77,7 +77,8 @@ export type InstructionName =
   | 'copy_priority_fee_distribution'
   | 'update_stake_info'
   | 'refresh_score'
-  | 'configure_scoring';
+  | 'configure_scoring'
+  | 'get_sfi';
 
 export type EventName =
   | 'PoolInitialized'
@@ -206,6 +207,7 @@ export const INSTRUCTION_DISCRIMINATORS: Readonly<Record<InstructionName, Uint8A
   update_stake_info: new Uint8Array([25, 244, 8, 32, 250, 244, 170, 207]),
   refresh_score: new Uint8Array([60, 234, 183, 65, 144, 1, 136, 207]),
   configure_scoring: new Uint8Array([208, 106, 50, 176, 142, 54, 115, 55]),
+  get_sfi: new Uint8Array([80, 163, 154, 169, 99, 61, 181, 129]),
 });
 
 export const EVENT_DISCRIMINATORS: Readonly<Record<EventName, Uint8Array>> = Object.freeze({

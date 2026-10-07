@@ -110,6 +110,7 @@ const REQUIRED = [
   'postIndex',
   'finalizeIndex',
   'vetoIndex',
+  'getSfi',
   'initializeIndexOperators',
   'addIndexOperator',
   'removeIndexOperator',

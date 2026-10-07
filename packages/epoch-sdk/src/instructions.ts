@@ -1,5 +1,5 @@
 /**
- * Instruction builders for all 56 instructions in `programs/epoch/src/lib.rs`.
+ * Instruction builders for all 57 instructions in `programs/epoch/src/lib.rs`.
  *
  * Accounts are listed in the exact order of each Rust `#[derive(Accounts)]` struct, with its signer and `mut`
  * flags; PDAs are derived from `programId`. Data is `discriminator ++ borsh(args)` in `lib.rs` argument order.
@@ -785,6 +785,19 @@ export interface VetoIndexInput extends WithProgram {
 export function vetoIndex({ programId, admin }: VetoIndexInput): TransactionInstruction[] {
   const { pool, feeIndex } = poolKeys(programId);
   return instruction(programId, 'veto_index', [signer(admin), readonly(pool), writable(feeIndex)]);
+}
+
+export interface GetSfiInput extends WithProgram {
+  epoch: bigint;
+}
+
+/**
+ * `get_sfi(epoch)`: the final Fee Index value for `epoch` as return data (u64 little-endian), for other programs to CPI
+ * into; `IndexMissing` when the epoch is not final or has left the 16-point history. No signer.
+ */
+export function getSfi({ programId, epoch }: GetSfiInput): TransactionInstruction[] {
+  const { feeIndex } = poolKeys(programId);
+  return instruction(programId, 'get_sfi', [readonly(feeIndex)], (w) => w.u64(epoch, 'epoch'));
 }
 
 // ─── Fee Index: operator consensus ─────────────────────────────────────────

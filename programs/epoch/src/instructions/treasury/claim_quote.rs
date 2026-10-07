@@ -3,13 +3,13 @@ use anchor_lang::prelude::*;
 use super::common::{credit_pool_income, ClaimSigner, DbcSource};
 use crate::{
     constants::*,
-    cpi::meteora::{
-        dbc_partner_withdraw_surplus_ix, dbc_withdraw_migration_fee_ix, invoke_claim, DbcClaimKeys,
-        DBC_MIGRATION_FEE_FLAG_PARTNER,
-    },
     errors::EpochError,
     events::{TreasuryClaimKind, TreasuryClaimed},
     math::{dbc_partner_migration_fee, dbc_partner_surplus},
+    outbound::meteora::{
+        dbc_partner_withdraw_surplus_ix, dbc_withdraw_migration_fee_ix, invoke_claim, DbcClaimKeys,
+        DBC_MIGRATION_FEE_FLAG_PARTNER,
+    },
     state::*,
 };
 

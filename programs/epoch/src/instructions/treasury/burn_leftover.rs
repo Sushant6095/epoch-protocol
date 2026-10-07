@@ -3,11 +3,11 @@ use anchor_lang::prelude::*;
 use super::common::{ClaimSigner, DbcSource};
 use crate::{
     constants::*,
-    cpi::meteora::{dbc_withdraw_leftover_ix, invoke_claim, DbcClaimKeys},
     errors::EpochError,
     events::{TreasuryClaimKind, TreasuryClaimed},
     math::dbc_leftover,
     meteora_account::SplTokenAccount,
+    outbound::meteora::{dbc_withdraw_leftover_ix, invoke_claim, DbcClaimKeys},
     state::*,
 };
 

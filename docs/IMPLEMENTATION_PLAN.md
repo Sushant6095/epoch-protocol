@@ -179,7 +179,7 @@ To ship in time, v1 uses **quote-based swaps against a seeded market-maker vault
 
 ### F9 · Publisher + Switchboard (Track B, 6–8 Oct)
 
-Signs and posts `post_index` / `post_quote`; publishes the index as a Switchboard On-Demand custom feed. **Cut first if late.**
+Signs and posts `post_index` / `post_quote`. The Switchboard On-Demand mirror is not built: Switchboard shut down on 25 Sep 2026, so the FeeIndex account is the oracle (other programs read it on chain; off-chain readers use `GET /v1/index/latest-final`, see `docs/FEE_INDEX_METHODOLOGY.md`).
 
 ### F10 · Panta bot (Track B, 8–9 Oct)
 

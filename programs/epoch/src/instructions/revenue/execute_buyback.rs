@@ -35,15 +35,15 @@ use solana_sysvar::epoch_schedule::EpochSchedule;
 use super::venue::{SwapIo, Venue, VenueAccounts};
 use crate::{
     constants::*,
-    cpi::{
-        meteora::invoke_swap,
-        system::{create_pda_account, transfer_from_pda},
-        token::{burn, close_account, initialize_account3_ix},
-    },
     errors::EpochError,
     events::BuybackExecuted,
     math::{min_out_floor, slice_budget, slice_timing, SliceTiming},
     meteora_account::SplTokenAccount,
+    outbound::{
+        meteora::invoke_swap,
+        system::{create_pda_account, transfer_from_pda},
+        token::{burn, close_account, initialize_account3_ix},
+    },
     state::*,
 };
 

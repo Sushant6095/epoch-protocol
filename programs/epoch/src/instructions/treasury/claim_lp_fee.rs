@@ -3,10 +3,10 @@ use anchor_lang::prelude::*;
 use super::common::{credit_pool_income, ClaimSigner};
 use crate::{
     constants::*,
-    cpi::meteora::{damm_claim_position_fee_ix, invoke_claim, DammClaimKeys},
     errors::EpochError,
     events::{TreasuryClaimKind, TreasuryClaimed},
     meteora_account::{DammPool, DammPosition, SplTokenAccount, DAMM_TOKEN_FLAG_SPL},
+    outbound::meteora::{damm_claim_position_fee_ix, invoke_claim, DammClaimKeys},
     state::*,
 };
 

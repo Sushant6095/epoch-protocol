@@ -2,11 +2,11 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::{system::transfer_from_pda, token::burn},
     errors::EpochError,
     events::RevenueTokenRedeemed,
     math::{circulating_supply, redeem_payout},
     meteora_account::{SplMint, SplTokenAccount},
+    outbound::{system::transfer_from_pda, token::burn},
     state::*,
 };
 

@@ -800,7 +800,7 @@ mod tests {
         let pool = DbcPool::parse(&hex(DBC_POOL_2K7B)).unwrap();
         assert_eq!(nft.owner, pool.creator);
         assert_eq!(
-            crate::cpi::meteora::damm_position_nft_account(&nft_mint),
+            crate::outbound::meteora::damm_position_nft_account(&nft_mint),
             k("9RjbRGAnCD6RmX4Rh6uoFNLiAhdiLXYGtkikyFBH9cuD")
         );
         assert!(DammPosition::parse(&hex(DAMM_POOL_F3S7)).is_none());

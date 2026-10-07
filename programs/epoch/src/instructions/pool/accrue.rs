@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::system::transfer_from_pda,
     errors::EpochError,
     events::Accrued,
     math::{distribute_income, share_price_e9},
+    outbound::system::transfer_from_pda,
     state::*,
 };
 

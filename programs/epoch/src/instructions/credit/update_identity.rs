@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::*, cpi::vote, errors::EpochError, events::IdentityUpdated, state::*,
+    constants::*, errors::EpochError, events::IdentityUpdated, outbound::vote, state::*,
     vote_account::VoteHeader,
 };
 

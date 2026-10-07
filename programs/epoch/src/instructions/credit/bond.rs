@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::system::{transfer_from_pda, transfer_from_signer},
     errors::EpochError,
     events::{BondPosted, BondWithdrawn},
+    outbound::system::{transfer_from_pda, transfer_from_signer},
     state::*,
 };
 

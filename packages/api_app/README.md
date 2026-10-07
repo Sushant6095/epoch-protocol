@@ -11,6 +11,7 @@ known yet" and the app shows "—".
 | ------------------------------------------------------------------------------------------ | ------------------------------- | ----- | ------------------------------------------------------------- |
 | `GET /health`                                                                              | `{ status, time }`              | —     | —                                                             |
 | `GET /v1/index?from=&to=&limit=`                                                           | `FeeIndexPoint[]`, newest first | 15 s  | the FeeIndex account, index events, Postgres `epoch_index`    |
+| `GET /v1/index/latest-final`                                                               | `FeeIndexLatestFinal`           | 15 s  | the FeeIndex account alone                                    |
 | `GET /v1/network`                                                                          | `NetworkSnapshot`               | 15 s  | mainnet RPC, Stakewiz, Jito Kobe, Jupiter, the delegator scan |
 | `GET /v1/network/stake-history?epochs=64`                                                  | `StakeHistory`, oldest first    | 5 min | StakeHistory sysvar                                           |
 | `GET /v1/validators?tab=&chips=&q=&sort=&dir=&fee=&client=&country=&votes=&cursor=&limit=` | `ValidatorList`                 | 30 s  | as `/v1/network`                                              |
@@ -82,6 +83,16 @@ it had not stored yet, drops the program caches the event makes stale and emits 
 - Only `Program data:` lines written while the Epoch program is the innermost frame count (epoch-sdk
   `parseEventsFromLogs`): other programs' data in the same transaction is ignored. `ix` is the event's position among
   its transaction's events; `epoch` is the program cluster's epoch of the slot; `payload` is `eventToJson(event).data`.
+
+**Latest final Fee Index** (`GET /v1/index/latest-final`, `Services/Program/FeeIndexLatestFinal.ts`). The provider-neutral
+read for off-chain consumers (there is no Switchboard mirror: Switchboard shut down on 25 Sep 2026). Straight from the
+FeeIndex account's last final point, nothing from events or Postgres, so anyone can check it against the chain:
+`{ schemaVersion, kind, asOf, source, epoch, value, unit: "µL/CU", finalizedSlot, inputsHash, cluster, programId,
+feeIndexAccount, methodology }`. `epoch` is the program epoch (the mainnet epoch when the program runs on mainnet),
+`finalizedSlot` the program cluster's slot `finalize_index` ran in, `inputsHash` the hex sha256 the value was posted
+with. A pending proposal never shows here. `404 NOT_FOUND` until the first value is final; `503
+PROGRAM_NOT_CONFIGURED` without `EPOCH_PROGRAM_ID`. Programs read the same account on chain or call `get_sfi`
+(`docs/FEE_INDEX_METHODOLOGY.md`, "Reading the index on chain").
 
 **Fee Index** (`GET /v1/index`, `Services/Program/FeeIndexService.ts`). A bare `FeeIndexPoint[]`, newest first, each
 `{ epoch, value, status? }` in µL/CU, merged from:

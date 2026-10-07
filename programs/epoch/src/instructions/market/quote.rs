@@ -5,10 +5,10 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::system::transfer_from_signer,
     errors::EpochError,
     events::{QuotePosted, QuoteWithdrawn},
     math::bps_of,
+    outbound::system::transfer_from_signer,
     state::*,
 };
 

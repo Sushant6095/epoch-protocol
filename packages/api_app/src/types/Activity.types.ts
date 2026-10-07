@@ -117,6 +117,27 @@ export interface FeeIndexLatest {
   avg8: number | null;
 }
 
+// ── GET /v1/index/latest-final ──────────────────────────────────────────────────────────────────────
+/**
+ * The newest FINAL Solana Fee Index value, read from the FeeIndex account: the same fields another program trusts on
+ * chain (docs/FEE_INDEX_METHODOLOGY.md, "Reading the index"). A pending proposal never shows here.
+ */
+export interface FeeIndexLatestFinal extends Meta {
+  /** The program epoch of the value (the mainnet epoch when the program runs on mainnet). */
+  epoch: number;
+  /** µL/CU. */
+  value: number;
+  unit: 'µL/CU';
+  /** The program cluster's slot `finalize_index` ran in. */
+  finalizedSlot: number;
+  /** Hex sha256 of the value's inputs (publisher_app Index/InputsHash.ts). */
+  inputsHash: string;
+  cluster: string;
+  programId: string;
+  feeIndexAccount: string;
+  methodology: string;
+}
+
 /** `feeIndex` channel data. */
 export interface FeeIndexStreamData extends FeeIndexLatest {
   /** The 16 newest points, newest first, as `GET /v1/index?limit=16` returns them. */

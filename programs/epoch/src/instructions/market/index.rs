@@ -207,3 +207,20 @@ pub fn veto_index(ctx: Context<VetoIndex>) -> Result<()> {
     emit!(IndexVetoed { epoch, value });
     Ok(())
 }
+
+#[derive(Accounts)]
+pub struct GetSfi<'info> {
+    #[account(seeds = [FEE_INDEX_SEED, fee_index.pool.as_ref()], bump = fee_index.bump)]
+    pub fee_index: Account<'info, FeeIndex>,
+}
+
+/// The CPI read of the Solana Fee Index: the final value (µL/CU) for
+/// `epoch`, returned as the instruction's return data. Only final values
+/// answer: the last one and the 16 before it. A pending proposal, a vetoed
+/// one or an epoch that has left the history is `IndexMissing`.
+pub fn get_sfi(ctx: Context<GetSfi>, epoch: u64) -> Result<u64> {
+    ctx.accounts
+        .fee_index
+        .value_for(epoch)
+        .ok_or_else(|| error!(EpochError::IndexMissing))
+}

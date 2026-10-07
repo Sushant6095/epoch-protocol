@@ -18,6 +18,7 @@ import {
   closeRevenueToken,
   configureIndex,
   configureScoring,
+  getSfi,
   configureRevenueToken,
   copyPriorityFeeDistribution,
   copyTipDistributionAccount,
@@ -275,6 +276,7 @@ const BUILDERS: Record<InstructionName, (v: RustInstruction, programId: PublicKe
     }),
   finalize_index: (v, programId) => finalizeIndex({ programId, cranker: acc(v, 'cranker') }),
   veto_index: (v, programId) => vetoIndex({ programId, admin: acc(v, 'admin') }),
+  get_sfi: (v, programId) => getSfi({ programId, epoch: big(v.args.epoch) }),
   initialize_index_operators: (v, programId) =>
     initializeIndexOperators({
       programId,

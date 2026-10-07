@@ -10,9 +10,6 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::meteora::{
-        damm_swap2_ix, dbc_swap2_ix, SwapKeys, SWAP_MODE_EXACT_IN, SWAP_MODE_PARTIAL_FILL,
-    },
     errors::EpochError,
     math::{
         damm_compounding_buy, damm_compounding_max_quote_in, damm_concentrated_buy,
@@ -20,6 +17,9 @@ use crate::{
         BuyFill,
     },
     meteora_account::{DammPool, DbcConfig, DbcPool, DAMM_COLLECT_FEE_COMPOUNDING},
+    outbound::meteora::{
+        damm_swap2_ix, dbc_swap2_ix, SwapKeys, SWAP_MODE_EXACT_IN, SWAP_MODE_PARTIAL_FILL,
+    },
     state::{BuybackVenue, RevenueToken},
 };
 

@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
-    cpi::system::transfer_from_pda,
     errors::EpochError,
     events::AdvanceOpened,
     math::{bps_of, credit_limit, CreditInputs},
+    outbound::system::transfer_from_pda,
     state::*,
 };
 

@@ -3434,6 +3434,25 @@ fn treasury_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
 
 /// Fee Index operator consensus: the nine new instructions and `post_index` through the
 /// sole-operator shortcut (the registry appended as `remaining_accounts[0]`).
+/// `get_sfi`, the CPI read (added later): fixed epochs, no sequence, so every older vector keeps its values.
+fn read_instructions(pid: Pubkey) -> Vec<Ix> {
+    let pool = addr(&[POOL_SEED], &pid);
+    let fee_index = addr(&[FEE_INDEX_SEED, pool.as_ref()], &pid);
+    let mut out = Vec::new();
+    for epoch in [0u64, 813, u64::MAX] {
+        ix!(
+            out,
+            pid,
+            "get_sfi",
+            format!("epoch_{epoch}"),
+            GetSfi { epoch },
+            GetSfi { fee_index },
+            context {}
+        );
+    }
+    out
+}
+
 fn consensus_instructions(g: &mut Gen, pid: Pubkey) -> Vec<Ix> {
     let system = anchor_lang::solana_program::system_program::ID;
     let (admin, cranker) = (k(1), k(6));
@@ -5176,6 +5195,7 @@ fn main() {
             .into_iter()
             .map(Ix::json),
     );
+    ixs.extend(read_instructions(program_id).into_iter().map(Ix::json));
 
     let root = obj(vec![
         (
