@@ -55,6 +55,8 @@ const TREASURY_CLAIM_KINDS: readonly TreasuryClaimKind[] = [
 /** What the feed reads from the program's cluster; `RpcBuybackChainReader` is the real one. */
 export interface BuybackChainReader {
   readonly network: string;
+  /** The Epoch program id (base58); null or absent when the API has none. */
+  readonly programId?: string | null;
   revenueTokenByMint(mint: PublicKey): Promise<{ address: PublicKey; account: RevenueTokenAccount } | null>;
   /** Escrow lamports above its rent-exempt minimum. */
   escrowAvailable(address: PublicKey): Promise<bigint>;
@@ -105,6 +107,7 @@ export class BuybackFeed {
       asOf: isoIst(this.now()),
       source: `Epoch program (${chain.network})`,
       network: chain.network,
+      programId: chain.programId ?? null,
       mint: mint.toBase58(),
     };
     // Treasury claims need no revenue token account: any launch naming the treasury has them.
@@ -183,7 +186,10 @@ export class BuybackFeed {
 const u64 = (value: string | number | boolean | undefined): bigint => BigInt(String(value ?? 0));
 
 /** A feed without the fields `get` adds around it (meta and the treasury section). */
-type FeedBody = Omit<LaunchBuybackFeed, 'schemaVersion' | 'kind' | 'asOf' | 'source' | 'network' | 'mint' | 'treasury'>;
+type FeedBody = Omit<
+  LaunchBuybackFeed,
+  'schemaVersion' | 'kind' | 'asOf' | 'source' | 'network' | 'programId' | 'mint' | 'treasury'
+>;
 
 /**
  * A closed revenue token's feed (pure), from its events (newest first): the term from `RevenueTokenRegistered`, the
@@ -350,7 +356,12 @@ export function buybackSchedule(
   const done = rt.buybackEpoch === epoch ? rt.slicesDone : 0;
   let slicesDone = 0;
   for (let i = 0; i < rt.slicesPerEpoch; i++) if ((done >>> i) & 1) slicesDone++;
-  const base = { slicesPerEpoch: rt.slicesPerEpoch, windowSlots: rt.windowSlots, slicesDoneThisEpoch: slicesDone };
+  const base = {
+    currentEpoch: info.epoch,
+    slicesPerEpoch: rt.slicesPerEpoch,
+    windowSlots: rt.windowSlots,
+    slicesDoneThisEpoch: slicesDone,
+  };
   const paused = revenueTokenBuybacksPaused(rt);
   const empty = escrowAvailable === 0n;
   const none = { ...base, paused, nextSlice: null };
@@ -399,6 +410,10 @@ export class RpcBuybackChainReader implements BuybackChainReader {
 
   get network(): string {
     return this.program.cluster;
+  }
+
+  get programId(): string | null {
+    return this.program.programId?.toBase58() ?? null;
   }
 
   escrowAddress(vote: PublicKey): PublicKey {

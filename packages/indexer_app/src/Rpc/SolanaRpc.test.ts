@@ -12,6 +12,40 @@ function reply(status: number, body: unknown, headers: Record<string, string> = 
 }
 
 describe('SolanaRpc', () => {
+  it('reads accounts in bulk: getProgramAccounts with filters, getMultipleAccounts (≤ 100), rent', async () => {
+    const data = Buffer.from([1, 2, 3]).toString('base64');
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValueOnce(
+        reply(200, { result: [{ pubkey: 'Acc1', account: { lamports: 5, owner: 'Prog', data: [data, 'base64'] } }] }),
+      )
+      .mockResolvedValueOnce(
+        reply(200, { result: { value: [null, { lamports: 7, owner: 'Prog', data: [data, 'base64'] }] } }),
+      )
+      .mockResolvedValueOnce(reply(200, { result: 1_503_680 }));
+    const rpc = new SolanaRpc('https://api.mainnet-beta.solana.com', { fetchFn: fetchFn as unknown as typeof fetch });
+    const filters = [{ dataSize: 168 }];
+    expect(await rpc.getProgramAccounts('Prog', filters)).toEqual([
+      { pubkey: 'Acc1', lamports: 5, owner: 'Prog', data: Buffer.from([1, 2, 3]) },
+    ]);
+    expect(await rpc.getMultipleAccounts(['A', 'B'])).toEqual([
+      null,
+      { lamports: 7, owner: 'Prog', data: Buffer.from([1, 2, 3]) },
+    ]);
+    expect(await rpc.getMinimumBalanceForRentExemption(168)).toBe(1_503_680);
+    const bodies = fetchFn.mock.calls.map(([, init]) => JSON.parse((init as { body: string }).body));
+    expect(bodies.map((b) => [b.method, b.params])).toEqual([
+      ['getProgramAccounts', ['Prog', { encoding: 'base64', commitment: 'confirmed', filters }]],
+      ['getMultipleAccounts', [['A', 'B'], { encoding: 'base64', commitment: 'confirmed' }]],
+      ['getMinimumBalanceForRentExemption', [168]],
+    ]);
+    expect(await rpc.getMultipleAccounts([])).toEqual([]);
+    await expect(rpc.getMultipleAccounts(Array.from({ length: 101 }, (_, i) => `K${i}`))).rejects.toThrow(
+      'at most 100',
+    );
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
   it('sends JSON-RPC and asks getBlock for v1 transactions in base64', async () => {
     const fetchFn = jest.fn(async () => reply(200, { jsonrpc: '2.0', id: 1, result: null }));
     const rpc = new SolanaRpc(URL_WITH_KEY, { fetchFn: fetchFn as unknown as typeof fetch });

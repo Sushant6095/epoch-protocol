@@ -39,6 +39,7 @@ export function getProgramServices(): ProgramServices {
       validators: services.validators,
       history: dbAvailable() ? new PgPoolHistory(PostgresConnectionManager.getDb()) : NO_POOL_HISTORY,
       rewardsActive: () => readEpochRewardsActive(services.program.connections),
+      mev: (vote) => services.mev.latest?.byVote.get(vote),
     });
   }
   return programServices;

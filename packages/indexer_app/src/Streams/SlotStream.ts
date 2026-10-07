@@ -50,6 +50,8 @@ const LIVE_FETCH_RPS = 20;
 const LIVE_FETCH_CONCURRENCY = 8;
 const FLUSH_MS = 500;
 const PRUNE_MS = 300_000;
+/** slot_fee_mix epochs kept when the options do not say (epoch_fee_mix keeps the totals). */
+const DEFAULT_FEE_MIX_KEEP_EPOCHS = 3;
 /** How often lag and the running estimate are logged at info level. */
 const STATUS_LOG_MS = 60_000;
 /** How often this process's Solami usage is written to solami_usage. */
@@ -82,6 +84,8 @@ export interface SlotStreamOptions {
   stride: number;
   liveIntervalMs: number;
   liveSlotsKeep: number;
+  /** Epochs of slot_fee_mix rows kept. Default 3. */
+  feeMixKeepEpochs?: number;
   /** Flush and gap-fill ticks (tests shorten them). Default 500 ms. */
   tickMs?: number;
 }
@@ -537,7 +541,7 @@ export class SlotStream {
     if (fees.medianCuPrice !== null) {
       this.tracker.add({ slot, epoch, leader, medianCuPrice: fees.medianCuPrice, txCount: fees.pricedTxs });
     }
-    this.queue.push({ fees, epoch, blockTime: block.blockTime, source });
+    this.queue.push({ fees, epoch, blockTime: block.blockTime, source, feeMix: block.feeMix });
     if (source !== 'gap-fill') {
       this.noteLive(slot);
       this.notifyQueue.push({
@@ -555,6 +559,14 @@ export class SlotStream {
         failedTxs: fees.failedTxs,
         blockTime: block.blockTime,
         source,
+        fees: {
+          baseLamports: Number(block.feeMix.baseLamports),
+          priorityLamports: Number(block.feeMix.priorityLamports),
+          tipsLamports: Number(block.feeMix.tipLamports),
+          tipTxs: block.feeMix.tipTxs,
+          rewardLamports: block.feeMix.feeRewardLamports === null ? null : Number(block.feeMix.feeRewardLamports),
+          basis: block.feeMix.baseFeeBasis,
+        },
       });
     }
   }
@@ -772,6 +784,9 @@ export class SlotStream {
       this.lastPrune = this.now();
       this.store.pruneLiveSlots(this.options.liveSlotsKeep).catch((error: unknown) => {
         logger.warn('live_slots prune failed', { error: String(error) });
+      });
+      this.store.pruneFeeMix(this.options.feeMixKeepEpochs ?? DEFAULT_FEE_MIX_KEEP_EPOCHS).catch((error: unknown) => {
+        logger.warn('slot_fee_mix prune failed', { error: String(error) });
       });
     }
   }

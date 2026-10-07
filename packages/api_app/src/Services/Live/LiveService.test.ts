@@ -1,7 +1,13 @@
 import { SolamiUsage } from '@epoch/solana';
 
 import { nameIndex } from '../Activity/ValidatorNames';
-import { type FeeIndexLiveRow, type LiveRepository, type LiveSlotRow } from './LiveRepository';
+import {
+  type EpochFeeMixRow,
+  type FeeIndexLiveRow,
+  type LiveRepository,
+  type LiveSlotRow,
+  type SlotFeeMixRow,
+} from './LiveRepository';
 import { LiveService, weightedMedian } from './LiveService';
 
 const IST = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:30$/;
@@ -85,9 +91,42 @@ function fakeRepo(overrides: Partial<LiveRepository> = {}): LiveRepository {
       percentiles: { p10: 1_000, p25: 1_000, p50: 3_162, p75: 3_200, p90: 3_300 },
     }),
     usageReports: async () => [],
+    epochFees: async () => null,
     ...overrides,
   };
 }
+
+const feeMixRow = (slot: number, basis = 'reward'): SlotFeeMixRow => ({
+  slot,
+  epoch: 1048,
+  baseFeeLamports: 5_175_000n,
+  priorityFeeLamports: 31_630_143n,
+  tipLamports: 6_287_601n,
+  tipTxs: 23,
+  voteTxs: 1_005,
+  nonVoteTxs: 30,
+  feeRewardLamports: 34_217_643n,
+  baseFeeBasis: basis,
+  source: 'grpc',
+  recordedAt: new Date(NOW),
+});
+
+const epochFeeRow = (epoch: number, patch: Partial<EpochFeeMixRow> = {}): EpochFeeMixRow => ({
+  epoch,
+  blocks: 200_000,
+  baseFeeLamports: 2_000_000_000n,
+  priorityFeeLamports: 5_000_000_000n,
+  tipLamports: 3_000_000_000n,
+  tipTxs: 1_250_000,
+  voteTxs: 300_000_000,
+  nonVoteTxs: 90_000_000,
+  feeRewardLamports: 6_000_000_000n,
+  estimatedBlocks: 12,
+  firstSlot: 452_736_000,
+  lastSlot: 452_937_400,
+  updatedAt: new Date(NOW - 500),
+  ...patch,
+});
 
 const service = (repo: LiveRepository, info: { slot?: number } | null = { slot: 452_937_405 }) =>
   new LiveService({
@@ -170,6 +209,47 @@ describe('LiveService.summary', () => {
     expect(summary.stream.status).toBe('offline');
   });
 
+  it("carries the epoch's fee composition and the previous epoch's (request #30)", async () => {
+    const summary = await service(
+      fakeRepo({
+        epochFees: async (epoch) =>
+          epoch === 1048 ? epochFeeRow(1048) : epoch === 1047 ? epochFeeRow(1047, { tipLamports: 0n }) : null,
+      }),
+    ).summary();
+    expect(summary.fees).toEqual({
+      epoch: 1048,
+      blocks: 200_000,
+      firstSlot: 452_736_000,
+      lastSlot: 452_937_400,
+      baseLamports: 2_000_000_000,
+      priorityLamports: 5_000_000_000,
+      tipsLamports: 3_000_000_000,
+      tipTxs: 1_250_000,
+      rewardLamports: 6_000_000_000,
+      estimatedBlocks: 12,
+      totalSol: 10,
+      sharePct: { base: 20, priority: 50, tips: 30 },
+      updatedAt: '2026-10-03T18:59:59+05:30',
+    });
+    expect(summary.lastEpochFees).toMatchObject({
+      epoch: 1047,
+      totalSol: 7,
+      sharePct: { base: 28.57, priority: 71.43, tips: 0 },
+    });
+  });
+
+  it('answers fees: null before the indexer recorded any, and no shares when nothing was paid', async () => {
+    const none = await service(fakeRepo()).summary();
+    expect(none).toMatchObject({ fees: null, lastEpochFees: null });
+    const zero = await service(
+      fakeRepo({
+        epochFees: async (epoch) =>
+          epochFeeRow(epoch, { baseFeeLamports: 0n, priorityFeeLamports: 0n, tipLamports: 0n, blocks: 1 }),
+      }),
+    ).summary();
+    expect(zero.fees).toMatchObject({ epoch: 1048, totalSol: 0, sharePct: null });
+  });
+
   it('answers before the indexer ever ran, and without the RPC', async () => {
     const empty = await service(
       fakeRepo({ latestLive: async () => null, lastFinal: async () => null }),
@@ -193,6 +273,44 @@ describe('LiveService.summary', () => {
   });
 });
 
+describe('LiveService.slotFromPayload (WS `slots` frames)', () => {
+  const payload = {
+    t: 'slot' as const,
+    slot: 454_151_245,
+    epoch: 1051,
+    leader: A,
+    medianCuPrice: 10_000,
+    p25CuPrice: 870,
+    p75CuPrice: 312_500,
+    p90CuPrice: 1_134_380,
+    pricedTxs: 132,
+    unpricedTxs: 101,
+    leaderPaidTxs: 0,
+    failedTxs: 31,
+    blockTime: 1_791_031_700,
+    source: 'grpc',
+  };
+
+  it("carries the block's fee composition (request #30)", async () => {
+    const fees = {
+      baseLamports: 5_175_000,
+      priorityLamports: 31_630_143,
+      tipsLamports: 6_287_601,
+      tipTxs: 23,
+      rewardLamports: 34_217_643,
+      basis: 'reward',
+    };
+    const frame = await service(fakeRepo()).slotFromPayload({ ...payload, fees });
+    expect(frame.fees).toEqual(fees);
+    expect(frame.leaderName).toBe('Helius');
+  });
+
+  it('answers null for payloads without fees (older indexers) or with unreadable ones', async () => {
+    expect((await service(fakeRepo()).slotFromPayload(payload)).fees).toBeNull();
+    expect((await service(fakeRepo()).slotFromPayload({ ...payload, fees: null })).fees).toBeNull();
+  });
+});
+
 describe('LiveService.slots', () => {
   it('maps live_slots rows with leader names and IST block times', async () => {
     const slots = await service(fakeRepo()).slots(60);
@@ -212,8 +330,33 @@ describe('LiveService.slots', () => {
       failedTxs: 31,
       time: '2026-10-03T18:18:20+05:30',
       source: 'grpc',
+      fees: null,
     });
     expect(slots.slots[1].medianCuPrice).toBeNull();
+  });
+
+  it("fills each block's fee composition from slot_fee_mix (request #30), null where the indexer had none", async () => {
+    const slots = await service(
+      fakeRepo({
+        recentSlots: async () => [
+          { ...slotRow(452_937_400, 10_000), feeMix: feeMixRow(452_937_400) },
+          { ...slotRow(452_937_399, null), feeMix: feeMixRow(452_937_399, 'something-new') },
+          { ...slotRow(452_937_398, null), feeMix: null },
+        ],
+      }),
+    ).slots(60);
+    expect(slots.slots.map((s) => s.fees)).toEqual([
+      {
+        baseLamports: 5_175_000,
+        priorityLamports: 31_630_143,
+        tipsLamports: 6_287_601,
+        tipTxs: 23,
+        rewardLamports: 34_217_643,
+        basis: 'reward',
+      },
+      expect.objectContaining({ basis: 'estimated' }),
+      null,
+    ]);
   });
 });
 

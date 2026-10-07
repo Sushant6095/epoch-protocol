@@ -1,0 +1,35 @@
+{
+ "source": "Solana mainnet-beta, read 2026-10-07 12:28 IST (epoch 1051) from https://api.mainnet-beta.solana.com: getMultipleAccounts / getProgramAccounts, base64. Unmodified account data. Trimmed to the accounts below; data unmodified.",
+ "accounts": {
+  "tdaWithRoot": {
+   "address": "9K9MRQencRx8cZbtK9bvkdYgc3znvyUSjtAUP1TbCUDE",
+   "data": "VUBxxupeeHsjIFU0dV5nxdCFqwwc8+glw/1wfdrIYLFv4PBQqKsIF2ucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAUNvyyQmis2WTV/HN4QzefXqVEjrMtM6GTnAdHcSg1d416TSRyYAAAB/BAAAAAAAAHx2uUcmAAAArAMAAAAAAAAaBAAAAAAAAAAAJAQAAAAAAAD7AAAAAAAAAAAAAAAA",
+   "vote": "3N7s9zXMZ4QqvHQR15t5GNHyqc89KduzMP7423eWiD5g"
+  },
+  "tdaWithoutRoot": {
+   "address": "719ow3CJtkEN3YLzyjtq1pEM18aqbUqSDtGsvbnqDgHu",
+   "data": "VUBxxupeeHsjIFU0dV5nxdCFqwwc8+glw/1wfdrIYLFv4PBQqKsIF2ucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjABsEAAAAAAAAAAAlBAAAAAAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+   "vote": "3N7s9zXMZ4QqvHQR15t5GNHyqc89KduzMP7423eWiD5g"
+  },
+  "tda700": {
+   "address": "8LpeJwvZxerRJPMq7nbZgnHoGXJSvQa8JdGzhyAYs7nC",
+   "data": "VUBxxupeeHusjYV7jhs84vxY/Vt2UplT7Dzd+js56nZGiUlxWL9WqmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAdoE3VT3iWIv9NeP85iWmkJB25A7iEatsN8WTzKcCAolTkvX1xgAAADMJwAAAAAAAC6LjdcYAAAAsxkAAAAAAAAaBAAAAAAAALwCJAQAAAAAAAD+AAAAAAAAAAAAAAAA",
+   "vote": "CcaHc2L43ZWjwCHART3oZoJvHLAe9hzT2DJNUpBzoTN1"
+  },
+  "tda10000": {
+   "address": "2CzcKdpHizZjxeb85XW7TUqfM9C6BLVwzSR1xzJmusnC",
+   "data": "VUBxxupeeHu7kgEmV+ubC72Y4BCcCKGhZRTfPyLflJ1dG54vBKrrbmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAWtRi8q3gHS8C3JP9yi7rXGPCOeUVGeZxstN72dDwVsTpisxVBkAAAA7CgAAAAAAAKYrMVQZAAAAAgAAAAAAAAAaBAAAAAAAABAnJAQAAAAAAAD/AAAAAAAAAAAAAAAA",
+   "vote": "DdCNGDpP7qMgoAy6paFzhhak2EeyCZcgjH7ak5u5v28m"
+  },
+  "claimStatus700": {
+   "address": "9ZGKd1g7dndQF7AaCp1Ged5qiHPCY4efCpvLM2jxF8m2",
+   "data": "Frf5nfdflmABrI2Fe44bPOL8WP1bdlKZU+w83fo7Oep2RolJcVi/VqpVLmFu4a41/gRtUJSslbOd2LvrvcwQIpsDTz19LVy1cERDEBsAAAAAwFkwvQEAAAAkBAAAAAAAAP8AAAAAAAA=",
+   "claimant": "CcaHc2L43ZWjwCHART3oZoJvHLAe9hzT2DJNUpBzoTN1"
+  },
+  "claimStatus10000": {
+   "address": "FqC1LuXNLeFuCzSFNUnCF3XohHY3dyvL8GrcqQXUpyho",
+   "data": "Frf5nfdflmABu5IBJlfrmwu9mOAQnAihoWUU3z8i35SdXRueLwSq625VLmFu4a41/gRtUJSslbOd2LvrvcwQIpsDTz19LVy1cDMmEBsAAAAAF57UixgAAAAkBAAAAAAAAP4AAAAAAAA=",
+   "claimant": "DdCNGDpP7qMgoAy6paFzhhak2EeyCZcgjH7ak5u5v28m"
+  }
+ }
+}

@@ -50,6 +50,7 @@ export function registryRevenueToken(
   const vote = entry.validator.vote ? new PublicKey(entry.validator.vote) : null;
   return {
     source: 'registry',
+    programId: programId?.toBase58() ?? null,
     address: programId && vote ? revenueTokenAddress(programId, vote).toBase58() : (entry.revenueToken ?? null),
     buybackEscrow: entry.escrow ?? (programId && vote ? buybackEscrowAddress(programId, vote).toBase58() : null),
     treasury: programId ? partnerTreasuryAddress(programId).toBase58() : (entry.feeClaimer ?? null),
@@ -73,6 +74,8 @@ export function registryRevenueToken(
 /** The program's record of a registered token, with the escrow's balance above rent (pure). */
 export function programRevenueToken(input: {
   rt: RevenueTokenAccount;
+  /** The program the account belongs to (request #26). */
+  programId?: PublicKey;
   address: PublicKey;
   escrow: PublicKey;
   treasury: PublicKey;
@@ -87,6 +90,7 @@ export function programRevenueToken(input: {
   const tokens = (raw: bigint) => Number(raw) / 10 ** decimals;
   return {
     source: 'program',
+    programId: input.programId?.toBase58() ?? null,
     address: input.address.toBase58(),
     buybackEscrow: input.escrow.toBase58(),
     treasury: input.treasury.toBase58(),
@@ -229,6 +233,7 @@ export class ProgramRevenueTokenSource implements RevenueTokenSource {
       }
       return programRevenueToken({
         rt,
+        programId,
         address,
         escrow,
         treasury: partnerTreasuryAddress(programId),

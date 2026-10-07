@@ -47,6 +47,8 @@ import {
 } from './EpochChain';
 
 const logger = Logger.create('ProgramClient');
+/** getMultipleAccounts takes at most 100 keys. */
+const MULTIPLE_ACCOUNTS_PER_CALL = 100;
 
 /** Under DRY_RUN the same action is simulated once per this window, so a minute poller does not log it every tick. */
 const DRY_RUN_MEMO_MS = 30 * 60_000;
@@ -137,6 +139,16 @@ export class ProgramClient implements EpochChain {
 
   async lamports(address: PublicKey): Promise<bigint> {
     return BigInt(await this.connections.withFailover((c) => c.getBalance(address, 'confirmed')));
+  }
+
+  async accountsData(addresses: PublicKey[]): Promise<(Uint8Array | null)[]> {
+    const out: (Uint8Array | null)[] = [];
+    for (let i = 0; i < addresses.length; i += MULTIPLE_ACCOUNTS_PER_CALL) {
+      const chunk = addresses.slice(i, i + MULTIPLE_ACCOUNTS_PER_CALL);
+      const infos = await this.connections.withFailover((c) => c.getMultipleAccountsInfo(chunk, 'confirmed'));
+      out.push(...infos.map((info) => (info ? new Uint8Array(info.data) : null)));
+    }
+    return out;
   }
 
   async rentExempt(space: number): Promise<bigint> {

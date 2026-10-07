@@ -110,7 +110,19 @@ export interface ValidatorRow {
   top18: boolean;
   /** 0–100, the program's formula. 0 when delinquent; at most 50 in the superminority. */
   epochScore: number;
+  /**
+   * Jito MEV commission, 0–100: from the chain first (the validator's newest TipDistributionAccount, this or the last
+   * epoch), else Jito Kobe, else Stakewiz; null when the validator does not run Jito. See `mevSource`.
+   */
   mevCommissionPct: number | null;
+  /**
+   * Jito tips of the validator's last finished epoch with a merkle root (`mevTipsEpoch`): everything its
+   * TipDistributionAccount pays out (stakers' share and the commission), in SOL; null without a TDA (request #5b).
+   */
+  mevTipsSol: number | null;
+  mevTipsEpoch: number | null;
+  /** Where `mevCommissionPct` came from: `chain` (mainnet TDA), `kobe`, `stakewiz`, or null when none knows. */
+  mevSource: 'chain' | 'kobe' | 'stakewiz' | null;
   delinquent: boolean;
   foundationSharePct: number | null;
   /** Server-side health, same rules as the app's lib/health.ts, so tabs filter on the server. */

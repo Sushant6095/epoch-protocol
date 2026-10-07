@@ -1,6 +1,7 @@
 import {
   encodeLivePayload,
   type EpochDb,
+  epochFeeMix,
   epochIndex,
   epochStakes,
   feeIndexLive,
@@ -9,6 +10,7 @@ import {
   type LiveIndexPayload,
   type LiveSlotPayload,
   liveSlots,
+  slotFeeMix,
   slotFees,
   SolamiUsageStore,
 } from '@epoch/pg_models';
@@ -16,6 +18,7 @@ import { type SolamiUsageReport } from '@epoch/solana';
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 
 import { type BlockFeesResult } from '../Blocks/BlockFees';
+import { type BlockFeeMix } from '../Blocks/FeeMix';
 import { type SlotFeeRow } from './SlotFeeRepository';
 
 /** Where a processed block came from. */
@@ -26,7 +29,87 @@ export interface SlotRecord {
   epoch: number;
   blockTime: number | null;
   source: SlotSource;
+  /** Base fees, priority fees and Jito tips (request #30); absent for records made without it. */
+  feeMix?: BlockFeeMix;
 }
+
+/** One block's slot_fee_mix row as the epoch rollup adds it. */
+interface FeeMixRow {
+  slot: number;
+  epoch: number;
+  baseFeeLamports: bigint;
+  priorityFeeLamports: bigint;
+  tipLamports: bigint;
+  tipTxs: number;
+  voteTxs: number;
+  nonVoteTxs: number;
+  feeRewardLamports: bigint | null;
+  baseFeeBasis: string;
+}
+
+/** epoch_fee_mix increments for rows just inserted, one per epoch. */
+export function rollUpFeeMix(rows: readonly FeeMixRow[]) {
+  const byEpoch = new Map<
+    number,
+    {
+      epoch: number;
+      blocks: number;
+      baseFeeLamports: bigint;
+      priorityFeeLamports: bigint;
+      tipLamports: bigint;
+      tipTxs: number;
+      voteTxs: number;
+      nonVoteTxs: number;
+      feeRewardLamports: bigint;
+      estimatedBlocks: number;
+      firstSlot: number;
+      lastSlot: number;
+    }
+  >();
+  for (const row of rows) {
+    const sum = byEpoch.get(row.epoch) ?? {
+      epoch: row.epoch,
+      blocks: 0,
+      baseFeeLamports: 0n,
+      priorityFeeLamports: 0n,
+      tipLamports: 0n,
+      tipTxs: 0,
+      voteTxs: 0,
+      nonVoteTxs: 0,
+      feeRewardLamports: 0n,
+      estimatedBlocks: 0,
+      firstSlot: row.slot,
+      lastSlot: row.slot,
+    };
+    sum.blocks++;
+    sum.baseFeeLamports += row.baseFeeLamports;
+    sum.priorityFeeLamports += row.priorityFeeLamports;
+    sum.tipLamports += row.tipLamports;
+    sum.tipTxs += row.tipTxs;
+    sum.voteTxs += row.voteTxs;
+    sum.nonVoteTxs += row.nonVoteTxs;
+    sum.feeRewardLamports += row.feeRewardLamports ?? 0n;
+    if (row.baseFeeBasis === 'estimated') sum.estimatedBlocks++;
+    sum.firstSlot = Math.min(sum.firstSlot, row.slot);
+    sum.lastSlot = Math.max(sum.lastSlot, row.slot);
+    byEpoch.set(row.epoch, sum);
+  }
+  return [...byEpoch.values()];
+}
+
+const feeMixRow = (r: SlotRecord & { feeMix: BlockFeeMix }) => ({
+  slot: r.fees.slot,
+  epoch: r.epoch,
+  baseFeeLamports: r.feeMix.baseLamports,
+  priorityFeeLamports: r.feeMix.priorityLamports,
+  tipLamports: r.feeMix.tipLamports,
+  tipTxs: r.feeMix.tipTxs,
+  voteTxs: r.feeMix.voteTxs,
+  nonVoteTxs: r.feeMix.nonVoteTxs,
+  feeRewardLamports: r.feeMix.feeRewardLamports,
+  baseFeeBasis: r.feeMix.baseFeeBasis,
+  source: r.source,
+});
 
 /** The contiguous run of done slots (see SlotWatermark): what a restart resumes from. */
 export interface IndexerCursor {
@@ -44,8 +127,10 @@ export type EpochIndexWrite = 'written' | 'posted';
 /** Postgres as the indexer uses it (an in-memory fake in tests). */
 export interface IndexerStore {
   /**
-   * One transaction: slot_fees for slots with priced transactions (the index input), live_slots for every block, a
-   * NOTIFY per live slot, and the cursor. Delivered to listeners only if it commits.
+   * One transaction: slot_fees for slots with priced transactions (the index input), live_slots for every block,
+   * slot_fee_mix for every block with a fee mix and the epoch_fee_mix rollup of the rows actually inserted (so a
+   * replayed slot is never counted twice), a NOTIFY per live slot, and the cursor. Delivered to listeners only if it
+   * commits.
    */
   writeBatch(batch: { records: SlotRecord[]; notify: LiveSlotPayload[]; cursor?: IndexerCursor }): Promise<void>;
   readCursor(): Promise<IndexerCursor | null>;
@@ -60,6 +145,8 @@ export interface IndexerStore {
   writeEpochIndex(epoch: number, value: number): Promise<EpochIndexWrite>;
   /** Keeps the newest `keep` live_slots rows. */
   pruneLiveSlots(keep: number): Promise<number>;
+  /** Keeps slot_fee_mix rows of the newest `keepEpochs` epochs (epoch_fee_mix keeps the totals). */
+  pruneFeeMix(keepEpochs: number): Promise<number>;
   /** This process's Solami usage (solami_usage row `indexer`), read by GET /v1/live/solami. */
   writeUsage(report: SolamiUsageReport): Promise<void>;
 }
@@ -113,6 +200,47 @@ export class PgIndexerStore implements IndexerStore {
             })),
           )
           .onConflictDoNothing();
+      }
+      const mixed = batch.records.filter((r): r is SlotRecord & { feeMix: BlockFeeMix } => r.feeMix !== undefined);
+      for (let i = 0; i < mixed.length; i += CHUNK) {
+        const inserted = await tx
+          .insert(slotFeeMix)
+          .values(mixed.slice(i, i + CHUNK).map(feeMixRow))
+          .onConflictDoNothing()
+          .returning({
+            slot: slotFeeMix.slot,
+            epoch: slotFeeMix.epoch,
+            baseFeeLamports: slotFeeMix.baseFeeLamports,
+            priorityFeeLamports: slotFeeMix.priorityFeeLamports,
+            tipLamports: slotFeeMix.tipLamports,
+            tipTxs: slotFeeMix.tipTxs,
+            voteTxs: slotFeeMix.voteTxs,
+            nonVoteTxs: slotFeeMix.nonVoteTxs,
+            feeRewardLamports: slotFeeMix.feeRewardLamports,
+            baseFeeBasis: slotFeeMix.baseFeeBasis,
+          });
+        for (const sum of rollUpFeeMix(inserted)) {
+          await tx
+            .insert(epochFeeMix)
+            .values({ ...sum, updatedAt: new Date() })
+            .onConflictDoUpdate({
+              target: epochFeeMix.epoch,
+              set: {
+                blocks: sql`${epochFeeMix.blocks} + excluded.blocks`,
+                baseFeeLamports: sql`${epochFeeMix.baseFeeLamports} + excluded.base_fee_lamports`,
+                priorityFeeLamports: sql`${epochFeeMix.priorityFeeLamports} + excluded.priority_fee_lamports`,
+                tipLamports: sql`${epochFeeMix.tipLamports} + excluded.tip_lamports`,
+                tipTxs: sql`${epochFeeMix.tipTxs} + excluded.tip_txs`,
+                voteTxs: sql`${epochFeeMix.voteTxs} + excluded.vote_txs`,
+                nonVoteTxs: sql`${epochFeeMix.nonVoteTxs} + excluded.non_vote_txs`,
+                feeRewardLamports: sql`${epochFeeMix.feeRewardLamports} + excluded.fee_reward_lamports`,
+                estimatedBlocks: sql`${epochFeeMix.estimatedBlocks} + excluded.estimated_blocks`,
+                firstSlot: sql`least(${epochFeeMix.firstSlot}, excluded.first_slot)`,
+                lastSlot: sql`greatest(${epochFeeMix.lastSlot}, excluded.last_slot)`,
+                updatedAt: new Date(),
+              },
+            });
+        }
       }
       if (batch.cursor) {
         const now = new Date();
@@ -248,6 +376,17 @@ export class PgIndexerStore implements IndexerStore {
       .limit(1);
     if (!edge) return 0;
     const result = await this.db.delete(liveSlots).where(lt(liveSlots.slot, edge.slot + 1));
+    return result.rowCount ?? 0;
+  }
+
+  async pruneFeeMix(keepEpochs: number): Promise<number> {
+    const [newest] = await this.db
+      .select({ epoch: slotFeeMix.epoch })
+      .from(slotFeeMix)
+      .orderBy(desc(slotFeeMix.epoch))
+      .limit(1);
+    if (!newest) return 0;
+    const result = await this.db.delete(slotFeeMix).where(lt(slotFeeMix.epoch, newest.epoch - keepEpochs + 1));
     return result.rowCount ?? 0;
   }
 

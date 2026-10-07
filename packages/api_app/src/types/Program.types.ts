@@ -112,6 +112,41 @@ export interface VaultSnapshot extends Meta {
 }
 
 // ── GET /v1/validators/:vote/position ─────────────────────────────────────────────────────────────
+/**
+ * The validator's Jito MEV commission per mainnet epoch (GET /v1/validators/:vote/position `mev`), from indexer_app's
+ * scan of the mainnet TipDistributionAccounts and claims. Its share reaches the vote account when Jito claims it, a few
+ * hours into the next epoch; cranks_app holds that epoch's sweep until the claim lands (ClaimMevJob), so the commission
+ * of epoch X is normally swept at epoch X + 1.
+ */
+export interface PositionMev {
+  /** The newest TDA's MEV commission, bps; null when the validator has no TDA in the window. */
+  commissionBps: number | null;
+  /** The newest mainnet epoch listed. */
+  lastEpoch: number | null;
+  /**
+   * Oldest first: epochs since onboarding when the program runs on mainnet; the last 10 mainnet epochs otherwise
+   * (devnet epochs are not mainnet's).
+   */
+  epochs: {
+    epoch: number;
+    /** The epoch's tips (root uploaded: `final`), else the tips so far. */
+    tipsSol: number | null;
+    final: boolean;
+    /** The validator's commission: claimed amount, else ⌊tips × bps ÷ 10,000⌋ (`estimated`). */
+    validatorShareSol: number | null;
+    estimated: boolean | null;
+    /** claimed | pending | none (0 % commission, never claimed) | expired */
+    claimStatus: 'claimed' | 'pending' | 'none' | 'expired' | null;
+    /** The program epoch whose sweep took it in; null when not swept yet or when the program is not on mainnet. */
+    sweptIn: number | null;
+  }[];
+  /**
+   * SOL of commission not in the vote account yet (claims still pending), plus, on a mainnet program, commission claimed
+   * but not swept yet.
+   */
+  pendingSol: number;
+}
+
 export interface OperatorPosition {
   vote: string | null;
   name: string;
@@ -152,6 +187,8 @@ export interface OperatorPosition {
     }[];
   };
   covenants: string[];
+  /** Jito MEV commission per mainnet epoch (request #5b); null without the MEV scan (no Postgres) or a TDA. */
+  mev: PositionMev | null;
 }
 
 /** API: the endpoint answers one position with the usual payload fields. */

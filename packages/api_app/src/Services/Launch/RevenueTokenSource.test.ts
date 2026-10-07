@@ -65,6 +65,7 @@ describe('RevenueTokenSource', () => {
     const source = new ProgramRevenueTokenSource(PROGRAM, registered(), () => NOW);
     expect(await source.get(RLOC_ENTRY)).toEqual({
       source: 'program',
+      programId: PROGRAM.toBase58(),
       address: RLOC.address,
       buybackEscrow: RLOC.escrow.address,
       treasury: TREASURY,

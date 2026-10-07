@@ -1,6 +1,7 @@
 import { fakeDeps, validatorRow } from '../../__fixtures__/ProgramFakes';
 import { key, ProgramSim, sol } from '../../__fixtures__/ProgramSim';
-import { OperatorPositionService, sweepableEstimate } from './OperatorPositionService';
+import { type MevEpochRecord } from '../Validator/MevHistory';
+import { OperatorPositionService, positionMev, sweepableEstimate } from './OperatorPositionService';
 
 const W = (label: string): string => key(label).toBase58();
 const NTT = 'FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk';
@@ -278,5 +279,104 @@ describe('OperatorPositionService: onboarded', () => {
     const dry = await new OperatorPositionService(fakeDeps(sim, await sim.store())).position(late);
     expect(dry.advance).toMatchObject({ epochsLeft: 20, status: 'active' });
     expect(dry.advance?.schedule).toEqual([{ epoch: 1105, remitSol: 0, endingSol: 1.02, status: 'due' }]);
+  });
+});
+
+describe('OperatorPositionService: MEV per position (request #5b)', () => {
+  // Mainnet figures (7 Oct 2026): a 700-bps validator's epoch 1050 (106.70 SOL of tips; its node claimed for exactly
+  // ⌊tips × 7 %⌋ at slot 454,050,628) and epoch 1051 in progress (tips so far, share estimated, not claimable yet).
+  const mev = (epoch: number, patch: Partial<MevEpochRecord> = {}): MevEpochRecord => ({
+    epoch,
+    commissionBps: 700,
+    tipsLamports: 106_700_426_062n,
+    rootUploaded: true,
+    validatorShareLamports: 7_469_029_824n,
+    validatorShareEstimated: false,
+    claim: 'claimed',
+    claimedSlot: 454_050_628,
+    pfCommissionBps: null,
+    pfTransferredLamports: null,
+    pfClaim: null,
+    ...patch,
+  });
+  const records = [
+    mev(1049),
+    mev(1050),
+    mev(1051, {
+      rootUploaded: false,
+      tipsLamports: 32_920_331_764n,
+      validatorShareLamports: 2_304_423_223n,
+      validatorShareEstimated: true,
+      claim: 'pending',
+      claimedSlot: null,
+    }),
+  ];
+
+  it('on a mainnet program: lists epochs since onboarding and marks each claimed commission swept at X + 1', () => {
+    const result = positionMev(records, { mainnet: true, onboardedEpoch: 1050, lastSweptEpoch: 1051 });
+    expect(result).toEqual({
+      commissionBps: 700,
+      lastEpoch: 1051,
+      epochs: [
+        {
+          epoch: 1050,
+          tipsSol: 106.7004,
+          final: true,
+          validatorShareSol: 7.469,
+          estimated: false,
+          claimStatus: 'claimed',
+          sweptIn: 1051,
+        },
+        {
+          epoch: 1051,
+          tipsSol: 32.9203,
+          final: false,
+          validatorShareSol: 2.3044,
+          estimated: true,
+          claimStatus: 'pending',
+          sweptIn: null,
+        },
+      ],
+      pendingSol: 2.3044,
+    });
+    // Before the 1051 sweep, epoch 1050's claimed commission is still waiting too.
+    expect(positionMev(records, { mainnet: true, onboardedEpoch: 1050, lastSweptEpoch: 1050 })?.pendingSol).toBe(
+      9.7734,
+    );
+  });
+
+  it('off mainnet: the last mainnet epochs, nothing marked swept; null without a TDA; 0 % nodes never pending', () => {
+    const devnet = positionMev(records, { mainnet: false, onboardedEpoch: 900, lastSweptEpoch: 950 });
+    expect(devnet?.epochs.map((e) => [e.epoch, e.sweptIn])).toEqual([
+      [1049, null],
+      [1050, null],
+      [1051, null],
+    ]);
+    expect(positionMev(undefined, { mainnet: false, onboardedEpoch: null, lastSweptEpoch: null })).toBeNull();
+    const zero = positionMev([mev(1050, { commissionBps: 0, validatorShareLamports: 0n, claim: 'none' })], {
+      mainnet: true,
+      onboardedEpoch: 1040,
+      lastSweptEpoch: 1050,
+    });
+    expect(zero).toMatchObject({ commissionBps: 0, pendingSol: 0, epochs: [{ claimStatus: 'none', sweptIn: null }] });
+  });
+
+  it('answers `mev` on the endpoint for onboarded and not-onboarded validators', async () => {
+    const sim = new ProgramSim(1173);
+    sim.initialize();
+    const deps = fakeDeps(sim, await sim.store(), { rows: [ntt], grossYieldPerEpoch: GROSS_YIELD });
+    const withMev = { ...deps, mev: (vote: string) => (vote === NTT ? records : undefined) };
+    const position = await new OperatorPositionService(withMev).position(NTT);
+    // Not onboarded: no sweep applies, so only the claim still pending counts.
+    expect(position.mev).toMatchObject({ commissionBps: 700, lastEpoch: 1051, pendingSol: 2.3044 });
+    expect((await new OperatorPositionService(deps).position(NTT)).mev).toBeNull();
+
+    const { sim: northwindSim, vote } = northwind();
+    const onboarded = await new OperatorPositionService({
+      ...fakeDeps(northwindSim, await northwindSim.store()),
+      mev: () => records,
+    }).position(vote);
+    // The test program runs on devnet: its epochs are not mainnet's, so nothing is marked swept.
+    expect(onboarded.mev?.epochs.every((e) => e.sweptIn === null)).toBe(true);
   });
 });

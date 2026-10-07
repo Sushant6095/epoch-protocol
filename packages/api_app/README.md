@@ -14,7 +14,7 @@ known yet" and the app shows "—".
 | `GET /v1/network`                                                                          | `NetworkSnapshot`               | 15 s  | mainnet RPC, Stakewiz, Jito Kobe, Jupiter, the delegator scan |
 | `GET /v1/network/stake-history?epochs=64`                                                  | `StakeHistory`, oldest first    | 5 min | StakeHistory sysvar                                           |
 | `GET /v1/validators?tab=&chips=&q=&sort=&dir=&fee=&client=&country=&votes=&cursor=&limit=` | `ValidatorList`                 | 30 s  | as `/v1/network`                                              |
-| `GET /v1/validators/:vote`                                                                 | `ValidatorProfile`              | 2 min | mainnet RPC, Stakewiz, Jito Kobe, validator history           |
+| `GET /v1/validators/:vote`                                                                 | `ValidatorProfile`              | 2 min | mainnet RPC, Stakewiz, Jito Kobe, validator history, MEV scan |
 | `GET /v1/delegators/biggest?limit=10`                                                      | `BiggestDelegators`             | 5 min | the delegator scan                                            |
 | `GET /v1/delegators/retail-magnets?limit=10`                                               | `RetailMagnets`                 | 5 min | the delegator scan                                            |
 | `GET /v1/wallets/:address/stake`                                                           | `MyStake`                       | 60 s  | mainnet RPC (stake accounts, balance, `getInflationReward`)   |
@@ -316,6 +316,38 @@ stake accounts (one filtered `getProgramAccounts`, the scan's 136-byte slice wit
 - **Suggestions**: three validators outside the top 18, Healthy, commission ≤ 5%, MEV commission ≤ 10%, uptime ≥ 99%,
   at least 100 delegators and none over 30% (the two delegator rules wait for the scan), highest APY first, never one
   the wallet already stakes with.
+
+## Jito MEV from mainnet (`validator_mev_epochs`, request #5b)
+
+indexer_app's MEV scan reads every Jito validator's TipDistributionAccount (TDA) and PriorityFeeDistributionAccount per
+mainnet epoch in bulk, and the ClaimStatus of each validator's commission node (see `packages/indexer_app/README.md`,
+"Jito MEV scan"). The API keeps the last 20 epochs in memory (`MevHistoryLoader`, reloaded every 10 minutes, only with
+`DATABASE_URL`); without them every field below falls back as described.
+
+- **`GET /v1/validators` rows.** `mevCommissionPct` is chain-first: the validator's newest TDA of this or the last epoch
+  (a TDA exists once the validator has led a slot with Jito), else Jito Kobe, else Stakewiz; `mevSource` says which
+  (`chain`, `kobe`, `stakewiz`, or null when none knows). New: `mevTipsSol`, the tips of the validator's last finished
+  epoch whose merkle root is uploaded (`mevTipsEpoch`), i.e. the whole TDA payout (stakers' share plus commission);
+  null without a TDA.
+- **`GET /v1/validators/:vote` `mevHistory`**, oldest first: per epoch `commissionBps`, `tipsSol`, `final` (root
+  uploaded), `validatorShareSol` (the claimed amount; before the claim ⌊tips × bps ÷ 10,000⌋ with `estimated: true`, an
+  upper bound at 100 % because the TipRouter protocol fee is paid first), `claimStatus`, `claimedSlot`,
+  `pfCommissionBps` / `pfTransferredSol` / `pfClaimStatus` (priority-fee distribution and its validator node; null for
+  almost everyone), and `source`: `chain`
+  rows from the scan, `kobe` rows (commission and tips, no claims) for epochs before the scan's window.
+- **`GET /v1/validators/:vote/position` `mev`** (`PositionMev`, null without the scan or a TDA): `commissionBps`,
+  `lastEpoch`, and per mainnet epoch `tipsSol`, `final`, `validatorShareSol`, `estimated`, `claimStatus` and `sweptIn`.
+  On a mainnet program the list starts at onboarding and a claimed commission of epoch X counts as swept at X + 1 once
+  that sweep ran (cranks_app's `ClaimMevJob` holds the sweep until Jito's claim lands); on devnet (epochs are not
+  mainnet's) it lists the last 10 mainnet epochs and `sweptIn` stays null. `pendingSol` = commission whose claim is still
+  pending, plus, on mainnet, commission claimed but not swept yet.
+- **Tips so far.** For an epoch without a root (the epoch in progress, and the first hours of the next) `tipsSol` is the
+  TDA's balance minus its rent-exempt minimum as read from the RPC (`getMinimumBalanceForRentExemption(168)`):
+  1,503,680 lamports on mainnet today, not the older 2,060,160, and never a hardcoded figure.
+- **0 % commission is normal.** About half of Jito validators (317 of 635 in epoch 1050) charge 0 % MEV commission:
+  their commission node is 0 and never gets a ClaimStatus, so `claimStatus: 'none'` is expected for them, not a missed
+  claim. `pending` = commission above 0 and not claimed yet (epoch 1050's claims landed 1.2 to 3.1 hours after the
+  boundary); `expired` = the TDA closed (10 epochs after its epoch) unclaimed.
 
 ## Validator history (`validator_epoch_stats`)
 
@@ -854,8 +886,8 @@ page contract, with example responses and the loading, empty, stale and error st
 
 | Endpoint | Query | Returns | Cache |
 | --- | --- | --- | --- |
-| `GET /v1/live/summary` | — | `LiveSummary`: live flag, data source, stream health, tip / processed slot / lag, epoch progress, running estimate, last final value | no-store |
-| `GET /v1/live/slots` | `limit` 1–500 (60) | the newest blocks with median, p25/p75/p90 and priced / unpriced / leader-paid / failed counts | no-store |
+| `GET /v1/live/summary` | — | `LiveSummary`: live flag, data source, stream health, tip / processed slot / lag, epoch progress, running estimate, last final value, fee composition of this epoch and the last (`fees`, `lastEpochFees`: base, priority, Jito tips, rewards, shares) | no-store |
+| `GET /v1/live/slots` | `limit` 1–500 (60) | the newest blocks with median, p25/p75/p90, priced / unpriced / leader-paid / failed counts and `fees` (base, priority, Jito tips, reward; null before fees were recorded) | no-store |
 | `GET /v1/live/leaders` | `epoch` (current), `limit` 1–5,000 (200) | per-leader median, slots, stake, weight, rank, and the leader whose median is the index | 5 s (10 s server) |
 | `GET /v1/live/epochs/:epoch/distribution` | — | log-bucket histogram and percentiles of the epoch's slot medians, index marker | 5 s (10 s server) |
 | `GET /v1/live/solami` | — | what Epoch uses of Solami, per component (indexer, api, publisher, cranks): gRPC streams (status, bytes, lag), RPC calls by method (p50/p95, errors, rate limits), Beam sends (landed, tips spent), the last error | no-store |

@@ -6,6 +6,7 @@ import { type EpochInfo, type VoteAccount } from '../Sources/SolanaDataSource';
 import { type HealthStatus, type ValidatorRow } from '../types/Api.types';
 import { type ScanSnapshot } from './DelegatorScanService';
 import { type MarketData, optional } from './MarketData';
+import { chainMev, type MevSnapshot } from './Validator/MevHistory';
 import { lastCommissionRaise, type ValidatorHistorySnapshot } from './Validator/ValidatorHistory';
 
 /** Fee per vote transaction; one vote per slot. */
@@ -38,6 +39,8 @@ export interface ValidatorTableData {
   scanAsOf: string | null;
   /** `version` of the validator history the rows were built with; 0 without history. */
   historyVersion: number;
+  /** `version` of the MEV snapshot the rows were built with; 0 without one. */
+  mevVersion: number;
 }
 
 export const clientFamily = (clientId: string | undefined): ValidatorRow['client'] => {
@@ -85,6 +88,7 @@ export class ValidatorTable {
     private readonly market: MarketData,
     private readonly scan: () => ScanSnapshot | undefined,
     private readonly history: () => ValidatorHistorySnapshot | undefined = () => undefined,
+    private readonly mev: () => MevSnapshot | undefined = () => undefined,
   ) {
     this.cache = new SnapshotCache('validatorTable', 60_000, () => this.build());
   }
@@ -96,6 +100,8 @@ export class ValidatorTable {
     if ((this.scan()?.asOf ?? null) !== data.scanAsOf) return this.cache.refresh();
     // Likewise when the validator history recorder wrote new epochs.
     if ((this.history()?.version ?? 0) !== data.historyVersion) return this.cache.refresh();
+    // And when indexer_app's MEV scan brought new Jito rows.
+    if ((this.mev()?.version ?? 0) !== data.mevVersion) return this.cache.refresh();
     return data;
   }
 
@@ -117,6 +123,7 @@ export class ValidatorTable {
     ]);
     const scan = this.scan();
     const history = this.history();
+    const mev = this.mev();
 
     const delinquentSet = new Set(voteAccounts.delinquent.map((v) => v.votePubkey));
     const all = [...voteAccounts.current, ...voteAccounts.delinquent]
@@ -149,7 +156,12 @@ export class ValidatorTable {
       const [, produced] = production.byIdentity[v.nodePubkey] ?? [0, 0];
       const stakeSol = v.activatedStake / 1e9;
       const commissionBps = v.inflationRewardsCommissionBps ?? v.commission * 100;
-      const mevBps = kb?.mev_commission_bps ?? sw?.jito_commission_bps ?? null;
+      const chain = chainMev(mev?.byVote.get(v.votePubkey), epoch.epoch);
+      const kobeBps = kb?.mev_commission_bps ?? null;
+      const stakewizBps = sw?.jito_commission_bps ?? null;
+      const mevBps = chain.commissionBps ?? kobeBps ?? stakewizBps;
+      const mevSource: ValidatorRow['mevSource'] =
+        chain.commissionBps !== null ? 'chain' : kobeBps !== null ? 'kobe' : stakewizBps !== null ? 'stakewiz' : null;
       const tipsApyPct = sw?.jito_apy ?? (sw ? 0 : null);
 
       const inflationCommission = stakeSol * grossYieldPerEpoch * (commissionBps / 10_000);
@@ -205,6 +217,9 @@ export class ValidatorTable {
         top18: superSet.has(index),
         epochScore: displayScore(score),
         mevCommissionPct: mevBps === null ? null : mevBps / 100,
+        mevTipsSol: chain.tipsSol,
+        mevTipsEpoch: chain.tipsEpoch,
+        mevSource,
         delinquent,
         foundationSharePct: stats?.foundationSharePct ?? null,
         ...healthOf(base),
@@ -226,6 +241,7 @@ export class ValidatorTable {
     if (kobe.size) sources.push('Jito Kobe');
     if (scan) sources.push('stake-account scan');
     if (history) sources.push('validator history');
+    if (mev && mev.byVote.size > 0) sources.push('Jito tip distribution accounts (mainnet)');
 
     return {
       asOf: isoIst(),
@@ -255,6 +271,7 @@ export class ValidatorTable {
       sources,
       scanAsOf: scan?.asOf ?? null,
       historyVersion: history?.version ?? 0,
+      mevVersion: mev?.version ?? 0,
     };
   }
 }

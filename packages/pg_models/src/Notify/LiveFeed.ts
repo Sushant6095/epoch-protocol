@@ -7,6 +7,18 @@ export const LIVE_NOTIFY_CHANNEL = 'epoch_live';
 /** Postgres refuses NOTIFY payloads of 8,000 bytes or more. */
 export const MAX_NOTIFY_BYTES = 7_900;
 
+/** A block's fee composition in lamports (request #30): see slot_fee_mix. */
+export interface LiveSlotFeesPayload {
+  baseLamports: number;
+  priorityLamports: number;
+  tipsLamports: number;
+  tipTxs: number;
+  /** The leader's Fee reward; null when the block reported none. */
+  rewardLamports: number | null;
+  /** counted | reward | estimated: how the votes' base fees were found. */
+  basis: string;
+}
+
 /** One processed block. Prices are µL/CU over priced, non-leader-paid transactions; null when there were none. */
 export interface LiveSlotPayload {
   t: 'slot';
@@ -25,6 +37,8 @@ export interface LiveSlotPayload {
   blockTime: number | null;
   /** grpc | hybrid | rpc */
   source: string;
+  /** Absent from indexers older than request #30; null when a payload's fees could not be read. */
+  fees?: LiveSlotFeesPayload | null;
 }
 
 /** The running estimate of the epoch in progress (also written to fee_index_live). */
@@ -69,6 +83,19 @@ export function encodeLivePayload(payload: LivePayload): string {
 const isNum = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isNumOrNull = (value: unknown): boolean => value === null || isNum(value);
 
+function isFees(value: unknown): value is LiveSlotFeesPayload {
+  if (typeof value !== 'object' || value === null) return false;
+  const fees = value as Record<string, unknown>;
+  return (
+    isNum(fees.baseLamports) &&
+    isNum(fees.priorityLamports) &&
+    isNum(fees.tipsLamports) &&
+    isNum(fees.tipTxs) &&
+    isNumOrNull(fees.rewardLamports) &&
+    typeof fees.basis === 'string'
+  );
+}
+
 /** Parses a payload from the channel; null for anything that is not one of ours (never trusted blindly). */
 export function decodeLivePayload(text: string | undefined): LivePayload | null {
   if (!text) return null;
@@ -87,7 +114,10 @@ export function decodeLivePayload(text: string | undefined): LivePayload | null 
         typeof payload.leader === 'string' &&
         isNumOrNull(payload.medianCuPrice) &&
         isNum(payload.pricedTxs)
-        ? (payload as unknown as LiveSlotPayload)
+        ? ({
+            ...payload,
+            ...(payload.fees !== undefined ? { fees: isFees(payload.fees) ? payload.fees : null } : {}),
+          } as unknown as LiveSlotPayload)
         : null;
     case 'index':
       return isNum(payload.epoch) && isNumOrNull(payload.estimate) && typeof payload.status === 'string'

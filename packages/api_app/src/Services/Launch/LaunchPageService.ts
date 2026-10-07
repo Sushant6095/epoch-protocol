@@ -375,7 +375,10 @@ export class LaunchPageService {
       count: complete
         ? { all: top.length, buyers: top.filter((holder) => !holder.owner || !notBuyers.has(holder.owner)).length }
         : {
-            all: item.real || item.detail.token.holders > 0 ? item.detail.token.holders : null,
+            all:
+              item.detail.token.holders !== null && (item.real || item.detail.token.holders > 0)
+                ? item.detail.token.holders
+                : null,
             buyers: item.real || item.summary.raise.buyers > 0 ? item.summary.raise.buyers : null,
           },
       top,
@@ -623,6 +626,8 @@ export class LaunchPageService {
       market: market ?? this.unavailableMarket(found.item),
       revenueToken,
       trades: (trades ?? []).map((row) => this.toTrade(row, entry)),
+      // Same rule and encoding as /trades: a full page has older trades behind its last row (request #28).
+      tradesNextCursor: trades && trades.length === PAGE_TRADES ? encodeTradeCursor(trades[trades.length - 1]) : null,
       candles: candles
         ? { interval: candles.interval, basis: candles.basis, candles: candles.candles }
         : { interval: '15m', basis: 'none', candles: [] },
@@ -663,7 +668,8 @@ export class LaunchPageService {
           : 'curve';
     const venue: LaunchMarket['venue'] = state === 'migrated' ? 'damm-v2' : state === 'curve' ? 'dbc' : null;
     const priceSol = upcoming ? null : (damm?.priceSol ?? pool?.priceSol ?? null);
-    const burned = item.detail.token.burned;
+    // An unreadable mint has no burned figure (request #32); the market cap then uses the launch record's.
+    const burned = item.detail.token.burned ?? entry.burned ?? 0;
     const marketCapSol = priceSol === null ? null : priceSol * Math.max(0, entry.supply - burned);
     const target = pool?.migrationThresholdSol ?? item.summary.raise.targetSol;
     const raised = migrated ? target : (pool?.quoteReserveSol ?? 0);

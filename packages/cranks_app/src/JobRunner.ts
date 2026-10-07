@@ -10,6 +10,7 @@ import {
   BuybackJob,
   type BuybackJobOptions,
   ClaimMevJob,
+  type ClaimMevJobOptions,
   FinalizeIndexJob,
   type Job,
   type JobOutcome,
@@ -24,11 +25,17 @@ import {
 const logger = Logger.create('JobRunner');
 
 export const DEFAULT_RESCORE_MS = 30 * 60_000;
+export const DEFAULT_MEV_CLAIM_WAIT_MINUTES = 360;
 
 export interface BoundaryStep {
   job: Job;
   /** Later boundary steps (and the steady jobs) wait until this one is done for the epoch. */
   gate: boolean;
+  /**
+   * Log `ALERT: boundary job still not done` when this gate is still waiting after `alertAfterMs` (default true). Off
+   * for a gate with its own bounded wait (ClaimMevJob), which logs when it gives up.
+   */
+  alert?: boolean;
 }
 
 export interface JobRunnerOptions {
@@ -46,8 +53,9 @@ export interface JobRunnerOptions {
  * Runs the cranks on one loop (a tick every `pollMs`, a minute by default):
  *
  * 1. **Boundary steps**, in the order the program needs, until each is done for the current program epoch:
- *    claim MEV → update scores → sweep (gate: waits for epoch rewards) → mark defaults (gate) → accrue (gate).
- *    A gate that is not done yet stops the steps after it; the next tick retries it. Claim and score never block.
+ *    update scores → wait for Jito's MEV claims (gate, bounded) → sweep (gate: waits for epoch rewards) → mark
+ *    defaults (gate) → accrue (gate). A gate that is not done yet stops the steps after it; the next tick retries it.
+ *    Scoring never blocks.
  * 2. **Steady jobs** once every gate is done, then on every tick: process withdrawals (the queue is paid as soon as
  *    the cash is there, never before this epoch's sweep and accrual), and revenue-token buybacks (one due slice per
  *    token per tick, after the sweep has moved this epoch's share into the escrow).
@@ -84,6 +92,7 @@ export class JobRunner {
     hedgeMakers: readonly PublicKey[],
     options: JobRunnerOptions,
     buyback?: { market: BuybackMarket; options: BuybackJobOptions },
+    claimMev: ClaimMevJobOptions = { waitMinutes: DEFAULT_MEV_CLAIM_WAIT_MINUTES },
   ): JobRunner {
     const scores = new UpdateScoreJob(chain, data, hedgeMakers);
     const steady: Job[] = [new ProcessWithdrawalsJob(chain)];
@@ -91,8 +100,8 @@ export class JobRunner {
     return new JobRunner(
       async () => (await chain.clock()).epoch,
       [
-        { job: new ClaimMevJob(), gate: false },
         { job: scores, gate: false },
+        { job: new ClaimMevJob(chain, { now: options.now, ...claimMev }), gate: true, alert: false },
         { job: new SweepJob(chain), gate: true },
         { job: new MarkDefaultJob(chain), gate: true },
         { job: new AccrueJob(chain), gate: true },
@@ -172,7 +181,9 @@ export class JobRunner {
     const minutes = Math.floor((this.now() - this.epochSeenAt) / 60_000);
     if (this.now() - this.epochSeenAt < this.options.alertAfterMs) return;
     for (const step of this.boundary) {
-      if (!step.gate || this.done.has(step.job.name) || this.alerted.has(step.job.name)) continue;
+      if (!step.gate || step.alert === false || this.done.has(step.job.name) || this.alerted.has(step.job.name)) {
+        continue;
+      }
       this.alerted.add(step.job.name);
       logger.error('ALERT: boundary job still not done', undefined, {
         job: step.job.name,

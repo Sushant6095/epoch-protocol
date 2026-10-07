@@ -156,6 +156,37 @@ describe('JobRunner', () => {
 });
 
 describe('JobRunner.create', () => {
+  it("holds the sweep on the MEV claim gate, never the scorer, and leaves alerting to the gate's own bounded wait", async () => {
+    const errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const log: string[] = [];
+    const [score, claim, sweep] = ['score', 'claim', 'sweep'].map((name) => new ScriptedJob(name, log));
+    let now = 0;
+    const runner = new JobRunner(
+      async () => 100n,
+      [
+        { job: score, gate: false },
+        { job: claim, gate: true, alert: false },
+        { job: sweep, gate: true },
+      ],
+      [],
+      [],
+      { pollMs: 60_000, alertAfterMs: 60 * 60_000, now: () => now },
+    );
+    claim.answer = () => 'retry';
+    await runner.tick();
+    expect(log).toEqual(['score', 'claim']);
+    now += 2 * 60 * 60_000;
+    await runner.tick();
+    expect(errors.mock.calls.filter(([m]) => String(m).startsWith('ALERT'))).toEqual([
+      expect.arrayContaining([expect.objectContaining({ job: 'sweep' })]),
+    ]);
+    claim.answer = () => 'done';
+    log.length = 0;
+    await runner.tick();
+    expect(log).toEqual(['claim', 'sweep']);
+    errors.mockRestore();
+  });
+
   it('wires every job on one chain, in the program order', async () => {
     const chain = new FakeChain();
     chain.scorer = undefined; // scores off

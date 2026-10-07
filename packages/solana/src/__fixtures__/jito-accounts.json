@@ -1,0 +1,59 @@
+{
+ "source": "Solana mainnet-beta, read 2026-10-07 12:28 IST (epoch 1051) from https://api.mainnet-beta.solana.com: getMultipleAccounts / getProgramAccounts, base64. Unmodified account data.",
+ "tipPaymentProgram": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+ "tipDistributionProgram": "4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7",
+ "priorityFeeDistributionProgram": "Priority6weCZ5HwDn29NxLFpb7TDp2iLZ6XKc5e8d3",
+ "tipAccounts": [
+  "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+  "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+  "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+  "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+  "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+  "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+  "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+  "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"
+ ],
+ "tipPaymentConfig": {
+  "address": "HgzT81VF1xZ3FT9Eq1pHhea7Wcfq2bv4tWTP3VvJ8Y9D",
+  "data": "mwyq4B76zIJZMBUFfVdrtw1JN/s6soq+OGPIO1sOAYppG4CVoW9zUOWGvzQg6T0tdMDztTFNUVL61IK0HxdwiGh1Nys8mSeAAwAAAAAAAAD+//7///z//P8="
+ },
+ "tdaWithRoot": {
+  "address": "9K9MRQencRx8cZbtK9bvkdYgc3znvyUSjtAUP1TbCUDE",
+  "vote": "3N7s9zXMZ4QqvHQR15t5GNHyqc89KduzMP7423eWiD5g",
+  "epoch": 1050,
+  "lamports": 3153947,
+  "data": "VUBxxupeeHsjIFU0dV5nxdCFqwwc8+glw/1wfdrIYLFv4PBQqKsIF2ucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAUNvyyQmis2WTV/HN4QzefXqVEjrMtM6GTnAdHcSg1d416TSRyYAAAB/BAAAAAAAAHx2uUcmAAAArAMAAAAAAAAaBAAAAAAAAAAAJAQAAAAAAAD7AAAAAAAAAAAAAAAA"
+ },
+ "tdaWithoutRoot": {
+  "address": "719ow3CJtkEN3YLzyjtq1pEM18aqbUqSDtGsvbnqDgHu",
+  "vote": "3N7s9zXMZ4QqvHQR15t5GNHyqc89KduzMP7423eWiD5g",
+  "epoch": 1051,
+  "lamports": 32921835444,
+  "data": "VUBxxupeeHsjIFU0dV5nxdCFqwwc8+glw/1wfdrIYLFv4PBQqKsIF2ucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjABsEAAAAAAAAAAAlBAAAAAAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+ },
+ "tda700": {
+  "address": "8LpeJwvZxerRJPMq7nbZgnHoGXJSvQa8JdGzhyAYs7nC",
+  "lamports": 6336992,
+  "data": "VUBxxupeeHusjYV7jhs84vxY/Vt2UplT7Dzd+js56nZGiUlxWL9WqmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAdoE3VT3iWIv9NeP85iWmkJB25A7iEatsN8WTzKcCAolTkvX1xgAAADMJwAAAAAAAC6LjdcYAAAAsxkAAAAAAAAaBAAAAAAAALwCJAQAAAAAAAD+AAAAAAAAAAAAAAAA"
+ },
+ "tda10000": {
+  "address": "2CzcKdpHizZjxeb85XW7TUqfM9C6BLVwzSR1xzJmusnC",
+  "lamports": 1503680,
+  "data": "VUBxxupeeHu7kgEmV+ubC72Y4BCcCKGhZRTfPyLflJ1dG54vBKrrbmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAWtRi8q3gHS8C3JP9yi7rXGPCOeUVGeZxstN72dDwVsTpisxVBkAAAA7CgAAAAAAAKYrMVQZAAAAAgAAAAAAAAAaBAAAAAAAABAnJAQAAAAAAAD/AAAAAAAAAAAAAAAA"
+ },
+ "claimStatus700": {
+  "address": "9ZGKd1g7dndQF7AaCp1Ged5qiHPCY4efCpvLM2jxF8m2",
+  "data": "Frf5nfdflmABrI2Fe44bPOL8WP1bdlKZU+w83fo7Oep2RolJcVi/VqpVLmFu4a41/gRtUJSslbOd2LvrvcwQIpsDTz19LVy1cERDEBsAAAAAwFkwvQEAAAAkBAAAAAAAAP8AAAAAAAA=",
+  "lamports": 1178560
+ },
+ "claimStatus10000": {
+  "address": "FqC1LuXNLeFuCzSFNUnCF3XohHY3dyvL8GrcqQXUpyho",
+  "data": "Frf5nfdflmABu5IBJlfrmwu9mOAQnAihoWUU3z8i35SdXRueLwSq625VLmFu4a41/gRtUJSslbOd2LvrvcwQIpsDTz19LVy1cDMmEBsAAAAAF57UixgAAAAkBAAAAAAAAP4AAAAAAAA=",
+  "lamports": 1178560
+ },
+ "pfdaWithRoot": {
+  "address": "7DteLZUv7xTR8nf2Ym2YMa9igaXmD6c8UAeg36PYtkr5",
+  "lamports": 1544320,
+  "data": "o7f+DHmJ6xv80T2ote3ZsSVQXwXdXsmLELwWrxqrmm7aHBZ2nE7pQmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAaGm1V7lSr6+Hj0IUy4NV1QUr38Sd6EfoqGRRpGI7jDVAAAAAAAAAAAUBwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaBAAAAAAAAIgTJAQAAAAAAAAAAAAAAAAAAP4AAAAAAAAAAAAAAAA="
+ }
+}

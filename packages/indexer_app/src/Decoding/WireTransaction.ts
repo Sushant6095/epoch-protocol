@@ -18,6 +18,8 @@ export class WireFormatError extends Error {
 
 export interface CompiledInstructionView {
   programIdIndex: number;
+  /** Indexes into the account keys (static keys, then any lookup-table addresses). */
+  accounts: Uint8Array;
   data: Uint8Array;
 }
 
@@ -142,9 +144,9 @@ function parseV1(reader: Reader): MessageView {
   for (let bit = 3; bit < 32; bit++) if (mask & (1 << bit)) reader.skip(4);
   const headers: [number, number, number][] = [];
   for (let i = 0; i < instructionCount; i++) headers.push([reader.u8(), reader.u8(), reader.u16le()]);
-  const instructions = headers.map(([programIdIndex, accounts, dataLength]) => {
-    reader.skip(accounts);
-    return { programIdIndex, data: reader.bytesOf(dataLength) };
+  const instructions = headers.map(([programIdIndex, accountCount, dataLength]) => {
+    const accounts = reader.bytesOf(accountCount);
+    return { programIdIndex, accounts, data: reader.bytesOf(dataLength) };
   });
   reader.skip(64 * numRequiredSignatures);
   return { version: 1, numRequiredSignatures, accountKeys, instructions, config };
@@ -167,8 +169,8 @@ function parseLegacyOrV0(reader: Reader): MessageView {
   const instructions: CompiledInstructionView[] = [];
   for (let i = 0; i < count; i++) {
     const programIdIndex = reader.u8();
-    reader.skip(reader.shortVec());
-    instructions.push({ programIdIndex, data: reader.bytesOf(reader.shortVec()) });
+    const accounts = reader.bytesOf(reader.shortVec());
+    instructions.push({ programIdIndex, accounts, data: reader.bytesOf(reader.shortVec()) });
   }
   if (version === 0) {
     const lookups = reader.shortVec();

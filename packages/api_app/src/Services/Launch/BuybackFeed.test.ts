@@ -208,6 +208,7 @@ describe('buybackSchedule', () => {
     });
     const early = { ...notStarted, lastShareEpoch: 0n };
     expect(buybackSchedule(early, info(5_750, 0), 0n)).toEqual({
+      currentEpoch: 0,
       slicesPerEpoch: 12,
       windowSlots: 9_000,
       slicesDoneThisEpoch: 0,
@@ -402,7 +403,11 @@ describe('BuybackFeed for a closed revenue token', () => {
   const now = () => new Date('2026-10-05T20:30:00Z');
 
   it('keeps its history and totals from the program events, and says where the escrow went', async () => {
-    const feed = await new BuybackFeed({ chain, events, now }).get(MINT.toBase58());
+    // Request #26: the program id for client-built instructions; null when the API has none.
+    expect((await new BuybackFeed({ chain, events, now }).get(MINT.toBase58())).programId).toBeNull();
+    const withProgram = { ...chain, programId: key(42).toBase58() };
+    const feed = await new BuybackFeed({ chain: withProgram, events, now }).get(MINT.toBase58());
+    expect(feed.programId).toBe(key(42).toBase58());
     expect(feed).toMatchObject({
       revenueToken: key(130).toBase58(),
       vote: key(20).toBase58(),

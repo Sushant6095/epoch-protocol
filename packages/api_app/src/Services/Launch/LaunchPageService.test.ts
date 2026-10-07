@@ -208,6 +208,17 @@ describe('LaunchPageService', () => {
   });
 
   describe('trades', () => {
+    it("pages on from the first-paint bundle with tradesNextCursor, /trades' own cursor (request #28)", async () => {
+      setup();
+      const start = NOW - 10 * 60_000;
+      await h.store.insertTrades(Array.from({ length: 51 }, (_, n) => storedTrade(n, start)));
+      const page = await h.page.page(MINT);
+      expect(page.trades).toHaveLength(50);
+      expect(page.tradesNextCursor).toBe(`3001:${storedTrade(1, start).signature}:1`);
+      const older = await h.page.trades(MINT, { before: page.tradesNextCursor });
+      expect(older.trades.map((trade) => trade.slot)).toEqual([3_000]);
+    });
+
     it('newest first, paged with nextCursor, mapped for the feed', async () => {
       setup();
       const start = NOW - 10 * 60_000;
@@ -642,6 +653,7 @@ describe('LaunchPageService', () => {
         unavailable: [],
       });
       expect(page.trades).toHaveLength(2);
+      expect(page.tradesNextCursor).toBeNull(); // the bundle holds every trade (request #28)
       expect(page.detail).toMatchObject({ curve: { dbcPool: DBC_POOL }, token: { supply: 1_000_000 } });
       expect(page.detail).not.toHaveProperty('schemaVersion');
       expect(page.holders).not.toHaveProperty('schemaVersion');
@@ -651,6 +663,7 @@ describe('LaunchPageService', () => {
       // program's PDAs; the program's own fields stay null until it is.
       expect(page.revenueToken).toEqual({
         source: 'registry',
+        programId: PROGRAM_ID.toBase58(),
         address: revenueTokenAddress(PROGRAM_ID, VOTE).toBase58(),
         buybackEscrow: ESCROW,
         treasury: partnerTreasuryAddress(PROGRAM_ID).toBase58(),

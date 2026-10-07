@@ -5,8 +5,8 @@ program cluster's epoch and runs:
 
 | Order | Job | Instruction | Signer | Runs | Gate |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `ClaimMevJob` | — | — | each boundary (logs once) | no |
-| 2 | `UpdateScoreJob` | `update_score` | scorer (crank pays) | each boundary until done, then every 30 min | no |
+| 1 | `UpdateScoreJob` | `update_score` | scorer (crank pays) | each boundary until done, then every 30 min | no |
+| 2 | `ClaimMevJob` | — (reads Jito's accounts) | — | each boundary until Jito's claims land, at most `MEV_CLAIM_WAIT_MINUTES` | yes (bounded, no alert) |
 | 3 | `SweepJob` | `sweep` | crank | each boundary until done | yes |
 | 4 | `MarkDefaultJob` | `mark_default` | crank | each boundary until done | yes |
 | 5 | `AccrueJob` | `accrue` | crank | each boundary until done | yes |
@@ -48,9 +48,17 @@ identical simulation is repeated at most every 30 minutes). Every job is tested 
   `ALERT: swap is about to leave the 16-entry history unsettled`, and one whose epoch has no final value even though a
   later epoch is final logs `ALERT: swap can never settle on-chain` (never posted, vetoed or evicted: its collateral
   and the maker's are locked).
-- **ClaimMevJob**: not implemented. Jito's tip-distribution `claim` requires the `merkle_root_upload_authority` signer,
-  so claims are permissioned and Jito's own crank submits them; the validator's commission is claimed to the vote
-  account and the next sweep collects it. The precise TODO (verify the ClaimStatus PDA before sweeping) is in the file.
+- **ClaimMevJob**: a check, never a claim (Jito's tip-distribution `claim` requires the `merkle_root_upload_authority`
+  signer, so Jito's own crank claims for everyone; the validator's commission node has the vote account as claimant, so
+  the claimed lamports land in the vote account and the sweep collects them). For program epoch E and every Active or
+  Late position not swept yet it reads the TipDistributionAccount `["TIP_DISTRIBUTION_ACCOUNT", vote, E − 1]` under
+  `JITO_TIP_DISTRIBUTION_PROGRAM_ID` (one `getMultipleAccounts` for all positions) and, for those with a merkle root and
+  a commission above 0, the ClaimStatus `["CLAIM_STATUS", vote, tda]` (one more call). No TDA (not running Jito, or a
+  cluster without Jito such as devnet) or 0 % commission (the node is 0 and is never claimed; about half of Jito
+  validators) → done. No root yet, or no claimed ClaimStatus → `retry`: the sweep waits, at most
+  `MEV_CLAIM_WAIT_MINUTES` (360) after the runner first saw the epoch (epoch 1050's claims landed 1.2 to 3.1 hours after
+  the boundary), then it lets the sweep run with a warning: the commission arrives later and is swept next epoch. The
+  scorer runs before it, so scoring never waits. It has its own bounded wait, so it raises no `ALERT`.
 
 ## Scores and the hedged flag
 
@@ -95,6 +103,8 @@ is what disagrees (the program does not check the flag, it trusts the scorer).
 | `DRY_RUN` | false | simulate and log; send nothing |
 | `CRANK_POLL_SECONDS` | 60 | tick interval |
 | `CRANK_ALERT_AFTER_MINUTES` | 60 | alert on an unfinished gate |
+| `JITO_TIP_DISTRIBUTION_PROGRAM_ID` | `4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7` (mainnet) | where `ClaimMevJob` reads TDAs and ClaimStatus on the program's cluster |
+| `MEV_CLAIM_WAIT_MINUTES` | 360 | how long the sweep waits for Jito's claims after a boundary (0 = never waits) |
 
 ```bash
 pnpm --filter @epoch/cranks_app build

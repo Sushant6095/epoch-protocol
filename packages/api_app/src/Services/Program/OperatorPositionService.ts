@@ -13,7 +13,8 @@ import { type StoredProgramEvent } from '../../Lib/EventBus';
 import { isoIst } from '../../Lib/Stats';
 import { type ProgramAccount } from '../../Sources/EpochProgramSource';
 import { type ValidatorRow } from '../../types/Api.types';
-import { type OperatorPosition, type OperatorPositionSnapshot } from '../../types/Program.types';
+import { type OperatorPosition, type OperatorPositionSnapshot, type PositionMev } from '../../types/Program.types';
+import { type MevEpochRecord } from '../Validator/MevHistory';
 import { advanceStatus, averageRevenue, expectedRemit, limitRateBps } from './AdvanceView';
 import { PLANNED_POOL_PARAMS } from './PoolParamsView';
 import { big, bpsText, ceilDiv, chainOrder, minBig, payload, solText, toLamports, toSol } from './ProgramFormat';
@@ -23,6 +24,8 @@ import { loadValidatorNames, type ValidatorNames } from './ValidatorNames';
 const { MIN_REVENUE_HISTORY, REVENUE_WINDOW, DEFAULT_AFTER_LATE_EPOCHS } = PROGRAM_CONSTANTS;
 /** A closed advance stays on the Manage tab for this many epochs. */
 const RECENT_CLOSED_EPOCHS = 10;
+/** Mainnet epochs of MEV listed when the program's epochs are not mainnet's (or before onboarding). */
+const MEV_EPOCHS_SHOWN = 10;
 /** Most projected rows in a schedule (`epochsLeft` stays exact). */
 const MAX_PROJECTED_ROWS = 60;
 
@@ -85,6 +88,55 @@ export function sweepableEstimate(
 }
 
 /** The bond that unlocks a limit: `ceil(limit ÷ bond_multiplier)`; 0 when the bond cap is off. */
+const lamportsToSol = (lamports: bigint | null): number | null =>
+  lamports === null ? null : Math.round(Number(lamports) / 1e5) / 1e4;
+
+/**
+ * The position's MEV per mainnet epoch. On a mainnet program the list starts at onboarding and an epoch's commission
+ * counts as swept at X + 1 once that sweep ran and the claim had landed (ClaimMevJob holds the sweep for it); elsewhere
+ * the last 10 mainnet epochs are listed and nothing is marked swept.
+ */
+export function positionMev(
+  records: readonly MevEpochRecord[] | undefined,
+  options: { mainnet: boolean; onboardedEpoch: number | null; lastSweptEpoch: number | null },
+): PositionMev | null {
+  const tdas = (records ?? []).filter((r) => r.commissionBps !== null);
+  if (tdas.length === 0) return null;
+  const listed =
+    options.mainnet && options.onboardedEpoch !== null
+      ? tdas.filter((r) => r.epoch >= (options.onboardedEpoch as number))
+      : tdas.slice(-MEV_EPOCHS_SHOWN);
+  const epochs = listed.map((r) => {
+    const swept =
+      options.mainnet &&
+      r.claim === 'claimed' &&
+      options.lastSweptEpoch !== null &&
+      options.lastSweptEpoch >= r.epoch + 1;
+    return {
+      epoch: r.epoch,
+      tipsSol: lamportsToSol(r.tipsLamports),
+      final: r.rootUploaded === true,
+      validatorShareSol: lamportsToSol(r.validatorShareLamports),
+      estimated: r.validatorShareEstimated,
+      claimStatus: r.claim,
+      sweptIn: swept ? r.epoch + 1 : null,
+    };
+  });
+  // Not in the vote account yet (claim pending), plus on a mainnet program what was claimed but not swept yet.
+  const pending = epochs
+    .filter(
+      (e) => e.claimStatus === 'pending' || (options.mainnet && e.claimStatus === 'claimed' && e.sweptIn === null),
+    )
+    .reduce((sum, e) => sum + (e.validatorShareSol ?? 0), 0);
+  const newest = tdas[tdas.length - 1];
+  return {
+    commissionBps: newest.commissionBps,
+    lastEpoch: epochs.length > 0 ? epochs[epochs.length - 1].epoch : null,
+    epochs,
+    pendingSol: Math.round(pending * 1e4) / 1e4,
+  };
+}
+
 const bondFor = (limit: bigint, params: PoolParams): bigint =>
   params.bondMultiplier > 0 ? ceilDiv(limit, BigInt(params.bondMultiplier)) : 0n;
 
@@ -170,6 +222,7 @@ export class OperatorPositionService {
       creditStartsAfterEpochs: MIN_REVENUE_HISTORY,
       advance: null,
       covenants: covenants(params),
+      mev: positionMev(this.deps.mev?.(vote), { mainnet: false, onboardedEpoch: null, lastSweptEpoch: null }),
     };
   }
 
@@ -241,6 +294,11 @@ export class OperatorPositionService {
           })
         : null,
       covenants: covenants(params),
+      mev: positionMev(this.deps.mev?.(vote), {
+        mainnet: program.cluster === 'mainnet',
+        onboardedEpoch: Number(position.onboardedEpoch),
+        lastSweptEpoch: position.lastSweptEpoch > 0n ? Number(position.lastSweptEpoch) : null,
+      }),
     };
   }
 }

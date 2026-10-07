@@ -6,7 +6,9 @@ import { Logger } from '@epoch/logger';
 import { PostgresConnectionManager } from '@epoch/pg_models';
 import { type GrpcEndpoint, solamiUsage } from '@epoch/solana';
 
+import { MevScanner } from './Jito/MevScanner';
 import { PgIndexerStore } from './Repositories/IndexerStore';
+import { PgMevRepository } from './Repositories/MevRepository';
 import { rpcHost, SolanaRpc } from './Rpc/SolanaRpc';
 import { SlotStream } from './Streams/SlotStream';
 
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
       stride: config.RPC_SLOT_STRIDE,
       liveIntervalMs: config.LIVE_INDEX_INTERVAL_MS,
       liveSlotsKeep: config.LIVE_SLOTS_KEEP,
+      feeMixKeepEpochs: config.FEE_MIX_KEEP_EPOCHS,
     },
     { rpc, store: new PgIndexerStore(PostgresConnectionManager.getDb()) },
   );
@@ -54,6 +57,24 @@ async function main(): Promise<void> {
     stream.stop();
     await running.catch(() => undefined);
   });
+
+  // Jito MEV per validator (validator_mev_epochs) from mainnet's Jito programs, on the data RPC (bulk, hourly).
+  if (config.MEV_SCAN_INTERVAL_MINUTES > 0) {
+    const scanner = new MevScanner(
+      new SolanaRpc(config.DATA_RPC_URL),
+      new PgMevRepository(PostgresConnectionManager.getDb()),
+      {
+        intervalMinutes: config.MEV_SCAN_INTERVAL_MINUTES,
+        backfillEpochs: config.MEV_BACKFILL_EPOCHS,
+        spacingMs: config.MEV_SCAN_SPACING_MS,
+      },
+    );
+    const scanning = scanner.run();
+    GracefulShutdown.register('mev-scan', async () => {
+      scanner.stop();
+      await scanning.catch(() => undefined);
+    });
+  }
   await running;
 }
 

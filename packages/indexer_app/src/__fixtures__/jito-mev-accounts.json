@@ -1,0 +1,116 @@
+{
+ "source": "Solana mainnet-beta, read 2026-10-07 12:28 IST (epoch 1051) from https://api.mainnet-beta.solana.com: getMultipleAccounts / getProgramAccounts, base64. Unmodified account data. Trimmed to the accounts below; data unmodified.",
+ "rentLamports168": 1503680,
+ "tdas1050": [
+  {
+   "pubkey": "2CzcKdpHizZjxeb85XW7TUqfM9C6BLVwzSR1xzJmusnC",
+   "account": {
+    "lamports": 1503680,
+    "data": [
+     "VUBxxupeeHu7kgEmV+ubC72Y4BCcCKGhZRTfPyLflJ1dG54vBKrrbmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAWtRi8q3gHS8C3JP9yi7rXGPCOeUVGeZxstN72dDwVsTpisxVBkAAAA7CgAAAAAAAKYrMVQZAAAAAgAAAAAAAAAaBAAAAAAAABAnJAQAAAAAAAD/AAAAAAAAAAAAAAAA",
+     "base64"
+    ],
+    "owner": "4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7",
+    "executable": false,
+    "rentEpoch": 18446744073709552000,
+    "space": 168
+   }
+  },
+  {
+   "pubkey": "8LpeJwvZxerRJPMq7nbZgnHoGXJSvQa8JdGzhyAYs7nC",
+   "account": {
+    "lamports": 6336992,
+    "data": [
+     "VUBxxupeeHusjYV7jhs84vxY/Vt2UplT7Dzd+js56nZGiUlxWL9WqmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAdoE3VT3iWIv9NeP85iWmkJB25A7iEatsN8WTzKcCAolTkvX1xgAAADMJwAAAAAAAC6LjdcYAAAAsxkAAAAAAAAaBAAAAAAAALwCJAQAAAAAAAD+AAAAAAAAAAAAAAAA",
+     "base64"
+    ],
+    "owner": "4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7",
+    "executable": false,
+    "rentEpoch": 18446744073709552000,
+    "space": 168
+   }
+  },
+  {
+   "pubkey": "9K9MRQencRx8cZbtK9bvkdYgc3znvyUSjtAUP1TbCUDE",
+   "account": {
+    "lamports": 3153947,
+    "data": [
+     "VUBxxupeeHsjIFU0dV5nxdCFqwwc8+glw/1wfdrIYLFv4PBQqKsIF2ucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAUNvyyQmis2WTV/HN4QzefXqVEjrMtM6GTnAdHcSg1d416TSRyYAAAB/BAAAAAAAAHx2uUcmAAAArAMAAAAAAAAaBAAAAAAAAAAAJAQAAAAAAAD7AAAAAAAAAAAAAAAA",
+     "base64"
+    ],
+    "owner": "4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7",
+    "executable": false,
+    "rentEpoch": 18446744073709552000,
+    "space": 168
+   }
+  }
+ ],
+ "pfdas1050": [
+  {
+   "pubkey": "7DteLZUv7xTR8nf2Ym2YMa9igaXmD6c8UAeg36PYtkr5",
+   "account": {
+    "lamports": 1544320,
+    "data": [
+     "o7f+DHmJ6xv80T2ote3ZsSVQXwXdXsmLELwWrxqrmm7aHBZ2nE7pQmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAaGm1V7lSr6+Hj0IUy4NV1QUr38Sd6EfoqGRRpGI7jDVAAAAAAAAAAAUBwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaBAAAAAAAAIgTJAQAAAAAAAAAAAAAAAAAAP4AAAAAAAAAAAAAAAA=",
+     "base64"
+    ],
+    "owner": "Priority6weCZ5HwDn29NxLFpb7TDp2iLZ6XKc5e8d3",
+    "executable": false,
+    "rentEpoch": 18446744073709552000,
+    "space": 176
+   }
+  },
+  {
+   "pubkey": "8yxHjWu3Kkhbf3CuTW4CETA1RT8euoAjDP27pjZ5vUvq",
+   "account": {
+    "lamports": 7612003,
+    "data": [
+     "o7f+DHmJ6xu3iSbON8ns+nj+Tn0Lj2F1WrSq/kPZEzDXPC6XaCn3tmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjASEjHpe1Rvq+DKwWO/MAf7Do9Woky1xYjw+nt91Ty+D9ZJWpqgAAAADgAgAAAAAAAIH/TKoAAAAApwIAAAAAAAAaBAAAAAAAAAAAJAQAAAAAAABklamqAAAAAP4AAAAAAAAAAAAAAAA=",
+     "base64"
+    ],
+    "owner": "Priority6weCZ5HwDn29NxLFpb7TDp2iLZ6XKc5e8d3",
+    "executable": false,
+    "rentEpoch": 18446744073709552000,
+    "space": 176
+   }
+  },
+  {
+   "pubkey": "JDL1R5bcdkfsjfUsC7nW3Sx6pHRBdifhw1U8BddqRW7F",
+   "account": {
+    "lamports": 1565702,
+    "data": [
+     "o7f+DHmJ6xuUzUKh2GluNeumnXpPmYxUiGX0vrxEkflKTS7ioZGWmmucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjAW7aCmnCbKndkPivvnPguzFAyo5h+AlbecOTXW7Taf3WDz8BUgEAAABVAAAAAAAAAInrAFIBAAAASgAAAAAAAAAaBAAAAAAAAAAAJAQAAAAAAAAPPwFSAQAAAP8AAAAAAAAAAAAAAAA=",
+     "base64"
+    ],
+    "owner": "Priority6weCZ5HwDn29NxLFpb7TDp2iLZ6XKc5e8d3",
+    "executable": false,
+    "rentEpoch": 18446744073709552000,
+    "space": 176
+   }
+  }
+ ],
+ "tdas1051": [
+  {
+   "pubkey": "719ow3CJtkEN3YLzyjtq1pEM18aqbUqSDtGsvbnqDgHu",
+   "account": {
+    "lamports": 32921835444,
+    "data": [
+     "VUBxxupeeHsjIFU0dV5nxdCFqwwc8+glw/1wfdrIYLFv4PBQqKsIF2ucJ+m/LOKHG4ag5H9hrGWwAMMv79ycInlhV02BzkvjABsEAAAAAAAAAAAlBAAAAAAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+     "base64"
+    ]
+   }
+  }
+ ],
+ "claimStatuses": [
+  {
+   "address": "9ZGKd1g7dndQF7AaCp1Ged5qiHPCY4efCpvLM2jxF8m2",
+   "lamports": 1178560,
+   "data": "Frf5nfdflmABrI2Fe44bPOL8WP1bdlKZU+w83fo7Oep2RolJcVi/VqpVLmFu4a41/gRtUJSslbOd2LvrvcwQIpsDTz19LVy1cERDEBsAAAAAwFkwvQEAAAAkBAAAAAAAAP8AAAAAAAA="
+  },
+  {
+   "address": "FqC1LuXNLeFuCzSFNUnCF3XohHY3dyvL8GrcqQXUpyho",
+   "lamports": 1178560,
+   "data": "Frf5nfdflmABu5IBJlfrmwu9mOAQnAihoWUU3z8i35SdXRueLwSq625VLmFu4a41/gRtUJSslbOd2LvrvcwQIpsDTz19LVy1cDMmEBsAAAAAF57UixgAAAAkBAAAAAAAAP4AAAAAAAA="
+  }
+ ]
+}

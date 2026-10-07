@@ -254,7 +254,8 @@ describe('buildLaunchItem', () => {
       backingRatio: null,
     });
     expect(item.detail.curve.valuePerTokenSol).toBe(0.00072);
-    expect(item.detail.token).toMatchObject({ burned: 0, holders: 0, metadataImmutable: false });
+    // Upcoming: the mint, holders and pool are not readable yet, so none of them is stated (request #32).
+    expect(item.detail.token).toMatchObject({ burned: null, holders: null, metadataImmutable: null });
   });
 
   it('ends after the term, keeping the last price', () => {
@@ -296,7 +297,7 @@ describe('buildLaunchItem', () => {
     });
     expect(item.summary.status).toBe('upcoming');
     expect(item.notes).toContain('rKEST: the curve pool is not on devnet yet.');
-    expect(item.detail.token.burned).toBe(0);
+    expect(item.detail.token.burned).toBeNull();
   });
 
   it('serves 0 share revenue and no yield or backing while the revenue is unknown', () => {

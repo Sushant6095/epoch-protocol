@@ -1,4 +1,4 @@
-import { type LiveSlotPayload } from '@epoch/pg_models';
+import { type LiveSlotFeesPayload, type LiveSlotPayload } from '@epoch/pg_models';
 import { type SolamiUsageReport, solamiUsage } from '@epoch/solana';
 
 import { KeyedSnapshotCache } from '../../Lib/KeyedSnapshotCache';
@@ -6,10 +6,12 @@ import { isoIst, LAMPORTS_PER_SOL, round } from '../../Lib/Stats';
 import { type EpochInfo } from '../../Sources/SolanaDataSource';
 import {
   type FeeDistribution,
+  type LiveEpochFees,
   type LiveEstimate,
   type LiveLeader,
   type LiveLeaders,
   type LiveSlot,
+  type LiveSlotFees,
   type LiveSlots,
   type LiveSource,
   type LiveStreamStatus,
@@ -20,7 +22,14 @@ import {
   type SolamiUsageResponse,
 } from '../../types/Live.types';
 import { EMPTY_NAMES, type NameIndex } from '../Activity/ValidatorNames';
-import { type FeeIndexLiveRow, type LeaderStat, type LiveRepository, type LiveSlotRow } from './LiveRepository';
+import {
+  type EpochFeeMixRow,
+  type FeeIndexLiveRow,
+  type LeaderStat,
+  type LiveRepository,
+  type LiveSlotRow,
+  type SlotFeeMixRow,
+} from './LiveRepository';
 
 const SLOT_SECONDS = 0.4;
 /** A watermark this far behind the processed slot means gap fill or a backfill is running. */
@@ -44,6 +53,64 @@ export interface LiveServiceDeps {
   /** SOLAMI_USAGE_STALE_SECONDS × 1000: a component's counters older than this are shown as stale. Default 120 s. */
   usageStaleMs?: number;
   now?: () => number;
+}
+
+const FEE_BASES: readonly LiveSlotFees['basis'][] = ['counted', 'reward', 'estimated'];
+const feeBasis = (basis: string): LiveSlotFees['basis'] =>
+  (FEE_BASES as readonly string[]).includes(basis) ? (basis as LiveSlotFees['basis']) : 'estimated';
+
+/** A NOTIFY payload's fee composition as the API types it (an unknown basis reads as `estimated`). */
+export function slotFees(fees: LiveSlotFeesPayload): LiveSlotFees {
+  return {
+    baseLamports: fees.baseLamports,
+    priorityLamports: fees.priorityLamports,
+    tipsLamports: fees.tipsLamports,
+    tipTxs: fees.tipTxs,
+    rewardLamports: fees.rewardLamports,
+    basis: feeBasis(fees.basis),
+  };
+}
+
+/** A slot_fee_mix row as the API types it (the same shape as the WS frames). */
+export function slotFeesFromRow(row: SlotFeeMixRow): LiveSlotFees {
+  return {
+    baseLamports: Number(row.baseFeeLamports),
+    priorityLamports: Number(row.priorityFeeLamports),
+    tipsLamports: Number(row.tipLamports),
+    tipTxs: row.tipTxs,
+    rewardLamports: row.feeRewardLamports === null ? null : Number(row.feeRewardLamports),
+    basis: feeBasis(row.baseFeeBasis),
+  };
+}
+
+/** An epoch_fee_mix rollup: totals, each kind's share of what the blocks paid, and SOL for display. */
+export function epochFees(row: EpochFeeMixRow): LiveEpochFees {
+  const base = Number(row.baseFeeLamports);
+  const priority = Number(row.priorityFeeLamports);
+  const tips = Number(row.tipLamports);
+  const total = base + priority + tips;
+  return {
+    epoch: row.epoch,
+    blocks: row.blocks,
+    firstSlot: row.firstSlot,
+    lastSlot: row.lastSlot,
+    baseLamports: base,
+    priorityLamports: priority,
+    tipsLamports: tips,
+    tipTxs: row.tipTxs,
+    rewardLamports: Number(row.feeRewardLamports),
+    estimatedBlocks: row.estimatedBlocks,
+    totalSol: round(total / LAMPORTS_PER_SOL, 3),
+    sharePct:
+      total > 0
+        ? {
+            base: round((base / total) * 100, 2),
+            priority: round((priority / total) * 100, 2),
+            tips: round((tips / total) * 100, 2),
+          }
+        : null,
+    updatedAt: isoIst(row.updatedAt),
+  };
 }
 
 /** Stake-weighted median of leader medians (same rule as indexer_app's FeeProcessor, ties broken by key). */
@@ -96,7 +163,14 @@ export class LiveService {
     const [row, info] = await Promise.all([this.deps.repo.latestLive(), this.deps.epochInfo().catch(() => null)]);
     const live = this.isLive(row);
     const currentEpoch = info?.epoch ?? row?.epoch ?? null;
-    const lastFinal = currentEpoch !== null ? await this.deps.repo.lastFinal(currentEpoch) : null;
+    const [lastFinal, fees, lastEpochFees] =
+      currentEpoch !== null
+        ? await Promise.all([
+            this.deps.repo.lastFinal(currentEpoch),
+            this.deps.repo.epochFees(currentEpoch),
+            this.deps.repo.epochFees(currentEpoch - 1),
+          ])
+        : [null, null, null];
     // A cached read is moved forward by the time since it was taken (slots are 400 ms), so a stalled indexer shows
     // its lag growing instead of a frozen tip.
     const rpcTip = info
@@ -121,7 +195,7 @@ export class LiveService {
       schemaVersion: 1,
       kind: 'real',
       asOf: isoIst(row?.updatedAt ?? new Date(this.now())),
-      source: 'indexer_app via Postgres (fee_index_live, epoch_index)',
+      source: 'indexer_app via Postgres (fee_index_live, epoch_index, epoch_fee_mix)',
       live,
       dataSource: this.dataSourceLabel(source, row?.endpoint ?? null),
       stream: this.stream(row, live),
@@ -139,6 +213,8 @@ export class LiveService {
             computedAt: isoIst(lastFinal.computedAt),
           }
         : null,
+      fees: fees ? epochFees(fees) : null,
+      lastEpochFees: lastEpochFees ? epochFees(lastEpochFees) : null,
       unit: 'µL/CU',
       ...(row ? {} : { note: 'The indexer has not written anything yet: start indexer_app (see its README).' }),
     };
@@ -154,7 +230,7 @@ export class LiveService {
       schemaVersion: 1,
       kind: 'real',
       asOf: isoIst(row?.updatedAt ?? rows[0]?.recordedAt ?? new Date(this.now())),
-      source: 'indexer_app via Postgres (live_slots)',
+      source: 'indexer_app via Postgres (live_slots, slot_fee_mix)',
       live: this.isLive(row),
       slots: rows.map((r) => this.slotFromRow(r, names)),
     };
@@ -385,6 +461,7 @@ export class LiveService {
       failedTxs: payload.failedTxs,
       time: payload.blockTime !== null ? isoIst(new Date(payload.blockTime * 1000)) : null,
       source: payload.source,
+      fees: payload.fees ? slotFees(payload.fees) : null,
     };
   }
 
@@ -408,6 +485,7 @@ export class LiveService {
       failedTxs: r.failedTxs,
       time: ist(r.blockTime),
       source: r.source,
+      fees: r.feeMix ? slotFeesFromRow(r.feeMix) : null,
     };
   }
 

@@ -2,6 +2,7 @@ import { sleep } from '@epoch/common';
 import {
   decodeLivePayload,
   type EpochDb,
+  epochFeeMix,
   epochIndex,
   feeIndexLive,
   LIVE_NOTIFY_CHANNEL,
@@ -12,12 +13,15 @@ import {
   PgListener,
   PostgresConnectionManager,
   runMigrations,
+  slotFeeMix,
   slotFees,
 } from '@epoch/pg_models';
 import { asc, count, eq, TransactionRollbackError } from 'drizzle-orm';
 
 import { type BlockFeesResult } from '../Blocks/BlockFees';
-import { PgIndexerStore, type SlotRecord } from './IndexerStore';
+import { type BlockFeeMix } from '../Blocks/FeeMix';
+import { MemoryIndexerStore } from './MemoryIndexerStore';
+import { PgIndexerStore, rollUpFeeMix, type SlotRecord } from './IndexerStore';
 
 const TEST_DB = process.env.TEST_DATABASE_URL;
 const LEADER = '5Us18hLZPXJTS4QVuGSsUw137Dyd2tgBaem24Xsf5nBS';
@@ -26,6 +30,9 @@ const LEADER = '5Us18hLZPXJTS4QVuGSsUw137Dyd2tgBaem24Xsf5nBS';
 const EPOCH = 7_101;
 const S = EPOCH * 432_000;
 const NOTIFY_EPOCH = 7_190;
+/** slot_fee_mix rows only these tests write (the table is new in migration 0004). */
+const MIX_EPOCH = 7_301;
+const MS = MIX_EPOCH * 432_000;
 const NS = NOTIFY_EPOCH * 432_000;
 
 const fees = (slot: number, median: number | null): BlockFeesResult => ({
@@ -46,6 +53,70 @@ const record = (
   source: SlotRecord['source'] = 'grpc',
   epoch = EPOCH,
 ): SlotRecord => ({ fees: fees(slot, median), epoch, blockTime: 1_791_031_700, source });
+
+const mix = (base: bigint, tips: bigint, basis: BlockFeeMix['baseFeeBasis'] = 'counted'): BlockFeeMix => ({
+  baseLamports: base,
+  priorityLamports: 1_000_000n,
+  tipLamports: tips,
+  tipTxs: tips > 0n ? 2 : 0,
+  voteTxs: 600,
+  nonVoteTxs: 300,
+  feeRewardLamports: 1_000_000n + base / 2n,
+  baseFeeBasis: basis,
+  rewardMatches: basis === 'counted' ? true : null,
+});
+
+const mixRecord = (slot: number, epoch: number, base: bigint, tips: bigint, basis?: BlockFeeMix['baseFeeBasis']) => ({
+  ...record(slot, 5_000, 'grpc', epoch),
+  feeMix: mix(base, tips, basis),
+});
+
+describe('rollUpFeeMix', () => {
+  it('sums rows per epoch with block counts, slot range and estimated blocks', () => {
+    const row = (slot: number, epoch: number, basis: string) => ({
+      slot,
+      epoch,
+      baseFeeLamports: 5_000n,
+      priorityFeeLamports: 7n,
+      tipLamports: 3n,
+      tipTxs: 1,
+      voteTxs: 2,
+      nonVoteTxs: 4,
+      feeRewardLamports: basis === 'estimated' ? null : 2_507n,
+      baseFeeBasis: basis,
+    });
+    expect(rollUpFeeMix([row(10, 1, 'counted'), row(8, 1, 'estimated'), row(20, 2, 'reward')])).toEqual([
+      {
+        epoch: 1,
+        blocks: 2,
+        baseFeeLamports: 10_000n,
+        priorityFeeLamports: 14n,
+        tipLamports: 6n,
+        tipTxs: 2,
+        voteTxs: 4,
+        nonVoteTxs: 8,
+        feeRewardLamports: 2_507n,
+        estimatedBlocks: 1,
+        firstSlot: 8,
+        lastSlot: 10,
+      },
+      expect.objectContaining({ epoch: 2, blocks: 1, firstSlot: 20, lastSlot: 20 }),
+    ]);
+  });
+});
+
+describe('MemoryIndexerStore fee mix', () => {
+  it('rolls each slot up once and prunes old epochs', async () => {
+    const store = new MemoryIndexerStore();
+    await store.writeBatch({ records: [mixRecord(1, 1, 10_000n, 5n), mixRecord(2, 1, 20_000n, 0n)], notify: [] });
+    await store.writeBatch({ records: [mixRecord(2, 1, 99_999n, 9n), mixRecord(3, 2, 5_000n, 1n)], notify: [] });
+    expect(store.epochFeeMix.get(1)).toMatchObject({ blocks: 2, baseFeeLamports: 30_000n, tipLamports: 5n, tipTxs: 2 });
+    expect(store.epochFeeMix.get(2)).toMatchObject({ blocks: 1, baseFeeLamports: 5_000n });
+    expect(await store.pruneFeeMix(1)).toBe(2);
+    expect([...store.feeMix.keys()]).toEqual([3]);
+    expect(store.epochFeeMix.get(1)?.blocks).toBe(2);
+  });
+});
 
 const LIVE: LiveIndexPayload = {
   t: 'index',
@@ -129,6 +200,67 @@ const SLOT: LiveSlotPayload = {
       // Replayed slots are written once.
       await store.writeBatch({ records: [record(S + 1, 1)], notify: [] });
       expect((await store.epochRows(EPOCH))[0].medianCuPrice).toBe(10_000);
+    }));
+
+  it('writes slot_fee_mix and adds each slot to epoch_fee_mix exactly once', () =>
+    inRollback(async (store, db) => {
+      await store.writeBatch({
+        records: [mixRecord(MS + 1, MIX_EPOCH, 3_300_000n, 6_287_601n), mixRecord(MS + 2, MIX_EPOCH, 3_400_000n, 0n)],
+        notify: [],
+      });
+      // A replay of slot 2 (different figures, as a second source might report) and a new slot, one of them estimated.
+      await store.writeBatch({
+        records: [
+          mixRecord(MS + 2, MIX_EPOCH, 9_999_999n, 1n),
+          mixRecord(MS + 5, MIX_EPOCH, 3_000_000n, 1_000n, 'estimated'),
+          record(MS + 6, null, 'grpc', MIX_EPOCH),
+        ],
+        notify: [],
+      });
+      const rows = await db
+        .select()
+        .from(slotFeeMix)
+        .where(eq(slotFeeMix.epoch, MIX_EPOCH))
+        .orderBy(asc(slotFeeMix.slot));
+      expect(rows.map((r) => [r.slot, r.baseFeeLamports, r.tipLamports, r.baseFeeBasis])).toEqual([
+        [MS + 1, 3_300_000n, 6_287_601n, 'counted'],
+        [MS + 2, 3_400_000n, 0n, 'counted'],
+        [MS + 5, 3_000_000n, 1_000n, 'estimated'],
+      ]);
+      const [epoch] = await db.select().from(epochFeeMix).where(eq(epochFeeMix.epoch, MIX_EPOCH));
+      expect(epoch).toMatchObject({
+        blocks: 3,
+        baseFeeLamports: 9_700_000n,
+        priorityFeeLamports: 3_000_000n,
+        tipLamports: 6_288_601n,
+        tipTxs: 4,
+        voteTxs: 1_800,
+        nonVoteTxs: 900,
+        feeRewardLamports: 3_000_000n + 4_850_000n,
+        estimatedBlocks: 1,
+        firstSlot: MS + 1,
+        lastSlot: MS + 5,
+      });
+    }));
+
+  it('prunes slot_fee_mix to the newest epochs and keeps epoch_fee_mix', () =>
+    inRollback(async (store, db) => {
+      await store.writeBatch({
+        records: [
+          mixRecord(MS + 10, MIX_EPOCH, 5_000n, 0n),
+          mixRecord(MS + 432_000 + 10, MIX_EPOCH + 1, 5_000n, 0n),
+          mixRecord(MS + 864_000 + 10, MIX_EPOCH + 2, 5_000n, 0n),
+        ],
+        notify: [],
+      });
+      expect(await store.pruneFeeMix(2)).toBeGreaterThanOrEqual(1);
+      const left = await db.select({ epoch: slotFeeMix.epoch }).from(slotFeeMix).orderBy(asc(slotFeeMix.epoch));
+      expect(left.map((r) => r.epoch).filter((e) => e >= MIX_EPOCH && e <= MIX_EPOCH + 2)).toEqual([
+        MIX_EPOCH + 1,
+        MIX_EPOCH + 2,
+      ]);
+      const totals = await db.select().from(epochFeeMix).where(eq(epochFeeMix.epoch, MIX_EPOCH));
+      expect(totals[0]?.blocks).toBe(1);
     }));
 
   it('rolls a failed batch back entirely (no rows, cursor unchanged)', () =>

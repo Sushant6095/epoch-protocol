@@ -3,6 +3,7 @@ export * from './ConnectionManager';
 export * from './EpochClock';
 export * from './EpochRewards';
 export * from './GrpcStream';
+export * from './Jito';
 export * from './keypair';
 export * from './PrebuiltTransaction';
 export * from './pubkeys';

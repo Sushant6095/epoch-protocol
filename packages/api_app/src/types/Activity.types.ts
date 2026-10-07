@@ -19,6 +19,11 @@ export interface ActivityEvent {
   unit: 'SOL' | 'µL/CU' | 'points';
   /** Transaction signature for the explorer link (on the program's cluster, devnet for now); null for a Predict call. */
   signature: string | null;
+  /**
+   * Kind `buyback` only (request #29): the revenue token's mint the event names (buybacks, redemptions, treasury
+   * claims…), so a token page can react to its own events; null when the event names none. Absent on other kinds.
+   */
+  mint?: string | null;
 }
 
 export interface ActivityFeed extends Meta {

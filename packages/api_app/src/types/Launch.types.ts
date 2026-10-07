@@ -67,12 +67,15 @@ export interface LaunchDetail extends Meta {
   launch: LaunchSummary;
   token: {
     supply: number;
-    burned: number;
-    holders: number;
+    /** Supply − the mint's current supply; null when the mint could not be read (request #32: never a guess). */
+    burned: number | null;
+    /** Wallets holding the token; null when the holders could not be read (never "0 holders" as a fact). */
+    holders: number | null;
     decimals: number;
     /** Fixed supply: no mint authority (plan F13). */
     mintAuthority: null;
-    metadataImmutable: boolean;
+    /** The curve pool's token update authority is immutable; null when the pool could not be read (or is not live). */
+    metadataImmutable: boolean | null;
   };
   curve: {
     dbcPool: string | null;

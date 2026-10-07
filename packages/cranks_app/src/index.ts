@@ -67,6 +67,7 @@ async function main(): Promise<void> {
           },
         }
       : undefined,
+    { tipDistributionProgramId: config.JITO_TIP_DISTRIBUTION_PROGRAM_ID, waitMinutes: config.MEV_CLAIM_WAIT_MINUTES },
   );
 
   const clock = await chain.clock();

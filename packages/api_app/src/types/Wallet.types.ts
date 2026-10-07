@@ -33,6 +33,40 @@ export interface ValidatorRevenue {
   netEstimate: number;
 }
 
+/**
+ * The validator's commission node in an epoch's Jito tip distribution: `claimed` (ClaimStatus on mainnet), `pending`
+ * (commission > 0, not claimed yet: claims land a few hours after the epoch ends), `none` (0 % commission: the node is 0
+ * and is never claimed; about half of Jito validators, 317 of 635 in epoch 1050), `expired` (closed unclaimed).
+ */
+export type MevClaimStatus = 'claimed' | 'pending' | 'none' | 'expired';
+
+/** One epoch of a validator's Jito MEV (GET /v1/validators/:vote `mevHistory`). */
+export interface MevHistoryRow {
+  epoch: number;
+  /** `chain`: indexer_app's scan of the mainnet TipDistributionAccount; `kobe`: Jito Kobe (older epochs, no claims). */
+  source: 'chain' | 'kobe';
+  /** MEV commission in bps (0–10,000); null for a chain row with only a priority-fee distribution account. */
+  commissionBps: number | null;
+  /**
+   * SOL: the epoch's tips from its merkle root when `final`; before the root is uploaded, the tips so far (the TDA's
+   * balance less its rent-exempt minimum as read from the RPC: 1,503,680 lamports in Oct 2026, never hardcoded).
+   */
+  tipsSol: number | null;
+  /** The merkle root is uploaded: `tipsSol` is the epoch's total. */
+  final: boolean;
+  /** The validator's commission, SOL: the claimed amount, else ⌊tips × bps ÷ 10,000⌋ with `estimated: true`. */
+  validatorShareSol: number | null;
+  estimated: boolean | null;
+  claimStatus: MevClaimStatus | null;
+  /** Slot of the claim (chain rows). */
+  claimedSlot: number | null;
+  /** Priority-fee distribution (Jito's block-reward sharing) where the validator has one; null for almost everyone. */
+  pfCommissionBps: number | null;
+  pfTransferredSol: number | null;
+  /** The priority-fee distribution's validator node: claimed | pending | none (a 0 node); null without one. */
+  pfClaimStatus: MevClaimStatus | null;
+}
+
 export interface ValidatorProfile extends Meta {
   name: string;
   vote: string;
@@ -74,6 +108,8 @@ export interface ValidatorProfile extends Meta {
   voteCreditsByEpoch: { max: number; rows: [number, number][] };
   /** [epoch, SOL] Jito tips the validator's stake earned per finished epoch, oldest first; up to 64 epochs. */
   jitoTipsTotalByEpochSol: [number, number][];
+  /** Jito MEV per epoch, oldest first: mainnet TDAs and claims (last 20 epochs), Jito Kobe before that. */
+  mevHistory: MevHistoryRow[];
   /** (API) the last finished epoch (the kit's fixture called this `revenueEpoch1043Sol`). */
   revenueEpoch: number;
   revenueLastEpochSol: ValidatorRevenue;

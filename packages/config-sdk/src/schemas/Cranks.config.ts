@@ -40,6 +40,10 @@ export const CranksConfigSchema = z.object({
   CRANK_POLL_SECONDS: z.coerce.number().int().min(5).max(3_600).default(60),
   /** A blocking boundary job (sweep, mark default, accrue) still unfinished this long after the boundary logs an error. */
   CRANK_ALERT_AFTER_MINUTES: z.coerce.number().int().min(1).max(1_440).default(60),
+  /** Jito's tip-distribution program on the Epoch program's cluster (ClaimMevJob reads its accounts). */
+  JITO_TIP_DISTRIBUTION_PROGRAM_ID: z.string().min(32).max(44).default('4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7'),
+  /** The sweep waits at most this long after the boundary for Jito to claim each validator's MEV commission. */
+  MEV_CLAIM_WAIT_MINUTES: z.coerce.number().int().min(0).max(1_440).default(360),
 });
 
 export type CranksConfig = z.infer<typeof CranksConfigSchema>;

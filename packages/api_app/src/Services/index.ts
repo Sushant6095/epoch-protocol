@@ -18,6 +18,7 @@ import { InflationRewards } from './InflationRewards';
 import { MarketData } from './MarketData';
 import { NetworkService } from './NetworkService';
 import { MemoryEventStore, PgEventStore, type ProgramEventStore } from './Program/ProgramEventStore';
+import { MevHistoryLoader, PgMevHistoryStore } from './Validator/MevHistory';
 import { ValidatorHistoryRecorder } from './Validator/ValidatorHistoryRecorder';
 import { PgValidatorHistoryStore } from './Validator/ValidatorHistoryStore';
 import { ValidatorProfileService } from './Validator/ValidatorProfileService';
@@ -40,6 +41,8 @@ export interface ApiServices {
   labels: DelegatorLabels;
   /** Commission and stake per validator per epoch (Postgres); `start()` only with DATABASE_URL. */
   history: ValidatorHistoryRecorder;
+  /** indexer_app's Jito MEV scan (validator_mev_epochs), reloaded every 10 minutes; `start()` only with DATABASE_URL. */
+  mev: MevHistoryLoader;
   /** GET /v1/validators/:vote */
   profiles: ValidatorProfileService;
   /** Every validator's inflation commission for the last 10 epochs, read in the background for the profiles. */
@@ -93,10 +96,16 @@ export function getServices(): ApiServices {
   const voteRewards = new InflationRewards(solana);
   const stakeRewards = new InflationRewards(solana, 200_000);
 
+  // Jito MEV per validator from indexer_app's scan of mainnet's tip distribution accounts (request #5b).
+  const mev = new MevHistoryLoader(
+    dbAvailable() ? new PgMevHistoryStore(PostgresConnectionManager.getDb()) : undefined,
+    async () => (await market.epochInfo.get()).epoch,
+  );
   const validators = new ValidatorTable(
     market,
     () => scan.latest,
     () => history.latest,
+    () => mev.latest,
   );
   const program = new EpochProgramSource(loadConfig(EpochProgramConfigSchema));
   services = {
@@ -110,6 +119,7 @@ export function getServices(): ApiServices {
     scan,
     labels,
     history,
+    mev,
     profiles: new ValidatorProfileService(
       market,
       solana,
@@ -120,6 +130,7 @@ export function getServices(): ApiServices {
       kobeApi,
       () => history.latest,
       new Set(config.FOUNDATION_AUTHORITIES.map(keyBase64)),
+      () => mev.latest,
     ),
     voteRewards: new VoteRewardsWarmer(market, voteRewards),
     wallets: new WalletStakeService(market, solana, validators, stakeRewards, () => scan.latest),

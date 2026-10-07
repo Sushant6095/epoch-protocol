@@ -147,6 +147,7 @@ the vote's, not the mint's).
   "market": { "…": "as GET /market" },
   "revenueToken": { "source": "program", "registeredOnChain": true, "…": "see 6. Revenue-token terms" },
   "trades": ["…the newest 50, as GET /trades…"],
+  "tradesNextCursor": null,
   "candles": { "interval": "15m", "basis": "trades", "candles": ["…24 hours of 15-minute candles…"] },
   "holders": { "count": { "all": 2, "buyers": 1 }, "top": ["…"], "freshness": { "…": "…" } },
   "fees": { "partner": { "…": "…" }, "creator": { "…": "…" }, "lp": { "…": "…" }, "leftover": { "…": "…" },
@@ -168,6 +169,14 @@ the vote's, not the mint's).
   price, market cap, raise and status.
 - `revenueToken` holds the terms: the program's own `RevenueToken` account once the validator's operator registered the
   token; otherwise the launch record's terms. See [6. Revenue-token terms](#6-revenue-token-terms).
+- `tradesNextCursor` (request #28) is `/trades`' own `nextCursor` for the bundled trades: pass it as `before` to
+  `GET /v1/launches/:mint/trades` for "Load older" without a first `/trades?limit=100` call. `null` when the bundle
+  holds every trade (fewer than 50) or the trades could not be read.
+- `detail.token.holders`, `detail.token.burned` and `detail.token.metadataImmutable` are `null` when the holders, the
+  mint or the curve pool could not be read (request #32), and for an upcoming token whose pool is not on chain yet:
+  show "—", never "0 holders" or "Mutable" as facts.
+- `revenueToken.programId` (request #26): the Epoch program id on `network`, for instructions the page builds itself
+  (redeem); `null` when the API has none.
 - `holders` and `fees` are `null` when they could not be read (they are listed in `unavailable`). `fees` is also `null`
   before the curve exists. When the market cannot be read, it falls back to an upcoming-looking block with
   `freshness.asOf: null`.
@@ -597,13 +606,14 @@ and every ingested `BuybackExecuted` event for the mint, newest first (at most 2
 {
   "schemaVersion": 1, "kind": "real", "asOf": "2026-10-04T11:49:53+05:30",
   "source": "Epoch program (localnet)", "network": "localnet",
+  "programId": "HQRKb1MYw1JHbLVYoLke5bNuL4zJJ5VQFAzigdNn8Jff",
   "mint": "G1MVHrAaAyPPnRNe6YQadsdmHTvdduxyXBtxj9kGpYEq",
   "revenueToken": "3mbboR1eVR4EdUtt64sMMpT4NGe9a466cRdgRZDyLeTd",
   "vote": "F8bkJtsc9HhPj9spAQXzGaVYUCtdUMwZVevSvR68d3jB",
   "venue": "dbc",
   "term": { "shareBps": 500, "termEpochs": 10, "startEpoch": 1, "endEpoch": 10 },
   "escrow": { "address": "9wjpf4Uw2w1BQ3SC3mygBz7tUDNi7Fwpu4WRSAL9PHva", "balanceSol": 0.1, "mode": "buyback" },
-  "schedule": { "slicesPerEpoch": 12, "windowSlots": 9000, "slicesDoneThisEpoch": 0, "paused": false,
+  "schedule": { "currentEpoch": 0, "slicesPerEpoch": 12, "windowSlots": 9000, "slicesDoneThisEpoch": 0, "paused": false,
                 "nextSlice": { "epoch": 0, "slice": 0, "inSlots": 0, "etaSeconds": 0, "waitsForSweep": false } },
   "totals": { "escrowedSol": 0, "spentSol": 0, "burned": 0, "redeemed": 0, "redeemedSol": 0, "buybacks": 0 },
   "buybacks": [],
@@ -619,12 +629,13 @@ and every ingested `BuybackExecuted` event for the mint, newest first (at most 2
 
 | Field | Use |
 | --- | --- |
+| `programId` | The Epoch program id on `network` (request #26), for the Trade card's redeem and other instructions the page builds; `null` when the API has no program id. |
 | `revenueToken`, `vote` | `null` when no validator registered the mint. Every other field is then empty, and `note` says "No validator has registered this mint as a revenue token." |
 | `venue` | `dbc` on the curve, `damm-v2` once the program synced the graduation |
 | `term` | `shareBps`, `termEpochs`, `startEpoch`, `endEpoch` (the last epoch whose share is bought back). Immutable. |
 | `escrow.balanceSol` | SOL waiting to be spent, above rent |
 | `escrow.mode` | `redeem` once holders can burn tokens for SOL: after the term, or during it if the pool admin enabled the fallback |
-| `schedule` | `slicesPerEpoch` (12), `windowSlots` (9,000, about an hour), `slicesDoneThisEpoch`, `paused`, and `nextSlice`: `epoch`, `slice`, `inSlots`, `etaSeconds` at 0.4 s a slot, and `waitsForSweep` (true in the term until that epoch's sweep pays the share). `nextSlice` is null once the term ended and the escrow is spent. |
+| `schedule` | `currentEpoch` (request #27: the program cluster's epoch now; `term.endEpoch − currentEpoch + 1` epochs of the term are left while in it), `slicesPerEpoch` (12), `windowSlots` (9,000, about an hour), `slicesDoneThisEpoch`, `paused`, and `nextSlice`: `epoch`, `slice`, `inSlots`, `etaSeconds` at 0.4 s a slot, and `waitsForSweep` (true in the term until that epoch's sweep pays the share). `nextSlice` is null once the term ended and the escrow is spent. |
 | `totals` | `escrowedSol`, `spentSol`, `burned` and `redeemed` (token UI units), `redeemedSol`, `buybacks` (count) |
 | `buybacks[]` | `LaunchBuyback` rows: `epoch`, `slice` of `slices`, `solIn`, `tokensBurned`, `priceSol` (SOL per token paid, fees included), `venue`, `signature`. Build the explorer link on the program's cluster (`network`). |
 | `treasury` | Epoch's treasury claims for the mint, present for every mint (see [Treasury claims](#treasury-claims)) |
@@ -661,7 +672,9 @@ How the program runs it:
   (decision 22).
 
 The activity feed (`/v1/activity` and the WS `activity` channel, kind `buyback`) also shows each registration, share
-swept, buyback, graduation sync, redemption and close, across all tokens.
+swept, buyback, graduation sync, redemption and close, across all tokens. Each `buyback` event carries `mint` (request
+#29): the revenue token's mint when the event names one (buybacks, redemptions, treasury claims), else `null`; a token
+page re-reads `/buybacks` when `mint` is its own.
 
 ## 6. Revenue-token terms
 
@@ -674,6 +687,7 @@ Registered (`rLOC`):
 ```json
 {
   "source": "program",
+  "programId": "HQRKb1MYw1JHbLVYoLke5bNuL4zJJ5VQFAzigdNn8Jff",
   "address": "3mbboR1eVR4EdUtt64sMMpT4NGe9a466cRdgRZDyLeTd",
   "buybackEscrow": "9wjpf4Uw2w1BQ3SC3mygBz7tUDNi7Fwpu4WRSAL9PHva",
   "treasury": "CgSSZYu6o2qys6kGBYBuJfuJAHmMyDqaeXBNa82B1ECP",
@@ -769,8 +783,8 @@ Data frames (`at` is when the server sent it, IST):
 - Frames follow the feed's `ingest.mode`: about a second after a transaction confirms when it is pushed (`grpc`,
   `websocket`), up to one poll behind on `polling`. Each row is sent once: the push and the backstop poll dedupe on
   (signature, event index).
-- There is no buyback channel. Buyback events are on the protocol-wide `activity` channel (kind `buyback`), without
-  the mint.
+- There is no buyback channel. Buyback events are on the protocol-wide `activity` channel (kind `buyback`), with
+  `mint` (request #29): filter on it to re-read `/buybacks` on your own token's slices instead of every 60 s.
 
 ## States
 

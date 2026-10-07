@@ -2,6 +2,7 @@ import { type Connection, PublicKey } from '@solana/web3.js';
 
 import { type StoredProgramEvent } from '../../Lib/EventBus';
 import { type EpochProgramSource } from '../../Sources/EpochProgramSource';
+import { type MevEpochRecord } from '../Validator/MevHistory';
 import { type ValidatorTableData } from '../ValidatorTable';
 import { type ProgramEventStore } from './ProgramEventStore';
 
@@ -62,6 +63,8 @@ export interface ProgramServiceDeps {
   history: PoolHistory;
   /** The program cluster's EpochRewards sysvar `active` flag; null when it can't be read. */
   rewardsActive: () => Promise<boolean | null>;
+  /** indexer_app's Jito MEV scan for a vote account, oldest first (request #5b); undefined without it. */
+  mev?: (vote: string) => readonly MevEpochRecord[] | undefined;
   now?: () => Date;
 }
 

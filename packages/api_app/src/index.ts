@@ -100,6 +100,7 @@ async function main(): Promise<void> {
   // epoch in Postgres (request #5b).
   services.voteRewards.start();
   if (dbAvailable()) services.history.start();
+  if (dbAvailable()) services.mev.start();
 
   // Alert sender, Telegram linker, Predict market maker and resolver: they need Postgres.
   if (dbAvailable()) startAccountJobs();

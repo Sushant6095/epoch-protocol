@@ -5,6 +5,8 @@ import { type Meta } from './Api.types';
 import { type LaunchBuyback } from './Launch.types';
 
 export interface BuybackSchedule {
+  /** The program cluster's current epoch (request #27): with `term.endEpoch`, how many epochs of the term are left. */
+  currentEpoch: number;
   slicesPerEpoch: number;
   /** Slices run inside the first `windowSlots` slots of each epoch. */
   windowSlots: number;
@@ -29,6 +31,8 @@ export interface BuybackSchedule {
 export interface LaunchBuybackFeed extends Meta {
   /** The program's cluster (devnet for now). */
   network: string;
+  /** The Epoch program id on `network` (request #26: the Trade card builds redeem itself); null when unset. */
+  programId: string | null;
   mint: string;
   /** The `RevenueToken` account; null when no validator registered this mint (the rest is then empty). */
   revenueToken: string | null;

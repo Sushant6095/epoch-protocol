@@ -63,10 +63,28 @@ on 3 Oct 2026 (mainnet epoch 1048) from a smoke run of `indexer_app` in RPC samp
     "sampled": true
   },
   "lastFinal": null,
+  "fees": {
+    "epoch": 1051,
+    "blocks": 2,
+    "firstSlot": 454151245,
+    "lastSlot": 454151246,
+    "baseLamports": 10525000,
+    "priorityLamports": 36909081,
+    "tipsLamports": 6869458,
+    "tipTxs": 48,
+    "rewardLamports": 42171581,
+    "estimatedBlocks": 0,
+    "totalSol": 0.054,
+    "sharePct": { "base": 19.38, "priority": 67.97, "tips": 12.65 },
+    "updatedAt": "2026-10-07T12:38:01+05:30"
+  },
+  "lastEpochFees": null,
   "unit": "µL/CU"
 }
 ```
 
+`fees` above is the rollup of the two complete mainnet blocks in `packages/indexer_app/src/__fixtures__`
+(slots 454,151,245 and 454,151,246, epoch 1051, leader Helius, 7 Oct 2026): the figures are what those blocks paid.
 Recorded from the smoke run on 3 Oct 2026 (RPC sampling on public RPC, since the build machine has no Solami key).
 With a Solami key the same fields read `"dataSource": "Solami gRPC (Yellowstone)"`,
 `"stream": { "source": "grpc", "endpoint": "solami", "status": "streaming", … }`, `"sampled": false`, a lag of a few
@@ -86,7 +104,25 @@ slots (blocks stream at `confirmed`, a second or two after they are produced), `
 | `estimate.coveragePct` | Share of the epoch so far that the estimate covers (below 100 when indexing started mid-epoch). |
 | `estimate.sampled` | True in the RPC sampling demo mode (one slot in N): show "sampled", never present it as the index. |
 | `lastFinal` | The newest finished epoch's value (`epoch_index`): the number to compare against ("+1.9% vs epoch 1047"). `postedSignature` is set once `publisher_app` posted it on-chain. Null until one epoch completed. |
+| `fees` | The epoch in progress, by kind of fee (request #30): `baseLamports`, `priorityLamports`, `tipsLamports` (Jito), `tipTxs`, `rewardLamports` (the leaders' Fee rewards), each kind's `sharePct` of base + priority + tips (null when nothing was paid), `totalSol`. Sums of the blocks the indexer saw (`blocks`, `firstSlot`..`lastSlot`), each block once; `estimatedBlocks` counts blocks whose vote base fees were estimated. Null before the indexer recorded any. See [Fee composition](#fee-composition-request-30). |
+| `lastEpochFees` | The same for the previous epoch (whole epoch when the indexer ran through it; compare `blocks` with 432,000 minus skipped slots). |
 | `note` | Present only when the indexer never ran: show it in the empty state. |
+
+## Fee composition (request #30)
+
+What each block paid, in lamports, as `indexer_app` decodes mainnet blocks (`Blocks/FeeMix.ts`):
+
+| Kind | How it is counted |
+| --- | --- |
+| Base | 5,000 × (transaction signatures + Ed25519 / secp256k1 / secp256r1 precompile signatures), votes included. Half is burned. |
+| Priority | `meta.fee` − base, per transaction (covers compute-unit price × limit and fees carried in the message). |
+| Tips | Jito tips: System Program transfers (`Transfer`, `TransferWithSeed`) into the eight tip-payment accounts, top-level and inner instructions, lookup-table addresses resolved, successful transactions only (a failed transaction's transfers are rolled back). |
+| Reward | The leader's Fee reward from the block's rewards. On mainnet it equals priority + base − ⌊base ÷ 2⌋ exactly; the RPC path checks this on every block. |
+
+`basis` says how the votes' base fees were found: `counted` (RPC blocks contain every vote), `reward` (the gRPC stream
+leaves votes out, so they come from the reward identity above), `estimated` (gRPC with no Fee reward: 5,000 per
+vote). On the recorded mainnet blocks the counted tips equal the tip accounts' balance increases to the lamport, and
+the reward identity holds exactly. Rows exist from the migration on: older blocks answer `fees: null`.
 
 ## `GET /v1/live/slots?limit=60`
 
@@ -97,9 +133,26 @@ slots (blocks stream at `confirmed`, a second or two after they are produced), `
   "schemaVersion": 1,
   "kind": "real",
   "asOf": "2026-10-03T19:19:02+05:30",
-  "source": "indexer_app via Postgres (live_slots)",
+  "source": "indexer_app via Postgres (live_slots, slot_fee_mix)",
   "live": true,
   "slots": [
+    {
+      "slot": 454151245,
+      "epoch": 1051,
+      "leader": "HEL1USMZKAL2odpNBj2oCjffnFGaYwmbGmyewGv1e2TU",
+      "leaderName": "Helius",
+      "…": "…",
+      "time": "2026-10-07T12:38:00+05:30",
+      "source": "rpc",
+      "fees": {
+        "baseLamports": 5175000,
+        "priorityLamports": 31630143,
+        "tipsLamports": 6287601,
+        "tipTxs": 23,
+        "rewardLamports": 34217643,
+        "basis": "counted"
+      }
+    },
     {
       "slot": 452951600,
       "epoch": 1048,
@@ -114,7 +167,8 @@ slots (blocks stream at `confirmed`, a second or two after they are produced), `
       "leaderPaidTxs": 1,
       "failedTxs": 270,
       "time": "2026-10-03T19:18:57+05:30",
-      "source": "rpc"
+      "source": "rpc",
+      "fees": null
     },
     {
       "slot": 452951590,
@@ -130,11 +184,15 @@ slots (blocks stream at `confirmed`, a second or two after they are produced), `
       "leaderPaidTxs": 0,
       "failedTxs": 185,
       "time": "2026-10-03T19:18:54+05:30",
-      "source": "rpc"
+      "source": "rpc",
+      "fees": null
     }
   ]
 }
 ```
+
+The first row is mainnet slot 454,151,245 (7 Oct 2026, from the fixture above, other fields trimmed); the other two
+were indexed on 3 Oct, before fees were recorded, so their `fees` is null.
 
 | Field | Meaning |
 | --- | --- |
@@ -146,6 +204,7 @@ slots (blocks stream at `confirmed`, a second or two after they are produced), `
 | `failedTxs` | Failed on chain, among the priced ones (they paid, so they count). |
 | `leaderName` | From the validator table; null → show the short key (`HEL1…e2TU`). |
 | `source` | `grpc`, `hybrid`, `rpc`, or `gap-fill` (filled in later over RPC; fine to show like the others). |
+| `fees` | What the block paid, by kind (request #30): `baseLamports`, `priorityLamports`, `tipsLamports` (Jito), `tipTxs`, `rewardLamports` (leader's Fee reward, null when the block reported none) and `basis` (`counted`, `reward` or `estimated`). Null for blocks indexed before fees were recorded. Same object in the WS `slots` frames. |
 
 Slot numbers may skip (a slot without a block has no row). Medians span four orders of magnitude: use a log scale.
 

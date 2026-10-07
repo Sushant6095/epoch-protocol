@@ -14,6 +14,7 @@ import { type DelegatorLabel, type DelegatorLabels, keyBase58 } from '../Delegat
 import { type InflationRewards } from '../InflationRewards';
 import { type MarketData, optional } from '../MarketData';
 import { type ValidatorTable } from '../ValidatorTable';
+import { type MevSnapshot } from './MevHistory';
 import { type ValidatorHistorySnapshot } from './ValidatorHistory';
 import { buildProfile } from './ValidatorProfileBuilder';
 
@@ -44,6 +45,7 @@ export class ValidatorProfileService {
     private readonly kobe: JitoKobeSource,
     private readonly history: () => ValidatorHistorySnapshot | undefined,
     private readonly foundationKeys: ReadonlySet<string>,
+    private readonly mev: () => MevSnapshot | undefined = () => undefined,
   ) {
     this.profiles = new KeyedSnapshotCache('validatorProfile', PROFILES_KEPT, PROFILE_TTL_MS, (vote) =>
       this.build(vote),
@@ -146,12 +148,14 @@ export class ValidatorProfileService {
       inflationLogRead: commissionLog !== null,
       recordedStake: recorded?.stake.get(vote),
       recordedCommission: recorded?.commission.get(vote),
+      mevRecords: this.mev()?.byVote.get(vote),
     });
 
     const sources = ['Solana mainnet RPC'];
     if (stakewizRows.size > 0 || stakewizStakes || commissionLog) sources.push('Stakewiz');
     if (kobeHistory) sources.push('Jito Kobe');
     if (recorded) sources.push("Epoch's validator history");
+    if (this.mev()?.byVote.has(vote)) sources.push('Jito tip distribution accounts (mainnet)');
     return {
       schemaVersion: 1,
       kind: 'real',

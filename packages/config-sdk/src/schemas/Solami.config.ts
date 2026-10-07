@@ -68,6 +68,14 @@ export const IndexerConfigSchema = z.object({
   LIVE_INDEX_INTERVAL_MS: z.coerce.number().int().min(250).max(60_000).default(2_000),
   /** Rows kept in live_slots (the Live page's recent slots). */
   LIVE_SLOTS_KEEP: z.coerce.number().int().min(100).max(1_000_000).default(20_000),
+  /** Epochs of per-block fee composition kept in slot_fee_mix (≈ 45 MB each); epoch_fee_mix keeps every total. */
+  FEE_MIX_KEEP_EPOCHS: z.coerce.number().int().min(1).max(64).default(3),
+  /** Jito MEV scan (validator_mev_epochs) on DATA_RPC_URL: minutes between scans; 0 turns it off. */
+  MEV_SCAN_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1_440).default(60),
+  /** Epochs the MEV scan keeps current, newest first (TDAs are closed 10 epochs after their epoch). */
+  MEV_BACKFILL_EPOCHS: z.coerce.number().int().min(1).max(10).default(10),
+  /** Pause between the MEV scan's RPC calls (public RPC is rate-limited). */
+  MEV_SCAN_SPACING_MS: z.coerce.number().int().min(0).max(10_000).default(400),
 });
 
 export type IndexerConfig = z.infer<typeof IndexerConfigSchema>;

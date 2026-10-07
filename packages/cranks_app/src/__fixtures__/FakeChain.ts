@@ -64,6 +64,10 @@ export class FakeChain implements EpochChain {
   swapAccounts: ProgramAccount<SwapPositionAccount>[] = [];
   revenueTokenAccounts: ProgramAccount<RevenueTokenAccount>[] = [];
   balances = new Map<string, bigint>();
+  /** Raw account data by address, for accountsData (e.g. Jito's TDA and ClaimStatus). */
+  accountData = new Map<string, Uint8Array>();
+  /** How many addresses each accountsData call asked for. */
+  readonly accountReads: number[] = [];
   /** Rent-exempt minimum per byte count (mainnet's: (128 + space) × 6,960). */
   rentFor = (space: number): bigint => BigInt((128 + space) * 6_960);
   readonly calls: ChainCall[] = [];
@@ -107,6 +111,10 @@ export class FakeChain implements EpochChain {
   }
   async rentExempt(space: number): Promise<bigint> {
     return this.rentFor(space);
+  }
+  async accountsData(addresses: PublicKey[]): Promise<(Uint8Array | null)[]> {
+    this.accountReads.push(addresses.length);
+    return addresses.map((address) => this.accountData.get(address.toBase58()) ?? null);
   }
   async simulate(
     label: string,

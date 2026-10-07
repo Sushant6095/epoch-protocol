@@ -1,0 +1,1 @@
+ALTER TABLE "validator_mev_epochs" ADD COLUMN "pf_validator_claim" text;

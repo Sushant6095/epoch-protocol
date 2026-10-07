@@ -7,6 +7,7 @@ import { type ParsedVoteAccount, type VoteStakeAccount } from '../../Sources/Sol
 import { type Meta, type ValidatorRow } from '../../types/Api.types';
 import { type StakeMove, type ValidatorProfile, type ValidatorRevenue } from '../../types/Wallet.types';
 import { type DelegatorLabel } from '../DelegatorLabels';
+import { type MevEpochRecord, mevHistoryRows } from './MevHistory';
 import { type CommissionPoint, STAKE_HISTORY_EPOCHS, type StakePoint } from './ValidatorHistory';
 
 /**
@@ -373,6 +374,8 @@ export interface ProfileInputs {
   inflationLogRead: boolean;
   recordedStake: StakePoint[] | undefined;
   recordedCommission: CommissionPoint[] | undefined;
+  /** indexer_app's MEV scan for this validator (mainnet TDAs and claims), oldest first; absent without Postgres. */
+  mevRecords?: readonly MevEpochRecord[];
 }
 
 export type ProfileBody = Omit<ValidatorProfile, keyof Meta>;
@@ -482,6 +485,7 @@ export function buildProfile(input: ProfileInputs): { profile: ProfileBody; note
       stakeByEpoch: stake.points,
       voteCreditsByEpoch: credits,
       jitoTipsTotalByEpochSol: tipsByEpoch(input.kobeHistory),
+      mevHistory: mevHistoryRows(input.mevRecords, input.kobeHistory),
       revenueEpoch: lastEpoch,
       revenueLastEpochSol: revenue,
       delegatorSplit: delegation.split,

@@ -78,6 +78,8 @@ export interface EpochChain {
   lamports(address: PublicKey): Promise<bigint>;
   /** The rent-exempt minimum for `space` bytes. */
   rentExempt(space: number): Promise<bigint>;
+  /** Raw data of any accounts (any owner), in order, read 100 per call; null where an account does not exist. */
+  accountsData(addresses: PublicKey[]): Promise<(Uint8Array | null)[]>;
 
   /** Simulate without sending (always, DRY_RUN or not). */
   simulate(

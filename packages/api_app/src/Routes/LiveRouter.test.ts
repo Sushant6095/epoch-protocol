@@ -3,12 +3,14 @@ import { type AddressInfo } from 'net';
 import { ExpressAppServer } from '@epoch/common_http_server';
 import {
   type EpochDb,
+  epochFeeMix,
   epochIndex,
   epochStakes,
   feeIndexLive,
   liveSlots,
   PostgresConnectionManager,
   runMigrations,
+  slotFeeMix,
   slotFees,
   solamiUsageReports,
 } from '@epoch/pg_models';
@@ -113,6 +115,35 @@ describe('/v1/live without Postgres', () => {
       { ...block, slot: S + 5, blockTime: new Date(now - 2_400), medianCuPrice: 5_000 },
       { ...block, slot: S + 6, blockTime: new Date(now - 2_000), medianCuPrice: 7_001 },
     ]);
+    // Fee composition (request #30) for the newest block only: S + 5 was indexed before the indexer recorded it.
+    await db.insert(slotFeeMix).values({
+      slot: S + 6,
+      epoch: EPOCH,
+      baseFeeLamports: 5_175_000n,
+      priorityFeeLamports: 31_630_143n,
+      tipLamports: 6_287_601n,
+      tipTxs: 23,
+      voteTxs: 1_005,
+      nonVoteTxs: 30,
+      feeRewardLamports: 34_217_643n,
+      baseFeeBasis: 'reward',
+      source: 'grpc',
+    });
+    const rollup = {
+      blocks: 2,
+      baseFeeLamports: 6_000_000n,
+      priorityFeeLamports: 3_000_000n,
+      tipLamports: 1_000_000n,
+      tipTxs: 4,
+      voteTxs: 2_000,
+      nonVoteTxs: 60,
+      feeRewardLamports: 6_000_000n,
+      estimatedBlocks: 0,
+    };
+    await db.insert(epochFeeMix).values([
+      { ...rollup, epoch: EPOCH, firstSlot: S + 5, lastSlot: S + 6 },
+      { ...rollup, epoch: EPOCH - 1, firstSlot: S - 432_000, lastSlot: S - 1, blocks: 431_000 },
+    ]);
     // What indexer_app writes every 10 s (a unique name: other test files may write their own rows in parallel).
     await db.insert(solamiUsageReports).values({
       component: 'route-test-indexer',
@@ -200,6 +231,16 @@ describe('/v1/live without Postgres', () => {
           estimate: { epoch: EPOCH, value: 200 },
           lastFinal: { epoch: EPOCH - 1, value: 9_120 },
           stream: { status: 'streaming', endpoint: 'solami' },
+          fees: {
+            epoch: EPOCH,
+            blocks: 2,
+            baseLamports: 6_000_000,
+            priorityLamports: 3_000_000,
+            tipsLamports: 1_000_000,
+            totalSol: 0.01,
+            sharePct: { base: 60, priority: 30, tips: 10 },
+          },
+          lastEpochFees: { epoch: EPOCH - 1, blocks: 431_000 },
         },
       });
     }));
@@ -208,8 +249,21 @@ describe('/v1/live without Postgres', () => {
     withSeed(async (get) => {
       const { body } = await get<{ slots: Record<string, unknown>[] }>('/v1/live/slots?limit=2');
       expect(body.data.slots).toEqual([
-        expect.objectContaining({ slot: S + 6, leaderName: 'Helius', medianCuPrice: 7_001, leaderPaidTxs: 1 }),
-        expect.objectContaining({ slot: S + 5, medianCuPrice: 5_000 }),
+        expect.objectContaining({
+          slot: S + 6,
+          leaderName: 'Helius',
+          medianCuPrice: 7_001,
+          leaderPaidTxs: 1,
+          fees: {
+            baseLamports: 5_175_000,
+            priorityLamports: 31_630_143,
+            tipsLamports: 6_287_601,
+            tipTxs: 23,
+            rewardLamports: 34_217_643,
+            basis: 'reward',
+          },
+        }),
+        expect.objectContaining({ slot: S + 5, medianCuPrice: 5_000, fees: null }),
       ]);
       const one = await get<{ slots: Record<string, unknown>[] }>('/v1/live/slots?limit=1');
       expect(one.body.data.slots.map((s) => s.slot)).toEqual([S + 6]);

@@ -192,11 +192,12 @@ export function buildLaunchItem(input: LaunchMapInput): LaunchItem {
   const detail: LaunchDetailBody = {
     token: {
       supply: entry.supply,
-      burned: round(burned, 6),
-      holders: chain.holders?.holders ?? 0,
+      // Unreadable is null, never 0 holders, the registry's figure or "mutable" stated as facts (request #32).
+      burned: chain.mint ? round(burned, 6) : null,
+      holders: chain.holders ? chain.holders.holders : null,
       decimals: chain.mint?.decimals ?? entry.decimals,
       mintAuthority: null,
-      metadataImmutable: pool ? pool.tokenUpdateAuthority === 1 : false,
+      metadataImmutable: pool ? pool.tokenUpdateAuthority === 1 : null,
     },
     curve: {
       dbcPool: entry.dbcPool ?? null,

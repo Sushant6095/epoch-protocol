@@ -137,7 +137,13 @@ describe('toActivityEvent', () => {
       value: null,
       unit: 'SOL',
       signature: 'sig1',
+      mint: null,
     });
+    // Request #29: buyback events carry the mint they name.
+    const MINT = 'EUdJ2RLs9NxeiaJfwTJsqTwX7iA1H7put7fcAVoRiDs1';
+    expect(row('BuybackExecuted', { vote: VOTE, mint: MINT, venue: 'dbc', lamportsIn: '1' })?.mint).toBe(MINT);
+    expect(row('RevenueTokenRedeemed', { vote: VOTE, mint: MINT, lamportsOut: '1' })?.mint).toBe(MINT);
+    expect(row('Swept', { vote: VOTE, gross: '1', remitted: '0' })).not.toHaveProperty('mint');
     expect(row('BuybackExecuted', { vote: VOTE, venue: 'dammV2', lamportsIn: '1000000000' })).toMatchObject({
       text: 'Kestrel Nodes · bought back and burned on DAMM v2',
       amountSol: 1,
@@ -172,6 +178,7 @@ describe('toActivityEvent', () => {
         value: null,
         unit: 'SOL',
         signature: 'sig1',
+        mint,
       },
     );
     expect(row('TreasuryClaimed', { mint, kind: 'lpFee', lamportsToPool: '1000000', tokensBurned: '42' })?.text).toBe(

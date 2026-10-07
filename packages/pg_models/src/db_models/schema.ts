@@ -532,3 +532,105 @@ export const solamiUsageReports = pgTable('solami_usage', {
   report: jsonb('report').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ── Fee composition and Jito MEV from mainnet (requests #30 and #5b) ───────────────────────────────────────────
+
+/**
+ * What each mainnet block paid, by kind (request #30), written by indexer_app with live_slots. Lamports:
+ * - base: 5,000 per signature (transaction and precompile signatures), votes included;
+ * - priority: `meta.fee` − base, summed over the block;
+ * - tips: Jito tips, System transfers into the eight tip-payment accounts (inner instructions included) by successful
+ *   transactions.
+ * `base_fee_basis` says how vote base fees were found: `counted` (RPC block: every vote is in it), `reward` (gRPC: the
+ * firehose leaves votes out, so they come from the leader's Fee reward = priority + base / 2), `estimated` (gRPC without
+ * a Fee reward: 5,000 per vote). Pruned to the newest FEE_MIX_KEEP_EPOCHS epochs; epoch_fee_mix keeps the totals.
+ */
+export const slotFeeMix = pgTable(
+  'slot_fee_mix',
+  {
+    slot: bigint('slot', { mode: 'number' }).primaryKey(),
+    epoch: integer('epoch').notNull(),
+    baseFeeLamports: lamports('base_fee_lamports').notNull(),
+    priorityFeeLamports: lamports('priority_fee_lamports').notNull(),
+    tipLamports: lamports('tip_lamports').notNull(),
+    /** Successful transactions that tipped. */
+    tipTxs: integer('tip_txs').notNull(),
+    voteTxs: integer('vote_txs').notNull(),
+    nonVoteTxs: integer('non_vote_txs').notNull(),
+    /** The leader's Fee reward for the block; null when the block reported none. */
+    feeRewardLamports: lamports('fee_reward_lamports'),
+    /** counted | reward | estimated */
+    baseFeeBasis: text('base_fee_basis').notNull(),
+    /** grpc | hybrid | rpc | gap-fill */
+    source: text('source').notNull(),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index('slot_fee_mix_epoch_idx').on(t.epoch)],
+);
+
+/**
+ * slot_fee_mix summed per epoch. Each slot is added exactly once: writeBatch adds only the slot_fee_mix rows its insert
+ * returned (`ON CONFLICT DO NOTHING RETURNING`), in the same transaction.
+ */
+export const epochFeeMix = pgTable('epoch_fee_mix', {
+  epoch: integer('epoch').primaryKey(),
+  blocks: integer('blocks').notNull(),
+  baseFeeLamports: lamports('base_fee_lamports').notNull(),
+  priorityFeeLamports: lamports('priority_fee_lamports').notNull(),
+  tipLamports: lamports('tip_lamports').notNull(),
+  tipTxs: bigint('tip_txs', { mode: 'number' }).notNull(),
+  voteTxs: bigint('vote_txs', { mode: 'number' }).notNull(),
+  nonVoteTxs: bigint('non_vote_txs', { mode: 'number' }).notNull(),
+  /** Sum of the blocks' Fee rewards (blocks without one add 0). */
+  feeRewardLamports: lamports('fee_reward_lamports').notNull(),
+  /** Blocks whose vote base fees were estimated (see slot_fee_mix.base_fee_basis). */
+  estimatedBlocks: integer('estimated_blocks').notNull(),
+  firstSlot: bigint('first_slot', { mode: 'number' }).notNull(),
+  lastSlot: bigint('last_slot', { mode: 'number' }).notNull(),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * Jito per validator per mainnet epoch, from the validator's TipDistributionAccount (TDA), the ClaimStatus of its
+ * commission node, and its PriorityFeeDistributionAccount (PFDA) where it has one. Written by indexer_app's MEV scan
+ * (getProgramAccounts by epoch, refreshed until the epoch's roots and claims settle); read by api_app for
+ * `/v1/validators` (`mevCommissionPct`, `mevTipsSol`), the profile's MEV history and the position's MEV.
+ */
+export const validatorMevEpochs = pgTable(
+  'validator_mev_epochs',
+  {
+    vote: text('vote').notNull(),
+    epoch: integer('epoch').notNull(),
+    /** The TDA address; null when the validator only has a PFDA this epoch. */
+    tda: text('tda'),
+    mevCommissionBps: integer('mev_commission_bps'),
+    /**
+     * The merkle root's max_total_claim (every lamport of tips the epoch pays out); before the root is uploaded, the
+     * tips so far: the TDA balance less its rent-exempt minimum (read from the RPC). Null without a TDA.
+     */
+    tipsLamports: lamports('tips_lamports'),
+    /** The TDA's balance when scanned (for the epoch in progress: tips so far + rent). */
+    tdaLamports: lamports('tda_lamports'),
+    rootUploaded: boolean('root_uploaded'),
+    totalFundsClaimedLamports: lamports('total_funds_claimed_lamports'),
+    nodesClaimed: integer('nodes_claimed'),
+    maxNodes: integer('max_nodes'),
+    /** The validator's commission node: the ClaimStatus amount once claimed, else ⌊tips × bps ÷ 10,000⌋. */
+    validatorShareLamports: lamports('validator_share_lamports'),
+    validatorShareEstimated: boolean('validator_share_estimated'),
+    /** claimed | pending (commission > 0, not claimed yet) | none (0 % commission: never claimed) | expired */
+    validatorClaim: text('validator_claim'),
+    validatorClaimedSlot: bigint('validator_claimed_slot', { mode: 'number' }),
+    expiresAt: integer('expires_at'),
+    uploadAuthority: text('upload_authority'),
+    pfda: text('pfda'),
+    pfCommissionBps: integer('pf_commission_bps'),
+    pfTransferredLamports: lamports('pf_transferred_lamports'),
+    pfTotalClaimLamports: lamports('pf_total_claim_lamports'),
+    pfRootUploaded: boolean('pf_root_uploaded'),
+    /** The PFDA's validator node: claimed (its ClaimStatus exists) | pending | none (a 0 node, never claimed). */
+    pfValidatorClaim: text('pf_validator_claim'),
+    scannedAt: timestamp('scanned_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.vote, t.epoch] }), index('validator_mev_epochs_epoch_idx').on(t.epoch)],
+);

@@ -1,6 +1,12 @@
 import { sleep } from '@epoch/common';
 import { Logger } from '@epoch/logger';
-import { explainSolamiError, isSolamiHost, type SolamiUsage, solamiUsage } from '@epoch/solana';
+import {
+  explainSolamiError,
+  isSolamiHost,
+  type ProgramAccountsFilter,
+  type SolamiUsage,
+  solamiUsage,
+} from '@epoch/solana';
 
 const logger = Logger.create('SolanaRpc');
 
@@ -38,9 +44,24 @@ export function redact(text: string, secrets: readonly (string | undefined)[] = 
   return out;
 }
 
+/** An inner instruction as getBlock sends it (data base58, account indexes into the full key list). */
+export interface RpcInnerInstruction {
+  programIdIndex: number;
+  accounts: number[];
+  data: string;
+  stackHeight?: number | null;
+}
+
 export interface RpcBlockTransaction {
   transaction: [string, string];
-  meta: { err: unknown; fee?: number } | null;
+  meta: {
+    err: unknown;
+    fee?: number;
+    /** Per top-level instruction that invoked others. */
+    innerInstructions?: { index: number; instructions: RpcInnerInstruction[] }[] | null;
+    /** v0 lookup-table addresses, after the static keys in index order: writable, then readonly. */
+    loadedAddresses?: { writable: string[]; readonly: string[] } | null;
+  } | null;
   version?: 'legacy' | number;
 }
 
@@ -72,6 +93,32 @@ export interface RpcEpochSchedule {
   firstNormalEpoch: number;
   firstNormalSlot: number;
 }
+
+/** An account as getMultipleAccounts / getProgramAccounts return it, data decoded from base64. */
+export interface RpcAccountInfo {
+  lamports: number;
+  owner: string;
+  data: Uint8Array;
+}
+
+export interface RpcKeyedAccount extends RpcAccountInfo {
+  pubkey: string;
+}
+
+interface RawAccount {
+  lamports: number;
+  owner: string;
+  data: [string, string];
+}
+
+const decodeAccount = (raw: RawAccount): RpcAccountInfo => ({
+  lamports: raw.lamports,
+  owner: raw.owner,
+  data: Buffer.from(raw.data[0], 'base64'),
+});
+
+/** getMultipleAccounts takes at most 100 keys per call. */
+export const MAX_MULTIPLE_ACCOUNTS = 100;
 
 type Fetch = typeof fetch;
 
@@ -215,5 +262,32 @@ export class SolanaRpc {
 
   getVersion(): Promise<{ 'solana-core': string; 'feature-set'?: number }> {
     return this.call('getVersion');
+  }
+
+  /** The program's accounts that match every filter (keep filters narrow: public RPC refuses broad scans). */
+  async getProgramAccounts(programId: string, filters: ProgramAccountsFilter[]): Promise<RpcKeyedAccount[]> {
+    const result = await this.call<{ pubkey: string; account: RawAccount }[]>('getProgramAccounts', [
+      programId,
+      { encoding: 'base64', commitment: 'confirmed', filters },
+    ]);
+    return result.map((r) => ({ pubkey: r.pubkey, ...decodeAccount(r.account) }));
+  }
+
+  /** Up to 100 accounts in one call, in order; null where an account does not exist. */
+  async getMultipleAccounts(pubkeys: string[]): Promise<(RpcAccountInfo | null)[]> {
+    if (pubkeys.length > MAX_MULTIPLE_ACCOUNTS) {
+      throw new Error(`getMultipleAccounts takes at most ${MAX_MULTIPLE_ACCOUNTS} keys (got ${pubkeys.length})`);
+    }
+    if (pubkeys.length === 0) return [];
+    const result = await this.call<{ value: (RawAccount | null)[] }>('getMultipleAccounts', [
+      pubkeys,
+      { encoding: 'base64', commitment: 'confirmed' },
+    ]);
+    return result.value.map((raw) => (raw ? decodeAccount(raw) : null));
+  }
+
+  /** Lamports an account of `size` bytes must hold to be rent-exempt (read, never hardcoded: it changed in 2026). */
+  getMinimumBalanceForRentExemption(size: number): Promise<number> {
+    return this.call<number>('getMinimumBalanceForRentExemption', [size]);
   }
 }

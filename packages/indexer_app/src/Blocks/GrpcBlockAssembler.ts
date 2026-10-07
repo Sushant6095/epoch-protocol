@@ -2,6 +2,7 @@ import { type SubscribeUpdateBlockMeta, type SubscribeUpdateTransaction } from '
 
 import { priorityFeeOf } from '../Decoding/PriorityFee';
 import { type DecodedBlock, type TxFeeInput } from './BlockFees';
+import { FeeMixTally, touchesTipAccount, txFeeMix } from './FeeMix';
 
 /** `solana.storage.ConfirmedBlock.RewardType.Fee`. */
 const REWARD_TYPE_FEE = 1;
@@ -12,7 +13,13 @@ interface PendingSlot {
   txs: TxFeeInput[];
   votes: number;
   malformed: number;
+  tally: FeeMixTally;
 }
+
+const newPending = (): PendingSlot => ({ txs: [], votes: 0, malformed: 0, tally: new FeeMixTally() });
+
+/** A uint64 Yellowstone sends as a decimal string; null when absent or empty. */
+const u64Text = (text: string | undefined): bigint | null => (text !== undefined && text !== '' ? BigInt(text) : null);
 
 /**
  * Rebuilds blocks from the Yellowstone firehose: at `confirmed` commitment the server sends a slot's transactions,
@@ -40,14 +47,35 @@ export class GrpcBlockAssembler {
     }
     let entry = this.pending.get(slot);
     if (!entry) {
-      entry = { txs: [], votes: 0, malformed: 0 };
+      entry = newPending();
       this.pending.set(slot, entry);
+    }
+    const message = info.transaction?.message;
+    const meta = info.meta;
+    const failed = meta?.err !== undefined;
+    if (message) {
+      const keys = [
+        ...message.accountKeys,
+        ...(meta?.loadedWritableAddresses ?? []),
+        ...(meta?.loadedReadonlyAddresses ?? []),
+      ];
+      entry.tally.add(
+        txFeeMix({
+          signatures: message.header?.numRequiredSignatures ?? info.transaction?.signatures.length ?? 1,
+          keys,
+          instructions: message.instructions,
+          innerInstructions:
+            failed || !touchesTipAccount(keys) ? [] : (meta?.innerInstructions ?? []).flatMap((g) => g.instructions),
+          fee: u64Text(meta?.fee),
+          failed,
+        }),
+        info.isVote,
+      );
     }
     if (info.isVote) {
       entry.votes++;
       return;
     }
-    const message = info.transaction?.message;
     const payer = message?.accountKeys[0];
     if (!message || !payer || payer.length !== 32) {
       entry.malformed++;
@@ -68,14 +96,14 @@ export class GrpcBlockAssembler {
             }
           : undefined,
       }),
-      failed: info.meta?.err !== undefined,
+      failed,
     });
   }
 
   /** The block for `meta.slot`, with every transaction received for it. */
   completeBlock(meta: SubscribeUpdateBlockMeta): DecodedBlock {
     const slot = Number(meta.slot);
-    const entry = this.pending.get(slot) ?? { txs: [], votes: 0, malformed: 0 };
+    const entry = this.pending.get(slot) ?? newPending();
     this.pending.delete(slot);
     this.remember(slot);
     const reward = meta.rewards?.rewards.find((r) => r.rewardType === REWARD_TYPE_FEE);
@@ -88,6 +116,10 @@ export class GrpcBlockAssembler {
       txs: entry.txs,
       votes: entry.votes,
       malformed: entry.malformed,
+      feeMix: entry.tally.streamed(
+        reward ? u64Text(reward.lamports) : null,
+        u64Text(meta.executedTransactionCount) === null ? null : Number(meta.executedTransactionCount),
+      ),
     };
   }
 

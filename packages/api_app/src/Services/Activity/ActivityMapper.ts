@@ -88,7 +88,13 @@ const indexRow = (data: Data, word: 'proposed' | 'final' | 'vetoed') => ({
  */
 export function toActivityEvent(stored: StoredProgramEvent, names: NameIndex): ActivityEvent | null {
   const row = rowFor(stored, names);
-  return row ? { id: `${stored.signature}:${stored.ix}`, ...row, signature: stored.signature } : null;
+  if (!row) return null;
+  const event: ActivityEvent = { id: `${stored.signature}:${stored.ix}`, ...row, signature: stored.signature };
+  if (row.kind === 'buyback') {
+    const mint = stored.data.mint;
+    event.mint = typeof mint === 'string' && mint.length > 0 ? mint : null;
+  }
+  return event;
 }
 
 function rowFor(stored: StoredProgramEvent, names: NameIndex): Omit<ActivityEvent, 'id' | 'signature'> | null {

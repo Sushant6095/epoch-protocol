@@ -61,6 +61,23 @@ describe('LiveFeed payloads', () => {
     });
   });
 
+  it("carries a block's fee composition, keeps old payloads valid and nulls unreadable fees", () => {
+    const fees = {
+      baseLamports: 5_175_000,
+      priorityLamports: 31_630_143,
+      tipsLamports: 6_287_601,
+      tipTxs: 23,
+      rewardLamports: 34_217_643,
+      basis: 'counted',
+    };
+    expect(decodeLivePayload(encodeLivePayload({ ...SLOT, fees }))).toEqual({ ...SLOT, fees });
+    expect(decodeLivePayload(JSON.stringify(SLOT))).toEqual(SLOT);
+    expect(decodeLivePayload(JSON.stringify({ ...SLOT, fees: { ...fees, tipsLamports: '6' } }))).toEqual({
+      ...SLOT,
+      fees: null,
+    });
+  });
+
   it('refuses an oversized payload instead of letting Postgres fail the transaction', () => {
     expect(() => encodeLivePayload({ ...SLOT, leader: 'x'.repeat(9_000) })).toThrow(RangeError);
   });

@@ -196,6 +196,10 @@ anything older is gap-filled over RPC), use `hybrid` for long runs, or try `SOLA
 | `RPC_SLOT_STRIDE` | `1` | `rpc` mode: sample one slot in N (no final values) |
 | `LIVE_INDEX_INTERVAL_MS` | `2000` | how often `fee_index_live` is written and announced |
 | `LIVE_SLOTS_KEEP` | `20000` | rows kept in `live_slots` (≈ 2 hours) |
+| `FEE_MIX_KEEP_EPOCHS` | `3` | epochs of per-block fee composition kept in `slot_fee_mix` (≈ 45 MB each); `epoch_fee_mix` keeps every total |
+| `MEV_SCAN_INTERVAL_MINUTES` | `60` | Jito MEV scan into `validator_mev_epochs` on `DATA_RPC_URL`; `0` turns it off |
+| `MEV_BACKFILL_EPOCHS` | `10` | epochs the MEV scan keeps current (TDAs close 10 epochs after their epoch) |
+| `MEV_SCAN_SPACING_MS` | `400` | pause between the MEV scan's RPC calls |
 | `DATABASE_URL`, `DATABASE_POOL_SIZE` | — / `10` | Postgres (required) |
 | `LOG_LEVEL` | `info` | `debug` adds a heartbeat with lag and gap counts |
 
@@ -212,6 +216,29 @@ Keys are read from the environment only and never logged; RPC URLs are logged by
 | `epoch_index` | an epoch's final value, once complete | publisher_app, `/v1/index`, `/v1/live/summary` |
 | `indexer_cursors` | `slot_stream`, `slot_stream_start` | restart |
 | `solami_usage` | each component's Solami counters (gRPC, RPC by method, Beam, last error), every 10 s here | `/v1/live/solami` |
+| `slot_fee_mix` | every block: base fees, priority fees, Jito tips, tip transactions, the leader's Fee reward, how vote base fees were found | `/v1/live/slots`, WS `slots` |
+| `epoch_fee_mix` | `slot_fee_mix` summed per epoch, each block once (`ON CONFLICT DO NOTHING RETURNING` in the same transaction) | `/v1/live/summary` (`fees`, `lastEpochFees`) |
+| `validator_mev_epochs` | the MEV scan: per validator and epoch, the TDA's commission, tips (or tips so far), root and claims, the commission node's ClaimStatus, the PFDA | `/v1/validators`, `/v1/validators/:vote`, `/:vote/position` |
+
+### Jito MEV scan
+
+`Jito/MevScanner.ts`, every `MEV_SCAN_INTERVAL_MINUTES`, for the epoch in progress and the `MEV_BACKFILL_EPOCHS − 1`
+before it. Per epoch: the TipDistributionAccounts and the PriorityFeeDistributionAccounts through `getProgramAccounts`
+(two filtered calls each: Borsh's `Option<MerkleRoot>` moves the epoch field by 64 bytes once the root is up), then
+the ClaimStatus of each validator's commission node (PDA `["CLAIM_STATUS", vote, tda]`) through `getMultipleAccounts`,
+100 per call, skipping nodes already known claimed, and for the rare PFDA whose validator node is above 0 its
+ClaimStatus under the priority-fee distribution program (existence = claimed; `pf_validator_claim`). Calls are `MEV_SCAN_SPACING_MS` apart (≈ 11 per epoch; epoch 1050
+had 635 TDAs, two calls under a second on public RPC). A finished epoch whose roots are all uploaded and whose
+commission nodes are all settled is not read again; a failed scan keeps the last rows. Facts the rows reflect:
+
+- Tips for an epoch without a root (the epoch in progress, and the first hours of the next) are the TDA balance minus
+  its rent-exempt minimum, read with `getMinimumBalanceForRentExemption(168)` on every scan: 1,503,680 lamports on
+  mainnet in October 2026 (not the older 2,060,160), never a hardcoded figure.
+- About half of Jito validators charge 0 % MEV commission (317 of 635 in epoch 1050): their commission node is 0 and is
+  never claimed, so `validator_claim = 'none'` is normal for them. `pending` means commission > 0 and not claimed yet
+  (claims landed 1.2 to 3.1 hours after the boundary in epoch 1051); `expired` means the TDA closed unclaimed.
+- The validator's share is the ClaimStatus `amount` once claimed; before that ⌊tips × bps ÷ 10,000⌋, flagged
+  estimated (an upper bound at 100 %: the TipRouter protocol fee, ≈ 3 %, is paid first).
 
 Each block's rows, the cursor and its `NOTIFY epoch_live` go in one transaction, so listeners only hear about committed
 data. Payloads are ~300 bytes (`@epoch/pg_models` `LiveFeed.ts`; the limit is 8,000).

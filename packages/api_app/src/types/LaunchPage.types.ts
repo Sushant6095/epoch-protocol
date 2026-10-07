@@ -336,6 +336,8 @@ export interface LaunchBuildResponse extends LaunchQuoteResponse {
  */
 export interface RevenueTokenInfo {
   source: 'program' | 'registry';
+  /** The Epoch program id on `network` (for redeem and other client-built instructions, request #26); null when unset. */
+  programId: string | null;
   /** The RevenueToken PDA ["revenue_token", vote]; null without a vote account or program id. */
   address: string | null;
   /** The buyback escrow PDA ["buyback", vote]: every sweep's share lands here. */
@@ -393,6 +395,11 @@ export interface LaunchPage extends Meta {
   revenueToken: RevenueTokenInfo;
   /** The newest 50 trades. */
   trades: LaunchTrade[];
+  /**
+   * `before` for GET /trades to load the trades older than `trades` (request #28; same encoding as `/trades`
+   * `nextCursor`); null when the bundle holds every trade or the trades could not be read.
+   */
+  tradesNextCursor: string | null;
   /** 15-minute candles over the last 24 hours (fetch /candles for other ranges). */
   candles: { interval: LaunchCandleInterval; basis: LaunchCandles['basis']; candles: LaunchCandle[] };
   holders: Omit<LaunchHolders, keyof Meta | 'network' | 'mint'> | null;

@@ -1,16 +1,21 @@
 import {
   type EpochDb,
+  epochFeeMix,
   epochIndex,
   epochStakes,
   feeIndexLive,
   liveSlots,
+  slotFeeMix,
   SolamiUsageStore,
   type SolamiUsageRow,
 } from '@epoch/pg_models';
 import { asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
 
 export type FeeIndexLiveRow = typeof feeIndexLive.$inferSelect;
-export type LiveSlotRow = typeof liveSlots.$inferSelect;
+export type SlotFeeMixRow = typeof slotFeeMix.$inferSelect;
+export type EpochFeeMixRow = typeof epochFeeMix.$inferSelect;
+/** A live_slots row with its slot_fee_mix row (null for blocks indexed before the indexer recorded fees). */
+export type LiveSlotRow = typeof liveSlots.$inferSelect & { feeMix?: SlotFeeMixRow | null };
 
 export interface EpochIndexRow {
   epoch: number;
@@ -42,8 +47,10 @@ export interface LiveRepository {
   /** The newest epoch_index row below `beforeEpoch`. */
   lastFinal(beforeEpoch: number): Promise<EpochIndexRow | null>;
   finalFor(epoch: number): Promise<EpochIndexRow | null>;
-  /** live_slots, newest first. */
+  /** live_slots with their slot_fee_mix rows, newest first. */
   recentSlots(limit: number): Promise<LiveSlotRow[]>;
+  /** The epoch's fee composition rollup (epoch_fee_mix). */
+  epochFees(epoch: number): Promise<EpochFeeMixRow | null>;
   leaderStats(epoch: number): Promise<LeaderStat[]>;
   /** The snapshot taken during `epoch`, else the next later one. */
   stakes(epoch: number): Promise<{ epoch: number; stakes: Map<string, bigint> } | null>;
@@ -86,8 +93,19 @@ export class PgLiveRepository implements LiveRepository {
     return row ?? null;
   }
 
-  recentSlots(limit: number): Promise<LiveSlotRow[]> {
-    return this.db.select().from(liveSlots).orderBy(desc(liveSlots.slot)).limit(limit);
+  async recentSlots(limit: number): Promise<LiveSlotRow[]> {
+    const rows = await this.db
+      .select({ slot: liveSlots, feeMix: slotFeeMix })
+      .from(liveSlots)
+      .leftJoin(slotFeeMix, eq(slotFeeMix.slot, liveSlots.slot))
+      .orderBy(desc(liveSlots.slot))
+      .limit(limit);
+    return rows.map((r) => ({ ...r.slot, feeMix: r.feeMix }));
+  }
+
+  async epochFees(epoch: number): Promise<EpochFeeMixRow | null> {
+    const [row] = await this.db.select().from(epochFeeMix).where(eq(epochFeeMix.epoch, epoch)).limit(1);
+    return row ?? null;
   }
 
   async leaderStats(epoch: number): Promise<LeaderStat[]> {

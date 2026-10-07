@@ -2,6 +2,7 @@ import { addressToBytes } from '@epoch/solana';
 
 import { type TxPrice, sameKey } from '../Decoding/PriorityFee';
 import { median } from '../Processors/FeeProcessor';
+import { type BlockFeeMix } from './FeeMix';
 
 /** One non-vote transaction of a block, reduced to what the Fee Index reads. */
 export interface TxFeeInput {
@@ -25,6 +26,8 @@ export interface DecodedBlock {
   votes: number;
   /** Transactions the decoder could not read (counted, never priced). */
   malformed: number;
+  /** Base fees, priority fees and Jito tips (request #30). */
+  feeMix: BlockFeeMix;
 }
 
 /** A block's Fee Index inputs and the detail the Live page shows. Prices in µL/CU. */

@@ -8,6 +8,56 @@ import type { Meta } from './Api.types';
 export type LiveSource = 'grpc' | 'hybrid' | 'rpc';
 export type LiveStreamStatus = 'streaming' | 'connecting' | 'reconnecting' | 'polling' | 'stopped' | 'offline';
 
+/**
+ * What one block paid, by kind, in lamports (request #30). From mainnet blocks as indexer_app decodes them:
+ * - base: 5,000 per signature (transaction and precompile signatures), votes included;
+ * - priority: `meta.fee` − base, summed over the block;
+ * - tips: Jito tips, System transfers into the eight tip-payment accounts (inner instructions included) by successful
+ *   transactions.
+ * On mainnet the leader's Fee reward is exactly priority + base − base ÷ 2 (half the base fees is burned).
+ */
+export interface LiveSlotFees {
+  baseLamports: number;
+  priorityLamports: number;
+  tipsLamports: number;
+  /** Successful transactions that tipped. */
+  tipTxs: number;
+  /** The leader's Fee reward for the block; null when the block reported none. */
+  rewardLamports: number | null;
+  /**
+   * How the votes' base fees were found: `counted` (RPC block, every vote in it), `reward` (gRPC stream, which leaves
+   * votes out: from the Fee reward), `estimated` (gRPC without a Fee reward: 5,000 per vote).
+   */
+  basis: 'counted' | 'reward' | 'estimated';
+}
+
+/**
+ * An epoch's fee composition (request #30): epoch_fee_mix, the sum of every block indexed with fees, each block counted
+ * once. Covers the blocks the indexer saw (`blocks`, `firstSlot`..`lastSlot`), not necessarily the whole epoch.
+ */
+export interface LiveEpochFees {
+  epoch: number;
+  /** Blocks summed. */
+  blocks: number;
+  firstSlot: number;
+  lastSlot: number;
+  baseLamports: number;
+  priorityLamports: number;
+  tipsLamports: number;
+  /** Successful transactions that tipped. */
+  tipTxs: number;
+  /** Sum of the leaders' Fee rewards (blocks without one add 0). */
+  rewardLamports: number;
+  /** Blocks whose vote base fees were estimated at 5,000 per vote (gRPC without a Fee reward). */
+  estimatedBlocks: number;
+  /** base + priority + tips, in SOL (3 decimals). */
+  totalSol: number;
+  /** Each kind's share of base + priority + tips, 0–100 (2 decimals); null when nothing was paid. */
+  sharePct: { base: number; priority: number; tips: number } | null;
+  /** When the indexer last added a block. ISO 8601 IST. */
+  updatedAt: string;
+}
+
 /** One block (GET /v1/live/slots, WS `slots`). */
 export interface LiveSlot {
   slot: number;
@@ -32,6 +82,8 @@ export interface LiveSlot {
   time: string | null;
   /** grpc | hybrid | rpc | gap-fill */
   source: string;
+  /** Base, priority and tips (request #30); null for blocks indexed before the indexer recorded them. */
+  fees: LiveSlotFees | null;
 }
 
 /** The running Fee Index of the epoch in progress (summary.estimate, WS `index:live`). */
@@ -85,6 +137,10 @@ export interface LiveSummary extends Meta {
   estimate: LiveEstimate | null;
   /** The newest finished epoch with a computed value (epoch_index). */
   lastFinal: { epoch: number; value: number; postedSignature: string | null; computedAt: string } | null;
+  /** The epoch in progress: base, priority and Jito tips of the blocks indexed so far (request #30); null before any. */
+  fees: LiveEpochFees | null;
+  /** The same for the previous epoch (complete when the indexer ran through it). */
+  lastEpochFees: LiveEpochFees | null;
   unit: 'µL/CU';
 }
 
