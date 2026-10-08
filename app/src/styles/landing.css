@@ -2791,3 +2791,58 @@ html:not([data-intro='on']) .it {
     right: 20px;
   }
 }
+
+/* ── Hero footage (NASA ISS, public domain) with market lines ── */
+.ev {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.ev-video,
+.ev-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ev-video {
+  object-fit: cover;
+  object-position: 50% 100%;
+}
+.ev-lines path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ev-core {
+  stroke-width: 1.4;
+}
+.ev-glow {
+  stroke-width: 6;
+  opacity: 0.22;
+}
+.ev [data-tone='blue'] path,
+.ev-tip[data-tone='blue'] {
+  stroke: var(--ep-lx-blue);
+  fill: var(--ep-lx-blue);
+}
+.ev [data-tone='violet'] path,
+.ev-tip[data-tone='violet'] {
+  stroke: var(--ep-lx-action);
+  fill: var(--ep-lx-action);
+}
+.ev [data-tone='amber'] path,
+.ev-tip[data-tone='amber'] {
+  stroke: var(--ep-lx-amber);
+  fill: var(--ep-lx-amber);
+}
+.ev-lines path {
+  fill: none !important;
+}
+/* keeps the headline readable over bright footage */
+.ev-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--ep-lx-bg) 0%, color-mix(in oklab, var(--ep-lx-bg) 55%, transparent) 30%, transparent 60%);
+  pointer-events: none;
+}

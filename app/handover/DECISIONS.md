@@ -62,3 +62,6 @@ User explicitly requested Mercury's zoom-on-scroll interaction. Replace chrome s
 
 ## 2026-10-07 · Colour hierarchy refinement
 User requested a more considered fintech palette. Keep the current landing structure and motion. Mercury is the dominant restraint reference, with Ramp and TradingView reviewed as secondary product references. Use shared graphite surfaces, silver typography, cobalt primary landing actions, pale blue selection/progress, and muted amber for warning/sample states. Raise faint label contrast. This supersedes the old emerald default for the active studio theme. No new libraries or components.
+
+## 2026-10-08 · Hero footage (overrides "no video backgrounds" for the landing hero only)
+Chahat asked for the TradingView-style hero: real Earth-at-night footage with market lines rising from cities. TradingView's own clip is their copyrighted asset and is not used. Source instead NASA ISS footage of Earth at night (public domain), served from `public/earth/hero.mp4` with a poster frame; credited in THIRD-PARTY-NOTICES. Market lines are an SVG overlay of real series (stake history, Fee Index) drawn with DrawSVG via useGSAP + matchMedia; reduced motion shows the poster and drawn lines. If the clip is missing or fails, the live 3D Earth (NASA textures, R3F) renders instead. App pages keep the rule: no video anywhere else.

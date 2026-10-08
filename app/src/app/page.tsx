@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Lenis from 'lenis';
@@ -19,6 +19,7 @@ import { AdvanceCalculator } from '@/components/landing/advance-calculator';
 import { NetworkHero } from '@/components/epoch/network-hero';
 import { HeroWord } from '@/components/landing/hero-word';
 import { OpenCards, EpochOrbit } from '@/components/landing/open-cards';
+import { EarthVideo } from '@/components/landing/earth-video';
 import { Intro } from '@/components/landing/intro';
 
 
@@ -68,6 +69,9 @@ export default function Home() {
   const n = network.data;
   const root = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
+  // real footage when /earth/hero.mp4 plays; the live 3D Earth otherwise
+  const [footage, setFootage] = useState(true);
+  const noFootage = useCallback(() => setFootage(false), []);
   const scroll = useRef(0);
   const progress = n ? n.epoch.slotIndex / n.epoch.slotsInEpoch : 0.9;
   const history = n?.validatorCountHistory ?? [];
@@ -170,7 +174,11 @@ export default function Home() {
         {/* ── Hero ─────────────────────────────────────────── */}
         <section className="lx-hero" aria-labelledby="hero-title">
           <div className="lx-hero-bg" aria-hidden="true">
-            <HorizonScene scroll={scroll} paused={paused} total={n?.validators.total} belowBreakEven={n?.validators.belowBreakEven} />
+            {footage ? (
+              <EarthVideo paused={paused} onFail={noFootage} />
+            ) : (
+              <HorizonScene scroll={scroll} paused={paused} total={n?.validators.total} belowBreakEven={n?.validators.belowBreakEven} />
+            )}
           </div>
           <div className="lx-hero-copy">
             <Link href="/terminal" className="lx-hero-pill">
