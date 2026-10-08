@@ -80,16 +80,15 @@ under 44 px on touch; motion → `src/design/motion.ts`, transform/opacity only,
 | SlotRuler | Kibo UI `ticker` or a Magic UI `marquee` of ticks, animated with anime.js through `src/lib/anime.ts` |
 | HealthBadge, SampleBadge, NetworkBadge | shadcn `badge` + `tooltip` |
 | DependencyBar, repayment and lent-out bars | shadcn `progress` |
-| StakeFlowChart, FeeIndexChart, FeeIndexForwardChart, stake-by-epoch, launch price chart | lightweight-charts + lightweight-charts-react-components |
+| StakeFlowChart, FeeIndexChart, stake-by-epoch | lightweight-charts + lightweight-charts-react-components |
 | Small bars, sparklines, rings, allocation | shadcn `chart` (Recharts), EvilCharts |
 | LossWaterfall | visx (or Recharts stacked bar) |
 | Every table (validators, loan book, moves, queue, history) | TanStack Table + Virtual through ReUI `data-grid` or openstatus data-table |
-| ActionPanel, DepositPanel, PredictTicket, SwapTicket, TradeCard | shadcn `card` + `toggle-group` + `input` + `slider` + `button`; ReUI `stepper` for multi-step |
+| ActionPanel, DepositPanel, PredictTicket | shadcn `card` + `toggle-group` + `input` + `slider` + `button`; ReUI `stepper` for multi-step |
 | BorrowConsole, TxPreview, WalletSignIn | shadcn `sheet` / `dialog` + `command` + ReUI `stepper`; wallet-adapter hooks |
 | ExplorerLinks | shadcn `dropdown-menu` |
-| PredictMarketCard, TrancheCard, LaunchCard, CurveCard, validator cards | shadcn `card` + `progress` + `badge` |
-| Activity feed, BuybackFeed | Magic UI `animated-list` |
-| PayoffLine (Fee Market ticket) | shadcn `chart` (Recharts line) |
+| PredictMarketCard, TrancheCard, validator cards | shadcn `card` + `progress` + `badge` |
+| Activity feed | Magic UI `animated-list` |
 | Landing hero object | shadergradient / R3F + drei (the only WebGL) |
 
 ## §5 The target screens per page
@@ -99,9 +98,7 @@ Terminal — Mercury Insights `18cf9c6a` (+ Kraken Pro strip and tables `6975134
 collection stats `52465519`; Validator — **Wealthsimple NVDA `47b50f40` (north star)** (+ Mercury Financing
 `7afb3554` for Manage); My Stake — Mercury Home `859b1114`; Sign in — Reown split `0457489c` + Acctual flow
 8823; Predict (`/predict`) — Stocktwits poll `50c3c89d`; Vault — Mercury Treasury `26e9c3a5` + Copperx flow
-8894; Fee Market (`/terminal?tab=market`) — Kraken Pro BTC-USD `cd4884df` (+ Kraken Pro tables `69751349`, Reown
-review `7d84a622`); Launch — OpenSea Drops `869184ab` (list) + Wealthsimple NVDA `47b50f40` (token page). App shell
-for every app page: Mercury's sidebar and top bar.
+8894. App shell for every app page: Mercury's sidebar and top bar.
 
 ## §6 The only rule this router enforces
 Whatever a skill produces must obey `CLAUDE.md`: Refero structure with Epoch identity · libraries first ·

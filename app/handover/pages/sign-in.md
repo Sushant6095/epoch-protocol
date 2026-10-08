@@ -33,15 +33,14 @@ Run `/refs sign-in` first: it pulls these images through the Refero MCP and writ
 | Left (value) | "See what your SOL is *really doing.*" and three check lines: signing in is a message, not a transaction · you approve every action in your wallet · exchange stakers can paste an address first | **Reown split sign-in** left card |
 | Right, step 1 of 2 | Wallet rows, 56 px: Phantom, Solflare, Backpack (each "Detected" or "Install"), then "Other wallets" (Wallet Standard); a divider; "Any wallet address (read-only)" input + View | Reown right column; OpenSea dark wallet list with the "Solana" tag; Acctual flow step 2 |
 | Right, connecting | Wallet icon + "Continue in Phantom" + Cancel | Acctual flow step 4 |
-| Right, step 2 of 2 | "Sign to confirm this wallet is yours." The full Sign In With Solana message in mono (domain = the app's own host, `window.location.host`; address, statement, URI, version, chain, nonce, issued at, expiration) BEFORE the wallet opens; Back and **Sign message** | Acctual flow step 5 (sign to confirm ownership) |
+| Right, step 2 of 2 | "Sign to confirm this wallet is yours." The full Sign In With Solana message in mono (domain, address, statement, URI, version, chain, nonce, issued at, expiration) BEFORE the wallet opens; Back and **Sign message** | Acctual flow step 5 (sign to confirm ownership) |
 | Right, done | "Signed in" with the short address; the page swaps to My Stake | Acctual flow step 6 |
 | Below | Three cards: what you'll see, what we watch, what you can do | — |
 
 ## Flow (wallet-adapter)
 
 1. `select(walletName)` → `connect()` (handle "not installed" → link to install, and user rejection).
-2. `POST /v1/auth/siws/nonce` → build the SIWS input (`domain: window.location.host`) → show it →
-   `signIn(input)` from the adapter.
+2. `POST /v1/auth/siws/nonce` → build the SIWS input → show it → `signIn(input)` from the adapter.
 3. `POST /v1/auth/siws/verify` with the output → session cookie → roles from chain → redirect to `/me`
    (or back to where the user came from).
 4. Until the endpoints exist: sign in the browser and keep the session client-side, clearly marked dev-only.
@@ -51,11 +50,7 @@ Account menu (header chip): copy address, view on explorers, switch wallet, read
 ## Rules
 
 Never ask for or accept a seed phrase or private key anywhere, including support copy. The domain in the
-message is the app's own host, `window.location.host` (decision 7, settled 1 Oct): the Vercel production URL
-for now, a custom domain later. The API accepts only domains in `SIWS_ALLOWED_DOMAINS` (comma-separated:
-`localhost:3000` and the Vercel production host; request #7). Signing in works with the wallet on mainnet or
-devnet: it is a message, and the Epoch program runs on devnet for now (decision 6). Session expiry → quiet
-re-sign prompt, not a logout wall.
+message is the real app domain (open decision 7). Session expiry → quiet re-sign prompt, not a logout wall.
 
 ## Done when
 

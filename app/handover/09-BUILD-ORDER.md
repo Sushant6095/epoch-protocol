@@ -1,8 +1,7 @@
 # 09 · Build order
 
 Dates are IST and follow the gates in `docs/PLAN.md`. The demo judges see is a screen recording under
-3 minutes at 1,280 px: Landing → Terminal (and its Fee Market tab) → Validators → a profile's Manage tab → Vault →
-My Stake. Launch gets its own short clip for the Meteora side track.
+3 minutes at 1,280 px: Landing → Terminal → Validators → a profile's Manage tab → Vault → My Stake.
 
 ## Phase 0 — foundation (29–30 Sep)
 
@@ -27,9 +26,6 @@ My Stake. Launch gets its own short clip for the Meteora side track.
       Biggest delegators; Loan book on sample), Fee Index card with explainer, live activity (sample).
 - [ ] Switch `useFeeIndex` to `GET /v1/index` as soon as `api_app` serves it; others stay on fixtures
       until their endpoints land.
-- [ ] `/v1/network`, `/v1/network/stake-history`, `/v1/validators` and both delegator endpoints were built on 1 Oct
-      for the branch `feat/api-network-validators-delegators`: once it is pushed, run it locally
-      (`07-DATA-CONTRACTS.md`), and flip `USE_API` for each hook once Sushant deploys it (request #25).
 
 ## Gate 2 — first real advance (5 Oct)
 
@@ -45,13 +41,8 @@ My Stake. Launch gets its own short clip for the Meteora side track.
 - [ ] `/screen my-stake`: tiles, alert banner, stake accounts, rewards per epoch, where your stake sits,
       healthier homes with the move plan, alerts.
 - [ ] `/screen landing` with live numbers, the 3D/shader hero, how-it-works flow, verify tiles.
-- [ ] `/screen predict` in points mode (decisions 2 and 3, settled 1 Oct): Fee Index markets, calls with
-      the sign-in session and no wallet transaction; the real-SOL path stays behind `PREDICT_REAL_SOL` (off).
-- [ ] `/refs fee-market`, then `/screen fee-market` (7–8 Oct; plan F7 puts the Market UI on 8 Oct): the Terminal's
-      Economy · Fee Market tabs, ticket, quotes by epoch, Fee Index chart with the forward quotes, docked tables, the
-      review flow on epoch-sdk `openSwap` (request #20); fixtures until `GET /v1/market` (request #19).
-- [ ] `/refs launch`, then `/screen launch` (8–9 Oct; plan F13 puts the Launch UI on 8 Oct): the list, the token page,
-      the Trade card on `@epoch/meteora` (request #23); fixtures until `GET /v1/launches` (request #22).
+- [ ] `/screen predict` ONLY if decisions 2 and 3 in `10-OPEN-DECISIONS.md` are cleared; otherwise it
+      ships behind a feature flag (points-only mode or hidden).
 - [ ] Passes on every page: reduced motion, contrast, axe clean, phone width, impeccable clean,
       1,280 px screen recording.
 
@@ -59,8 +50,6 @@ My Stake. Launch gets its own short clip for the Meteora side track.
 
 - [ ] Every page on the production URL, network badge correct, no Sample badge on anything that is live.
 - [ ] Record the demo; re-record after any visual fix.
-- [ ] Record the Launch clip for the Meteora side track (closes 13 Oct 12:29 IST): list → rKEST-style token page →
-      a devnet buy → the buyback feed.
 - [ ] README screenshots from `design/screens/impl/`.
 
 ## Daily rhythm

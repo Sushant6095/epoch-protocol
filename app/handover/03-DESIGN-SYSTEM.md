@@ -19,7 +19,6 @@ Copy them to `src/styles/`, `src/design/` and `src/lib/` on day one; every scree
 ## Themes
 
 Two dark themes, same variable names, same meanings. `<html data-theme="emerald" className="dark">`.
-Emerald is final for v1 (decision 1, settled 1 Oct); graphite stays in the code as an unused alternative.
 
 | Token | emerald (default) | graphite (canvas v1) | Use |
 | --- | --- | --- | --- |

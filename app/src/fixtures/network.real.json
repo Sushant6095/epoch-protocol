@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-09-29T00:30:00+05:30",
+  "source": "Solana mainnet RPC, Jito Kobe, Stakewiz, validators.app",
+  "kind": "real",
+  "epoch": {
+    "number": 1044,
+    "slotsInEpoch": 432000,
+    "slotIndex": 395700,
+    "startSlot": 451008000,
+    "secondsPerSlot": 0.267,
+    "hoursPerEpoch": 32.2,
+    "epochsPerYear": 271.5
+  },
+  "validators": {
+    "total": 683,
+    "delinquent": 7,
+    "belowBreakEven": 136,
+    "dependOnOneDelegator": 338,
+    "dependOnFoundation": 130,
+    "superminorityCount": 18
+  },
+  "stake": {
+    "totalSol": 441000000,
+    "activatingThisEpochSol": 950000,
+    "deactivatingThisEpochSol": 970000,
+    "medianApyPct": 4.95,
+    "topApyPct": 5.2
+  },
+  "delegators": {
+    "wallets": 582644,
+    "stakeAccounts": 1356362,
+    "medianWalletSol": 1,
+    "retail": {
+      "wallets": 573000,
+      "sharePct": 3.4
+    },
+    "midSize": {
+      "wallets": 9000,
+      "sharePct": 16.4
+    },
+    "allocators": {
+      "holders": 560,
+      "sharePct": 80.2
+    }
+  },
+  "blocks": {
+    "perDay": 323376,
+    "skipRatePct": 0.02
+  },
+  "tps": {
+    "total": 4747,
+    "user": 2226,
+    "vote": 2521
+  },
+  "finalitySeconds": 8.5,
+  "clients": {
+    "agavePct": 84.3,
+    "firedancerPct": 15.7,
+    "validatorsWithVersion": 652
+  },
+  "breakEvenStakeSol": 87000,
+  "voteFeesPerEpochSol": 2.16,
+  "price": {
+    "solUsd": 119.8,
+    "usdInr": 95.93
+  },
+  "validatorCountHistory": [
+    {
+      "date": "2023-03",
+      "count": 2560,
+      "source": "Cointelegraph"
+    },
+    {
+      "date": "2026-01",
+      "count": 795,
+      "source": "Cointelegraph"
+    },
+    {
+      "date": "2026-09-29",
+      "count": 683,
+      "source": "Solana RPC"
+    }
+  ]
+}

@@ -1,32 +1,46 @@
-"use client";
+'use client';
 // anime.js v4 wrapper for Epoch. Copy to app/src/lib/anime.ts. anime.js is sanctioned ONLY for
 // staggered SVG and glyph work that GSAP and Motion do not cover well (the slot-ruler tick sweep,
 // staggered dot-matrix reveals). Import anime from here, never from "animejs" directly.
 // Under prefers-reduced-motion the element jumps to its end state (no travel). Timelines are skipped:
 // build them so their end state is also the element's resting CSS.
-import { animate, createTimeline, cubicBezier, stagger, svg, utils } from "animejs";
-import motion from "@/design/motion";
+import { animate, createTimeline, cubicBezier, stagger, svg, utils } from 'animejs';
+import motion from '@/design/motion';
 
 const epochEase = cubicBezier(...motion.easeOut);
 
-const reduced = () =>
-  typeof window !== "undefined" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 type Targets = Parameters<typeof animate>[0];
 type Params = NonNullable<Parameters<typeof animate>[1]>;
 
 const TIMING_KEYS = new Set([
-  "duration", "delay", "ease", "loop", "alternate", "reversed", "autoplay", "frameRate", "playbackRate",
-  "playbackEase", "composition", "modifier", "onBegin", "onUpdate", "onRender", "onLoop", "onPause",
-  "onComplete", "onBeforeUpdate",
+  'duration',
+  'delay',
+  'ease',
+  'loop',
+  'alternate',
+  'reversed',
+  'autoplay',
+  'frameRate',
+  'playbackRate',
+  'playbackEase',
+  'composition',
+  'modifier',
+  'onBegin',
+  'onUpdate',
+  'onRender',
+  'onLoop',
+  'onPause',
+  'onComplete',
+  'onBeforeUpdate',
 ]);
 
 /** The values an animation ends on: the last keyframe of every animated property. */
 function endState(params: Params): Record<string, unknown> {
   const end: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params as Record<string, unknown>)) {
-    if (TIMING_KEYS.has(key) || typeof value === "function") continue;
+    if (TIMING_KEYS.has(key) || typeof value === 'function') continue;
     end[key] = Array.isArray(value) ? value[value.length - 1] : value;
   }
   return end;

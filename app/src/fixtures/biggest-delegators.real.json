@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-09-29T00:30:00+05:30",
+  "source": "Solana mainnet RPC, Jito Kobe, Stakewiz, validators.app",
+  "kind": "real",
+  "rows": [
+    {
+      "name": "Solana Foundation (delegation program)",
+      "stakeSol": 27120000,
+      "validators": 349,
+      "kind": "Foundation"
+    },
+    {
+      "name": "JitoSOL pool",
+      "stakeSol": 10330000,
+      "validators": 673,
+      "kind": "Liquid staking"
+    },
+    {
+      "name": "Binance BNSOL",
+      "stakeSol": 10240000,
+      "validators": 5,
+      "kind": "Exchange"
+    },
+    {
+      "name": "Unlabelled institution",
+      "stakeSol": 7980000,
+      "validators": 26,
+      "kind": "Custodian / fund"
+    },
+    {
+      "name": "JupSOL pool",
+      "stakeSol": 5170000,
+      "validators": 7,
+      "kind": "Liquid staking"
+    }
+  ]
+}

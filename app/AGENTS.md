@@ -18,8 +18,7 @@ fees, every staker sees which validators are healthy. Read `handover/00-START-HE
    router §2 and §4 in `.claude/skills/epoch-ui-craft/SKILL.md`). Writing one from scratch needs a line in
    `handover/DECISIONS.md` that names the libraries you searched.
 3. **Every click is specified.** Behaviour, data calls and states come from `handover/11-CLICK-MAP.md`; each
-   row is a test case. Missing behaviour → add a row first. Which API and program instruction each screen
-   uses, and what exists today: `handover/13-BACKEND-AND-PROGRAM-MAP.md`.
+   row is a test case. Missing behaviour → add a row first.
 
 ## Skills (playbooks you should read before the matching task)
 All in `.claude/skills/<name>/SKILL.md`. Start with `epoch-ui-craft` (it tells you which one to open next).

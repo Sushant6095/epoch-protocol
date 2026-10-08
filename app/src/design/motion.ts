@@ -29,17 +29,16 @@ export const motion = {
   /** Expo-out: calm and premium. Same curve for CSS, Motion and GSAP. */
   easeOut: [0.16, 1, 0.3, 1] as [number, number, number, number],
   /** Motion (motion.dev) spring for selection pills, tabs underline, number rolls. No wobble. */
-  spring: { type: "spring", duration: 0.3, bounce: 0 } as const,
+  spring: { type: 'spring', duration: 0.3, bounce: 0 } as const,
   /** Reduced-motion budget: near-instant, no travel. */
-  reduced: { duration: 0.01, ease: "linear" } as const,
+  reduced: { duration: 0.01, ease: 'linear' } as const,
 } as const;
 
 /** CSS easing string for inline styles and Tailwind arbitrary-free usage via the token. */
-export const ease = `cubic-bezier(${motion.easeOut.join(", ")})`;
+export const ease = `cubic-bezier(${motion.easeOut.join(', ')})`;
 
 /** CSS transition shorthand using the standard duration and ease. */
-export const transition = (prop: string, ms: number = motion.transition): string =>
-  `${prop} ${ms}ms ${ease}`;
+export const transition = (prop: string, ms: number = motion.transition): string => `${prop} ${ms}ms ${ease}`;
 
 /** Motion (motion/react) transition presets. */
 export const presets = {

@@ -118,7 +118,7 @@ export function MeteoraProof() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <DataStatus source={isSampleKind(l.kind) ? "sample" : list.data.source} asOf={l.asOf} sampleNote="Tokens recorded on the local stand-in with Meteora's mainnet programs (3–5 Oct 2026)." />
+        <DataStatus source={isSampleKind(l.kind) ? "sample" : list.data.source} asOf={l.asOf} sampleNote="Tokens recorded on the local stand-in with Meteora's mainnet programs (3-5 Oct 2026)." />
       </div>
       <KeyValueGrid cols={3}>
         <KeyValue label="Revenue tokens" value={fmtInt(l.launches.length)} valueClassName="text-xl" sub={`${onCurve} on the curve · ${graduated} graduated`} />

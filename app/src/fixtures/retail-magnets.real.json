@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-09-29T00:30:00+05:30",
+  "source": "Solana mainnet RPC, Jito Kobe, Stakewiz, validators.app",
+  "kind": "real",
+  "note": "delegator wallets per validator, from a scan of all 1.36M stake accounts",
+  "rows": [
+    {
+      "name": "Everstake",
+      "wallets": 120031
+    },
+    {
+      "name": "Ledger by Figment",
+      "wallets": 70476
+    },
+    {
+      "name": "Phantom Validator",
+      "wallets": 61933
+    },
+    {
+      "name": "Trust Nodes",
+      "wallets": 36006
+    },
+    {
+      "name": "Solflare",
+      "wallets": 35779
+    },
+    {
+      "name": "Solana Mobile",
+      "wallets": 25607
+    }
+  ]
+}

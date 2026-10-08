@@ -1,0 +1,26 @@
+{
+  "Phantom Validator": {
+    "src": "/validators/phantom-validator.png",
+    "source": "https://phantom.com/_web_platform_assets/favicon-96x96.png"
+  },
+  "Solflare": {
+    "src": "/validators/solflare.png",
+    "source": "https://www.solflare.com/wp-content/themes/solflare-web-2024/static/ui/favicon/favicon-96x96.png"
+  },
+  "Helius": {
+    "src": "/validators/helius.png",
+    "source": "https://www.helius.dev/favicon-96x96.png"
+  },
+  "Figment": {
+    "src": "/validators/figment.png",
+    "source": "https://www.figment.io/wp-content/uploads/2023/02/Figment-F-Icon.png"
+  },
+  "P2P.org": {
+    "src": "/validators/p2p-org.svg",
+    "source": "https://cdn.prod.website-files.com/661ce38fc2cbb4e39a655100/661e5a04c53f2dcc93c360b0_32x32.svg"
+  },
+  "Triton One": {
+    "src": "/validators/triton-one.png",
+    "source": "https://triton.one/favicon.png"
+  }
+}

@@ -38,7 +38,7 @@ Run `/refs landing` first: it pulls these images through the Refero MCP and writ
 | 7 | How it works | Three numbered steps + an animated flow: vote account → Epoch escrow → Vault (repays) and validator payout (keeps the rest) | static | Kraken's 1-2-3 steps; @xyflow/react or Magic UI animated-beam for the flow |
 | 8 | Pick your side | Three audience cards (delegators, lenders, validators), each with its real number and link | `network.delegators.wallets`, vault TVL, `network.validators.total` | — |
 | 9 | Who holds the stake | Split bar: retail ≈573,000 wallets 3.4% · mid-size ≈9,000 16.4% · allocators 560 holders 80.2%; biggest-delegators table; "where retail stakes" bars (Everstake 120,031 wallets … Solana Mobile 25,607) | `network.delegators.*`, `useBiggestDelegators`, `useRetailMagnets` | OpenSea data-console density |
-| 10 | Predict teaser | One sample market card with the YES/NO bar, pool in points, players, "Points only · no cash value" + "18+ · where allowed" | `usePredict` → `markets[0]` | Stocktwits poll card |
+| 10 | Predict teaser | One sample market card with the YES/NO bar, pool, players, "Settles by Panta" + "18+ · where allowed" | `usePredict` → `markets[0]` | Stocktwits poll card |
 | 11 | Don't trust, verify | Five explorer tiles for one real vote account (NTT DOCOMO GLOBAL) | `useValidator` → `vote`, `identity`; `lib/explorers.ts` | — |
 | 12 | Final CTA + footer | "Is your validator healthy?" + Check my stake; footer strip | — | Kraken closing band |
 
@@ -59,7 +59,7 @@ and grey the live dot with "updated 2 min ago". WebGL failure falls back to the 
 
 Hero: "The revenue desk for *Solana validators.*" · sub: "Validators borrow against their next paychecks,
 lenders earn the fees, and every staker can see which validators are healthy." · Never promise a yield;
-show live network numbers. Predict teaser uses "call", "pool", "payout", "points" only, never SOL.
+show live network numbers. Predict teaser uses "call", "pool", "payout" only.
 
 ## Done when
 

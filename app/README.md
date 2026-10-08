@@ -42,8 +42,7 @@ shadcn, Magic UI, Context7, Playwright, Chrome DevTools, Figma, ReUI, CSS Studio
 colours, fonts, logo, words and data: `handover/12-REPLICA-BLUEPRINTS.md`, the `refero-replica` skill and
 `scripts/ui/ref-compare.mjs`. **Every component comes from a library** (`handover/04-UI-LIBRARIES.md`).
 The design canvas "Epoch — UI designs (5 pages)" and its renders in `handover/design/boards/` only map which
-content and controls exist (the Fee Market and Launch, added on 1 Oct, have no board: their specs are the map);
-what every click does is in `handover/11-CLICK-MAP.md`. Where a board and a spec disagree, the spec wins.
+content and controls exist; what every click does is in `handover/11-CLICK-MAP.md`.
 
 ## The Refero screen to follow first
 
@@ -67,9 +66,8 @@ the Vault and Predict. Every other page's lock is in `handover/06-REFERO-SCREENS
 | `handover/design/components.json` | shadcn 4 config (`base-nova`, CSS at `src/styles/globals.css`) — copy it instead of running `shadcn init` |
 | `handover/00-START-HERE.md` | Reading order and the pages at a glance |
 | `handover/01 … 10` | Product and users · sitemap and routes · design system · UI libraries · MCP servers and skills · Refero screens · data contracts · git workflow · build order · open decisions |
-| `handover/11-CLICK-MAP.md` | What every click does on every page (322 rows, the Fee Market and Launch included): route, UI change, hook or call, loading · empty · error · success |
+| `handover/11-CLICK-MAP.md` | What every click does on every page (264 rows): route, UI change, hook or call, loading · empty · error · success |
 | `handover/12-REPLICA-BLUEPRINTS.md` | The look: every region of every Refero screen mapped to Epoch content and a library component |
-| `handover/13-BACKEND-AND-PROGRAM-MAP.md` | The wiring: per screen, which API it reads and which program instruction the wallet signs; what the backend and program have today; the words for every program error |
 | `.claude/skills/` | 24 skills: the router, `refero-replica`, Sushant's `sushant-special-fe`, and 21 published design, motion and React skills with their licences (list: `THIRD-PARTY-SKILLS.md`) |
 | `AGENTS.md` | The same rules for any other coding agent (Codex, Cursor, Astra …) |
 | `skills-lock.json` · `scripts/update-skills.sh` | Where each vendored skill came from; refresh them |

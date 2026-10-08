@@ -74,20 +74,6 @@ Style lock: Fey (`08ae8676-eeed-4eba-9835-856c0f25a1d4`).
 
 To extend: `refero_get_similar_screens` on the primary, or search "dark finance dashboard hero number with range brush chart", "trading dashboard KPI strip with tabbed tables", "index explainer modal".
 
-### Fee Market · `/terminal?tab=market` (a Terminal tab, added 1 Oct)
-
-**Hero:** the ticket beside the quotes by epoch and the Fee Index chart. Spec: `handover/pages/fee-market.md`. No
-new searches: every screen below was already in this lock, picked again for its trading layout.
-
-| Role | Screen | Take | Don't take |
-| --- | --- | --- | --- |
-| primary | [Kraken Pro — BTC-USD trade screen](https://refero.design/pages/cd4884df-7bf5-4c8e-9814-c604e1e9f6f0)<br>`cd4884df-7bf5-4c8e-9814-c604e1e9f6f0` | Three columns: order form (side tabs, amount with unit, estimate rows, one button), order book (our quotes by epoch with a "now" line), chart with a slim toolbar; the status line at the bottom. | Purple, order types, drawing tools, colour picker, candles, 'Verify your account'. |
-| secondary | [Kraken Pro — trading dashboard](https://refero.design/pages/69751349-05f1-4fee-abac-c5452f01bc17)<br>`69751349-05f1-4fee-abac-c5452f01bc17` | The KPI strip and the tabbed tables docked at the bottom (Your swaps · Recent swaps · Settlements). | Resizable panels, several charts at once. |
-| secondary | [Reown — Preview swap (dark)](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6)<br>`7d84a622-9f0f-459a-82a6-5ec05e3dc1a6` | The review step for `open_swap` and `settle_swap`: rows, 'Review carefully', Cancel / Sign. | Token icons, price impact and slippage rows (the rate is fixed). |
-| secondary | [Stocktwits — Sentiment Index explainer](https://refero.design/pages/9ede2f3b-2a72-41c5-8e09-19d21483cfdb)<br>`9ede2f3b-2a72-41c5-8e09-19d21483cfdb` | "How a fee swap works": one paragraph, a payoff scale, one button. | Fear/greed colours. |
-
-To extend: `refero_get_similar_screens` on the primary, or search "trading order form beside order book and chart dark", "positions table docked under a chart".
-
 ### Validators · `/validators`
 
 **Hero:** The ranked, filterable table of all 683 validators. Spec: `handover/pages/validators.md`.
@@ -128,16 +114,16 @@ Style lock: Fey (`08ae8676-eeed-4eba-9835-856c0f25a1d4`).
 
 To extend: `refero_get_similar_screens` on the primary, or search "dark dashboard home with balance chart and accounts list", "staking balance total rewards staked assets table", "grouped transactions list dark".
 
-### Predict · `/predict` (`/me#predict` redirects here)
+### Predict · `/me#predict`
 
 **Hero:** The market card with its YES/NO bar. Spec: `handover/pages/predict.md`.
 
 | Role | Screen | Take | Don't take |
 | --- | --- | --- | --- |
-| primary | [Stocktwits — poll card on an asset page (dark)](https://refero.design/pages/50c3c89d-5cb1-4aa3-8082-9b4ef3ce30d0)<br>`50c3c89d-5cb1-4aa3-8082-9b4ef3ce30d0` | Question, one bar per outcome with its share, total votes and time left, sitting inside a data page rather than a casino lobby. Our card: question, YES/NO bar with pool share, pool in points, players, closes with epoch N. | The social feed, bullish/bearish buttons, the green 'Trade' button. |
+| primary | [Stocktwits — poll card on an asset page (dark)](https://refero.design/pages/50c3c89d-5cb1-4aa3-8082-9b4ef3ce30d0)<br>`50c3c89d-5cb1-4aa3-8082-9b4ef3ce30d0` | Question, one bar per outcome with its share, total votes and time left, sitting inside a data page rather than a casino lobby. Our card: question, YES/NO bar with pool share, pool in SOL, players, closes with epoch N. | The social feed, bullish/bearish buttons, the green 'Trade' button. |
 | secondary | [Kraken Pro — order form](https://refero.design/pages/cd4884df-7bf5-4c8e-9814-c604e1e9f6f0)<br>`cd4884df-7bf5-4c8e-9814-c604e1e9f6f0` | The ticket: a two-way toggle (YES / NO), amount input with preset chips, an estimate line, one full-width button. | Limit/stop order types. |
 | secondary | [Coinbase Advanced — gated ticket](https://refero.design/pages/c2dbc562-373b-4790-b6dd-fa8ac6cf2c59)<br>`c2dbc562-373b-4790-b6dd-fa8ac6cf2c59` | The ticket replaced by a calm blocking state with one button: our 18+ and region check, and 'Connect wallet to call'. | KYC wording. |
-| secondary | [Reown — Preview swap (dark)](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6)<br>`7d84a622-9f0f-459a-82a6-5ec05e3dc1a6` | The review step: rows of what the call does (market, side, points, payout if right, points left this epoch), 'Review carefully', Cancel / Confirm. Predict is points only (1 Oct): nothing is signed. | Swap wording, the network fee row. |
+| secondary | [Reown — Preview swap (dark)](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6)<br>`7d84a622-9f0f-459a-82a6-5ec05e3dc1a6` | The approve step: rows of what will be signed (market, side, amount, network fee, refund if cancelled), 'Review carefully', Cancel / Confirm. | Swap wording. |
 
 To extend: `refero_get_similar_screens` on the primary, or search "poll card with percentage bars and votes", "order form buy sell toggle amount presets", "transaction preview modal before signing dark".
 
@@ -156,20 +142,6 @@ To extend: `refero_get_similar_screens` on the primary, or search "poll card wit
 | secondary | [Column — account with transfers (dark)](https://refero.design/pages/10d78fe2-0d3a-45e8-b086-abc28c644ac0)<br>`10d78fe2-0d3a-45e8-b086-abc28c644ac0` | KPI row over a filterable table with status badges and a direction column: the loan book and withdrawal queue. | Bank transfer types. |
 
 To extend: `refero_get_similar_screens` on the primary, or search "treasury account allocation ring net yield", "deposit modal amount quote review", "transaction progress step list success".
-
-### Launch · `/launch` and `/launch/[mint]` (added 1 Oct)
-
-**Hero:** on the list, the launch card with its raise bar; on a token, the price and what backs it, beside the
-Trade card. Spec: `handover/pages/launch.md`.
-
-| Role | Screen | Take | Don't take |
-| --- | --- | --- | --- |
-| primary | [OpenSea — Drops](https://refero.design/pages/869184ab-10dc-4787-927f-7a90f388f24f)<br>`869184ab-10dc-4787-927f-7a90f388f24f` | `/launch`: bold title over two tabs (Active & upcoming / Past), group headings, one wide card per drop with a status badge, name and creator, a stats line, a countdown and one small button. | The light theme, banner artwork, ETH prices, cart and profile icons. |
-| primary | [Wealthsimple — NVDA stock page (dark)  ← NORTH STAR](https://refero.design/pages/47b50f40-2189-480a-8279-8d1796ddf5eb)<br>`47b50f40-2189-480a-8279-8d1796ddf5eb` | `/launch/[mint]`: identity row with a watch star, one price with its change, one chart with a labelled dashed line and range pills, the sticky Buy card, then Market details → what backs it, Dividends → buybacks, News → the buyback feed, About → about and risks. | Options, the promo illustration, account-creation copy. |
-| secondary | [Reown — Preview swap (dark)](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6)<br>`7d84a622-9f0f-459a-82a6-5ec05e3dc1a6` | The buy and sell review with price impact, minimum received and fee rows, 'Review carefully', Cancel / Sign. | Token logos. |
-| secondary | [Coinbase Advanced — gated ticket](https://refero.design/pages/c2dbc562-373b-4790-b6dd-fa8ac6cf2c59)<br>`c2dbc562-373b-4790-b6dd-fa8ac6cf2c59` | The 18+ and region gate before the first trade, with the not-an-offer line. | KYC wording. |
-
-To extend: `refero_get_similar_screens` on OpenSea Drops, or search "token launch page bonding curve progress", "drops list wide cards countdown dark".
 
 ## Flows used
 
@@ -198,14 +170,14 @@ No Hyperliquid app screens (only its marketing style above), no Polymarket or Ka
 | [`50d92ee2-7149-4802-80fe-6e191616ddaf`](https://refero.design/pages/50d92ee2-7149-4802-80fe-6e191616ddaf) | Acctual | https://app.acctual.com/payments/receive | Sign in |
 | [`8c2b4da5-7d7a-4b6b-8ab5-752fbb032bae`](https://refero.design/pages/8c2b4da5-7d7a-4b6b-8ab5-752fbb032bae) | OpenSea | https://opensea.io/login | Sign in |
 | [`18cf9c6a-e713-4e47-a3e2-db729d647cc3`](https://refero.design/pages/18cf9c6a-e713-4e47-a3e2-db729d647cc3) | Mercury | https://demo.mercury.com/insights/overview | Terminal |
-| [`69751349-05f1-4fee-abac-c5452f01bc17`](https://refero.design/pages/69751349-05f1-4fee-abac-c5452f01bc17) | Kraken | https://pro.kraken.com/app/trade/dai-usd | Terminal, Fee Market |
+| [`69751349-05f1-4fee-abac-c5452f01bc17`](https://refero.design/pages/69751349-05f1-4fee-abac-c5452f01bc17) | Kraken | https://pro.kraken.com/app/trade/dai-usd | Terminal |
 | [`f06ee439-d696-4a31-a32c-1e1b6bdfae35`](https://refero.design/pages/f06ee439-d696-4a31-a32c-1e1b6bdfae35) | Mercury | https://demo.mercury.com/insights/overview | Terminal |
-| [`9ede2f3b-2a72-41c5-8e09-19d21483cfdb`](https://refero.design/pages/9ede2f3b-2a72-41c5-8e09-19d21483cfdb) | Stocktwits | https://stocktwits.com/stream/people | Terminal, Fee Market |
+| [`9ede2f3b-2a72-41c5-8e09-19d21483cfdb`](https://refero.design/pages/9ede2f3b-2a72-41c5-8e09-19d21483cfdb) | Stocktwits | https://stocktwits.com/stream/people | Terminal |
 | [`52465519-ed54-42b3-95db-30226a52fe32`](https://refero.design/pages/52465519-ed54-42b3-95db-30226a52fe32) | OpenSea | https://opensea.io/rankings | Validators |
 | [`7e48ec24-1285-410c-8b9d-865dafa2862b`](https://refero.design/pages/7e48ec24-1285-410c-8b9d-865dafa2862b) | Stocktwits | https://stocktwits.com/sentiment | Validators |
 | [`0bfeff29-e274-4df6-9006-775da4955138`](https://refero.design/pages/0bfeff29-e274-4df6-9006-775da4955138) | Kraken | https://trade.kraken.com/markets | Validators |
 | [`c7c156f4-429d-41d2-ba4f-8ad2478cf703`](https://refero.design/pages/c7c156f4-429d-41d2-ba4f-8ad2478cf703) | Kraken | https://pro.kraken.com/app/trade/sbr-usd | Validators |
-| [`47b50f40-2189-480a-8279-8d1796ddf5eb`](https://refero.design/pages/47b50f40-2189-480a-8279-8d1796ddf5eb) | Wealthsimple | https://my.wealthsimple.com/app/security-details/sec-s-220e8c65080c441aa87da8089460fae4 | Validator profile, Launch |
+| [`47b50f40-2189-480a-8279-8d1796ddf5eb`](https://refero.design/pages/47b50f40-2189-480a-8279-8d1796ddf5eb) | Wealthsimple | https://my.wealthsimple.com/app/security-details/sec-s-220e8c65080c441aa87da8089460fae4 | Validator profile |
 | [`363e96ab-a3d1-4eb0-bbfb-1d9e4b0052d8`](https://refero.design/pages/363e96ab-a3d1-4eb0-bbfb-1d9e4b0052d8) | Wealthsimple | https://my.wealthsimple.com/app/security-details/sec-s-220e8c65080c441aa87da8089460fae4 | Validator profile |
 | [`857d5d0b-390b-4e95-a4a7-dd298180b8e7`](https://refero.design/pages/857d5d0b-390b-4e95-a4a7-dd298180b8e7) | Stocktwits | https://stocktwits.com/symbol/NVDA/sentiment | Validator profile |
 | [`7afb3554-b9d2-4634-bb44-01c9afd4146f`](https://refero.design/pages/7afb3554-b9d2-4634-bb44-01c9afd4146f) | Mercury | https://demo.mercury.com/capital/ecommerce | Validator profile |
@@ -213,13 +185,12 @@ No Hyperliquid app screens (only its marketing style above), no Polymarket or Ka
 | [`aa8460b1-db4b-40aa-a920-a1921d852c4d`](https://refero.design/pages/aa8460b1-db4b-40aa-a920-a1921d852c4d) | Kraken | https://www.kraken.com/u/earn/staking | My Stake |
 | [`2443b687-2f0d-464a-9a30-39567fba1d25`](https://refero.design/pages/2443b687-2f0d-464a-9a30-39567fba1d25) | Mercury | https://demo.mercury.com/transactions | My Stake |
 | [`50c3c89d-5cb1-4aa3-8082-9b4ef3ce30d0`](https://refero.design/pages/50c3c89d-5cb1-4aa3-8082-9b4ef3ce30d0) | Stocktwits | https://stocktwits.com/symbol/NVDA | Predict |
-| [`cd4884df-7bf5-4c8e-9814-c604e1e9f6f0`](https://refero.design/pages/cd4884df-7bf5-4c8e-9814-c604e1e9f6f0) | Kraken | https://pro.kraken.com/app/trade/btc-usd | Predict, Fee Market |
-| [`c2dbc562-373b-4790-b6dd-fa8ac6cf2c59`](https://refero.design/pages/c2dbc562-373b-4790-b6dd-fa8ac6cf2c59) | Coinbase | https://www.coinbase.com/advanced-trade/BTC-USDT | Predict, Launch |
-| [`7d84a622-9f0f-459a-82a6-5ec05e3dc1a6`](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6) | Reown | https://demo.reown.com/ | Predict, Vault, Fee Market, Launch |
+| [`cd4884df-7bf5-4c8e-9814-c604e1e9f6f0`](https://refero.design/pages/cd4884df-7bf5-4c8e-9814-c604e1e9f6f0) | Kraken | https://pro.kraken.com/app/trade/btc-usd | Predict |
+| [`c2dbc562-373b-4790-b6dd-fa8ac6cf2c59`](https://refero.design/pages/c2dbc562-373b-4790-b6dd-fa8ac6cf2c59) | Coinbase | https://www.coinbase.com/advanced-trade/BTC-USDT | Predict |
+| [`7d84a622-9f0f-459a-82a6-5ec05e3dc1a6`](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6) | Reown | https://demo.reown.com/ | Predict, Vault |
 | [`26e9c3a5-c493-4ab4-a7f9-216dc95b85c6`](https://refero.design/pages/26e9c3a5-c493-4ab4-a7f9-216dc95b85c6) | Mercury | https://demo.mercury.com/accounts/treasury/party-treasury-id-0 | Vault |
 | [`06475d7f-d26e-4a49-b649-30fa76adc86a`](https://refero.design/pages/06475d7f-d26e-4a49-b649-30fa76adc86a) | Copperx | https://payout.copperx.io/app | Vault |
 | [`bb22ea58-3993-48e1-aa3a-2b35c1309ad6`](https://refero.design/pages/bb22ea58-3993-48e1-aa3a-2b35c1309ad6) | Copperx | https://payout.copperx.io/app | Vault |
 | [`09948e77-45b2-4e9b-8c90-a2bd83f81344`](https://refero.design/pages/09948e77-45b2-4e9b-8c90-a2bd83f81344) | Copperx | https://payout.copperx.io/app | Vault |
 | [`eb79095c-7f3d-44a2-88e8-7f58dccab175`](https://refero.design/pages/eb79095c-7f3d-44a2-88e8-7f58dccab175) | Copperx | https://payout.copperx.io/app | Vault |
 | [`10d78fe2-0d3a-45e8-b086-abc28c644ac0`](https://refero.design/pages/10d78fe2-0d3a-45e8-b086-abc28c644ac0) | Column | https://dashboard.column.com/app/accounts/edit/bacc_2iguSXoSImcURHkPZti9uexPGYD | Vault |
-| [`869184ab-10dc-4787-927f-7a90f388f24f`](https://refero.design/pages/869184ab-10dc-4787-927f-7a90f388f24f) | OpenSea | https://opensea.io/drops | Launch |

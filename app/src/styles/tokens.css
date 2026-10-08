@@ -22,30 +22,30 @@
  */
 
 :root,
-:root[data-theme="emerald"] {
+:root[data-theme='emerald'] {
   color-scheme: dark;
 
   /* surfaces, darkest to lightest */
-  --ep-bg: #050e0c;          /* page */
-  --ep-bg-bar: #040b09;      /* footer strip, ticker */
-  --ep-inset: #07120f;       /* wells inside cards, input fill */
-  --ep-surface: #0a1714;     /* cards, tiles, menus, table body */
-  --ep-hover: #0e1f1b;       /* row hover, pressed ghost button */
-  --ep-raised: #10241f;      /* popovers, dialogs, the sticky action panel */
+  --ep-bg: #050e0c; /* page */
+  --ep-bg-bar: #040b09; /* footer strip, ticker */
+  --ep-inset: #07120f; /* wells inside cards, input fill */
+  --ep-surface: #0a1714; /* cards, tiles, menus, table body */
+  --ep-hover: #0e1f1b; /* row hover, pressed ghost button */
+  --ep-raised: #10241f; /* popovers, dialogs, the sticky action panel */
 
   /* lines */
-  --ep-line: #15302a;        /* card borders, dividers, empty bar tracks */
+  --ep-line: #15302a; /* card borders, dividers, empty bar tracks */
   --ep-line-strong: #23524c; /* pills, chips, ghost buttons */
-  --ep-field-border: #3e8276;/* inputs, selects, checkboxes (3:1 on surface) */
+  --ep-field-border: #3e8276; /* inputs, selects, checkboxes (3:1 on surface) */
 
   /* text */
-  --ep-text: #e8f1ee;        /* primary */
-  --ep-text-2: #c2d3ce;      /* body copy on cards */
-  --ep-muted: #8aa59e;       /* labels, captions, axis text */
+  --ep-text: #e8f1ee; /* primary */
+  --ep-text-2: #c2d3ce; /* body copy on cards */
+  --ep-muted: #8aa59e; /* labels, captions, axis text */
 
   /* meaning */
-  --ep-accent: #97fcd7;      /* mint */
-  --ep-accent-ink: #03201a;  /* text on an accent fill */
+  --ep-accent: #97fcd7; /* mint */
+  --ep-accent-ink: #03201a; /* text on an accent fill */
   --ep-accent-soft: #0f2a24; /* selected chip, success panel fill */
   --ep-accent-line: #2b5e52; /* selected chip / success panel border */
   --ep-info: #7db9ff;
@@ -67,7 +67,7 @@
   --ep-glow: 0 0 24px 2px rgb(151 252 215 / 0.18);
 }
 
-:root[data-theme="graphite"] {
+:root[data-theme='graphite'] {
   color-scheme: dark;
   --ep-bg: #0a0d10;
   --ep-bg-bar: #0b0f13;
@@ -107,21 +107,21 @@
   --ep-radius-chip: 8px;
   --ep-radius-pill: 9999px;
 
-  --ep-gutter: 32px;         /* page gutter at ≥ 1024 px; 16 px on phones (set in globals.css) */
+  --ep-gutter: 32px; /* page gutter at ≥ 1024 px; 16 px on phones (set in globals.css) */
   --ep-header-h: 64px;
   --ep-footer-h: 44px;
-  --ep-control-h: 44px;      /* nothing clickable smaller on touch */
-  --ep-control-h-lg: 52px;   /* primary buttons in heroes and action panels */
+  --ep-control-h: 44px; /* nothing clickable smaller on touch */
+  --ep-control-h-lg: 52px; /* primary buttons in heroes and action panels */
 
   --ep-font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --ep-font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  --ep-font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', monospace;
   --ep-font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
 
   /* motion (mirrors design/motion.ts) */
   --ep-dur-fast: 150ms;
   --ep-dur: 200ms;
   --ep-dur-slow: 250ms;
-  --ep-flash: 180ms;         /* value-changed tint */
+  --ep-flash: 180ms; /* value-changed tint */
   --ep-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -132,4 +132,252 @@
     --ep-dur-slow: 0ms;
     --ep-flash: 0ms;
   }
+}
+
+/* 5 October redesign: silver/cobalt launch, graphite product workspace. */
+:root[data-theme='studio'] {
+  color-scheme: dark;
+  --ep-bg: #101218;
+  --ep-bg-bar: #0d0f14;
+  --ep-inset: #13161d;
+  --ep-surface: #191d25;
+  --ep-hover: #252b35;
+  --ep-raised: #222832;
+  --ep-line: #303641;
+  --ep-line-strong: #4b5565;
+  --ep-field-border: #748196;
+  --ep-text: #f0f2f6;
+  --ep-text-2: #cbd0da;
+  --ep-muted: #a5adbc;
+  --ep-accent: #aac1f5;
+  --ep-accent-ink: #132342;
+  --ep-accent-soft: #202e48;
+  --ep-accent-line: #506b9a;
+  --ep-info: #98d2c9;
+  --ep-info-soft: #1b3233;
+  --ep-info-line: #4d7775;
+  --ep-warn: #dfb782;
+  --ep-warn-soft: #34291d;
+  --ep-warn-line: #806340;
+  --ep-chart-4: #8c98ad;
+  --ep-chart-grid: #2b323d;
+  --ep-chart-crosshair: #748196;
+  --ep-glow: none;
+}
+:root {
+  --ep-launch-green: #c9dfff;
+  --ep-launch-cyan: #8ebaff;
+  --ep-launch-amber: #eac28d;
+  --ep-launch-signal: #76a7ee38;
+  --ep-launch-button-ink: #101a2b;
+  --ep-launch-bg: #060d1b;
+  --ep-launch-paper: #101b2b;
+  --ep-launch-ink: #e9eef6;
+  --ep-launch-muted: #a4b2c7;
+  --ep-launch-blue: #eac28d;
+  --ep-launch-line: #293b54;
+  --ep-launch-soft: #101e33;
+  --ep-launch-stage: #11223a;
+  --ep-launch-card: #213c5c;
+  --ep-launch-shadow: #00000066;
+  --ep-launch-shadow-heavy: #000000aa;
+  --ep-launch-card-shine: #101b2bb3;
+  --ep-launch-dark: #2a4465;
+  --ep-console-silver: #25352c;
+  --ep-console-edge: #4b6150;
+  --ep-console-ink: #080d0b;
+  --ep-console-screen: #07150d;
+  --ep-console-blue: #7fe353;
+  --ep-console-phosphor: #b6ff80;
+  --ep-console-white: #e8ffd4;
+  --ep-console-muted: #90bca0;
+  --ep-console-floor: #11223a;
+}
+
+/* Shared graphite / silver palette: colour identifies an action or a data state.
+ * Mercury is the dominant restraint reference; Epoch retains its own dark identity. */
+:root {
+  --ep-lx-bg: #101218;
+  --ep-lx-bg-2: #151820;
+  --ep-lx-panel: #191d25;
+  --ep-lx-panel-2: #20252e;
+  --ep-lx-raised: #272e39;
+  --ep-lx-line: #303641;
+  --ep-lx-line-2: #4b5565;
+  --ep-lx-text: #f0f2f6;
+  --ep-lx-text-2: #cbd0da;
+  --ep-lx-muted: #a5adbc;
+  --ep-lx-faint: #9da8ba;
+  --ep-lx-silver: #e3e7ef;
+  --ep-lx-blue: #aac1f5;
+  --ep-lx-blue-soft: #202e48;
+  --ep-lx-amber: #dfb782;
+  --ep-lx-amber-soft: #34291d;
+  --ep-lx-amber-line: #806340;
+  --ep-lx-ink: #132342;
+  --ep-lx-shadow: #080a10cc;
+  --ep-lx-veil: #10121800;
+  --ep-lx-action: #4165dc;
+  --ep-lx-action-hover: #3558c8;
+  --ep-lx-action-text: #ffffff;
+}
+
+/*
+ * horizon (light, default since 7 Oct) — icy silver paper, ink-blue type and actions, warm amber for
+ * live signals, Samples and watch states, teal for the second series. Same meanings as the dark themes.
+ * Contrast on #fff: text 16.9:1, muted 5.6:1, accent 9.6:1, info 5.0:1, warn 4.6:1.
+ */
+:root[data-theme='horizon'] {
+  color-scheme: light;
+  --ep-bg: #f1f4f9;
+  --ep-bg-bar: #e8edf4;
+  --ep-inset: #f5f7fb;
+  --ep-surface: #ffffff;
+  --ep-hover: #eef2f8;
+  --ep-raised: #ffffff;
+  --ep-line: #e2e7ef;
+  --ep-line-strong: #c9d2df;
+  --ep-field-border: #8995ab;
+  --ep-text: #0b1530;
+  --ep-text-2: #2c3853;
+  --ep-muted: #5b6780;
+  --ep-accent: #1d3b9a;
+  --ep-accent-ink: #ffffff;
+  --ep-accent-soft: #e7edfb;
+  --ep-accent-line: #b8c7ee;
+  --ep-info: #0e7383;
+  --ep-info-soft: #e1f2f4;
+  --ep-info-line: #a6d5dc;
+  --ep-warn: #a85a0c;
+  --ep-warn-soft: #fbf0e1;
+  --ep-warn-line: #ebc596;
+  --ep-chart-1: #1d3b9a;
+  --ep-chart-2: #0e7383;
+  --ep-chart-3: #d9862b;
+  --ep-chart-4: #9aa6bb;
+  --ep-chart-grid: #e8ecf3;
+  --ep-chart-crosshair: #8995ab;
+  --ep-glow: none;
+  /* brand extras used by the shell and Terminal hero */
+  --ep-brand-ink: #0a1430;
+  --ep-brand-ink-2: #13224a;
+  --ep-brand-silver: #dfe6f1;
+  --ep-brand-amber: #f0a347;
+  --ep-brand-amber-soft: #fff4e6;
+  --ep-brand-on-ink: #eef2f9;
+  --ep-brand-on-ink-muted: #9fadc7;
+}
+
+/* Landing light chapters: same --ep-lx-* names, light values. */
+.lx-light {
+  --ep-lx-bg: #f1f4f9;
+  --ep-lx-bg-2: #ffffff;
+  --ep-lx-panel: #ffffff;
+  --ep-lx-panel-2: #f3f6fb;
+  --ep-lx-raised: #e8edf6;
+  --ep-lx-line: #e2e7ef;
+  --ep-lx-line-2: #cdd5e2;
+  --ep-lx-text: #0b1530;
+  --ep-lx-text-2: #2c3853;
+  --ep-lx-muted: #5b6780;
+  --ep-lx-faint: #7d899f;
+  --ep-lx-silver: #0b1530;
+  --ep-lx-ink: #ffffff;
+  --ep-lx-blue: #1d3b9a;
+  --ep-lx-blue-soft: #e7edfb;
+  --ep-lx-amber: #b5620e;
+  --ep-lx-amber-soft: #fff1df;
+  --ep-lx-amber-line: #ecc596;
+  --ep-lx-shadow: #0b153033;
+}
+
+/*
+ * Palette v6 · "Mercury ink" (7 Oct). Synthesised from the references:
+ *   Mercury   ink-violet #171721 / #1E1E2A / #272735, periwinkle action #5266EB, lavender text #EDEDF3, paper #FCFCFA
+ *   21st.dev  violet-black with one electric blue · TasteSkill warm paper + one hot accent · GSAP charcoal + cream
+ * Rule: violet-tinted ink, warm paper, ONE action colour (periwinkle). Amber = the epoch / live / sample signal.
+ * Teal (Solana's green, toned for paper) = healthy / positive. These overrides win over earlier blocks.
+ */
+:root {
+  --ep-lx-bg: #171721;
+  --ep-lx-bg-2: #1e1e2a;
+  --ep-lx-panel: #1e1e2a;
+  --ep-lx-panel-2: #272735;
+  --ep-lx-raised: #30303f;
+  --ep-lx-line: #2c2c3b;
+  --ep-lx-line-2: #3d3d50;
+  --ep-lx-text: #ededf3;
+  --ep-lx-text-2: #c3c3cc;
+  --ep-lx-muted: #a1a1b2;
+  --ep-lx-faint: #8a8a9c;
+  --ep-lx-silver: #ededf3;
+  --ep-lx-blue: #9cb4e8;
+  --ep-lx-blue-soft: #262a48;
+  --ep-lx-amber: #f0b46a;
+  --ep-lx-amber-soft: #2e2519;
+  --ep-lx-amber-line: #6e5233;
+  --ep-lx-ink: #171721;
+  --ep-lx-shadow: #07070ccc;
+  --ep-lx-veil: #17172100;
+  --ep-lx-action: #5266eb;
+  --ep-lx-action-hover: #4458dc;
+  --ep-lx-action-text: #ffffff;
+}
+.lx-light {
+  --ep-lx-bg: #fcfcfa;
+  --ep-lx-bg-2: #ffffff;
+  --ep-lx-panel: #ffffff;
+  --ep-lx-panel-2: #f5f5f1;
+  --ep-lx-raised: #ededf3;
+  --ep-lx-line: #e8e8e3;
+  --ep-lx-line-2: #d4d4dc;
+  --ep-lx-text: #171721;
+  --ep-lx-text-2: #3a3a4a;
+  --ep-lx-muted: #63636f;
+  --ep-lx-faint: #7c7c88;
+  --ep-lx-silver: #171721;
+  --ep-lx-ink: #ffffff;
+  --ep-lx-blue: #5266eb;
+  --ep-lx-blue-soft: #eceefd;
+  --ep-lx-amber: #a85a0c;
+  --ep-lx-amber-soft: #fbf1e3;
+  --ep-lx-amber-line: #ecc596;
+  --ep-lx-shadow: #17172124;
+}
+:root[data-theme='horizon'] {
+  --ep-bg: #fcfcfa;
+  --ep-bg-bar: #f5f5f1;
+  --ep-inset: #f7f7f4;
+  --ep-surface: #ffffff;
+  --ep-hover: #f3f3f6;
+  --ep-raised: #ffffff;
+  --ep-line: #e8e8e3;
+  --ep-line-strong: #d4d4dc;
+  --ep-field-border: #8b8b99;
+  --ep-text: #171721;
+  --ep-text-2: #3a3a4a;
+  --ep-muted: #63636f;
+  --ep-accent: #4458dc;
+  --ep-accent-ink: #ffffff;
+  --ep-accent-soft: #eceefd;
+  --ep-accent-line: #c3cbf8;
+  --ep-info: #0f766e;
+  --ep-info-soft: #e3f4f1;
+  --ep-info-line: #a8dbd3;
+  --ep-warn: #a85a0c;
+  --ep-warn-soft: #fbf1e3;
+  --ep-warn-line: #ecc596;
+  --ep-chart-1: #5266eb;
+  --ep-chart-2: #14a38b;
+  --ep-chart-3: #e0913a;
+  --ep-chart-4: #a1a1b2;
+  --ep-chart-grid: #efefea;
+  --ep-chart-crosshair: #8b8b99;
+  --ep-brand-ink: #171721;
+  --ep-brand-ink-2: #272735;
+  --ep-brand-silver: #ededf3;
+  --ep-brand-amber: #f0a347;
+  --ep-brand-amber-soft: #fbf1e3;
+  --ep-brand-on-ink: #ededf3;
+  --ep-brand-on-ink-muted: #a1a1b2;
 }

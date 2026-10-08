@@ -48,3 +48,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ## TradingView Lightweight Charts
 
 - `lightweight-charts` is Apache-2.0. Its attribution logo stays on every chart, and the footer links TradingView.
+
+## Earth imagery (`public/earth/*`)
+Day, night-lights and cloud maps from NASA Visible Earth (Blue Marble, Black Marble), public domain, as
+distributed in the three.js examples (`examples/textures/planets`, MIT). Re-encoded; the cloud map is the
+blue channel of `earth_bump_roughness_clouds_4096.jpg`.
+
+## Hero footage (`public/earth/hero.mp4`, `hero.webm`, `hero-poster.jpg`)
+NASA, "Earth from Space in 4K, Expedition 65 Edition" (jsc2022m000172, images.nasa.gov), footage from the
+International Space Station. NASA imagery is not copyrighted (public domain). Excerpt 32:59-33:04 from the 4K original, colour-graded, slowed 2x, rotated 180
+degrees, crossfade-looped and re-encoded. NASA does not endorse Epoch.

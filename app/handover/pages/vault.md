@@ -9,10 +9,9 @@
 The older wireframes ([`06-vault.png`](../design/wireframes/06-vault.png)) are superseded.
 
 **Job:** let anyone lend SOL to validators and choose their risk. Retail picks **Senior** (paid first,
-target 0.03% per epoch ≈ 8.1% a year); funds and treasuries pick **Junior** (first loss after the validator's bond,
+target 0.04% per epoch); funds and treasuries pick **Junior** (first loss after the validator's bond,
 keeps everything above the senior target). Every number is sample today, but all of them obey the
-program's rules, so they double as test fixtures. The Vault uses the Epoch program, which runs on devnet for
-now (decision 6).
+program's rules, so they double as test fixtures.
 
 **Users:** lenders (senior: retail; junior: funds, DAOs, treasuries); judges.
 
@@ -34,9 +33,9 @@ Run `/refs vault` first: it pulls these images through the Refero MCP and writes
 
 | # | Block | What it shows | Data (hook → field) | Reference region |
 | --- | --- | --- | --- | --- |
-| 1 | Title row | Devnet · Sample · Pre-alpha, unaudited · Live since epoch 1033 pills; the line "Epoch's program runs on devnet for now. Switch your wallet to devnet to sign."; "Lend SOL to validators, *repaid at the source.*"; Rules and risks link | `useVault` → `pool.liveSinceEpoch`, `kind`; network from `NEXT_PUBLIC_EPOCH_RPC_URL` | Mercury Treasury title |
-| 2 | Summary | In the vault 1,633 SOL (≈ $195,633, 1,297 lenders) with an allocation ring (senior 1,124 / junior 509) · senior target ≈ 8.1% a year (0.03% an epoch), met 12 of 12 epochs · junior APY 23.7% since launch · lent out 190 SOL (11.6%, cap 60%) · lost by lenders 0 SOL (one default, paid by its bond) | `pool`, `tranches` | **Mercury Treasury** balance card + allocation ring + net yield / all-time earnings |
-| 3 | **Hero: tranche cards** | Senior: 1,124 SOL, share price 1.0036, withdraw any epoch, 912 SOL of room before junior must grow, "target, paid only from real fees". Junior: 509 SOL, share price 1.0105, 31% of the vault (minimum 20%), cushion 509 SOL + 93 SOL of bonds, locked 10 epochs | `tranches.senior`, `tranches.junior`, `params` | Mercury Treasury per-fund cards (yield, type, risk rating) |
+| 1 | Title row | Sample · Pre-alpha, unaudited · Live since epoch 1033 pills; "Lend SOL to validators, *repaid at the source.*"; Rules and risks link | `useVault` → `pool.liveSinceEpoch`, `kind` | Mercury Treasury title |
+| 2 | Summary | In the vault 1,633 SOL (≈ $195,633, 1,297 lenders) with an allocation ring (senior 1,124 / junior 509) · senior APY 10.9%, target met 12 of 12 epochs · junior APY 23.7% since launch · lent out 190 SOL (11.6%, cap 60%) · lost by lenders 0 SOL (one default, paid by its bond) | `pool`, `tranches` | **Mercury Treasury** balance card + allocation ring + net yield / all-time earnings |
+| 3 | **Hero: tranche cards** | Senior: 1,124 SOL, share price 1.0048, withdraw any epoch, 912 SOL of room before junior must grow, "target, paid only from real fees". Junior: 509 SOL, share price 1.0105, 31% of the vault (minimum 20%), cushion 509 SOL + 93 SOL of bonds, locked 10 epochs | `tranches.senior`, `tranches.junior`, `params` | Mercury Treasury per-fund cards (yield, type, risk rating) |
 | 4 | Performance chart | Three views (segment): share price for both tranches against plain staking · yield by epoch (senior flat, junior bars rising) · share lent out against the 60% cap | `series` | lightweight-charts; Mercury Insights chart treatment |
 | 5 | What protects you | The order a loss travels (bond → junior → senior) as a visx waterfall + StressTestSlider: "the N biggest open advances stop paying today" (validators are never named in the what-if) → what bonds absorb, what junior loses, senior loses nothing (two biggest: bonds 50, junior 88.2 SOL or 17.3%; all eight: junior 106.4 SOL or 20.9%) | `openAdvancesForStressTest`, `tranches` | — |
 | 6 | Tabbed tables | Advances (12: score, borrowed, owes with 2%, repaid, progress, bond, epochs, status) · Withdrawal queue (first in, first out) · Lenders (largest, then grouped) · Parameters (12, each with its on-chain name) | `advances`, `withdrawQueue`, `lenders`, `params` | Column account table (KPI row, filters, status badges) |
@@ -50,15 +49,11 @@ Run `/refs vault` first: it pulls these images through the Refero MCP and writes
 - Keep the deposit button disabled until the risk box is ticked.
 - Read every parameter from the pool account (`params`); never hard-code 20%, 60% or 10 epochs.
 - Confetti only on a user's FIRST deposit, once.
-- Show the "Devnet" badge and the switch-to-devnet line while the program runs on devnet (decision 6); the
-  Sample badges go once the devnet Pool exists.
 
 ## States
 
 Skeletons; wallet not connected → the panel shows the amount field and "Connect to deposit"; deposit over
-the senior room → warn line with the exact room; utilisation near the cap → info note; error → retry in place;
-a Junior withdrawal the crank bounced at the Junior floor → the request card reads "Bounced: Junior floor.
-Your shares are back." (decision 20, VA23).
+the senior room → warn line with the exact room; utilisation near the cap → info note; error → retry in place.
 
 ## Done when
 

@@ -16,7 +16,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "incremental": true,
-    "allowJs": false,
     "plugins": [
       {
         "name": "next"
@@ -26,20 +25,19 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "allowJs": true
   },
   "include": [
     "next-env.d.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
+    "**/*.ts",
+    "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "handover",
-    "scripts",
-    "design",
-    ".claude"
+    "src/components/vendor/_raw"
   ]
 }

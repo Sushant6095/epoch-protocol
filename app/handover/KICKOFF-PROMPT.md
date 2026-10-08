@@ -29,14 +29,13 @@ Goal of this session: Phase 0 (foundation) from handover/09-BUILD-ORDER.md, then
    03-DESIGN-SYSTEM.md; <html lang="en" data-theme="emerald" className="dark …font variables">; import
    @/styles/globals.css; metadata title "Epoch" and the one-line description.
 5. Data layer: copy handover/contracts/epoch-data.ts to src/lib/data/types.ts and
-   handover/fixtures/*.json to src/fixtures/. Add a QueryClient provider, src/lib/data/api.ts as in
-   07-DATA-CONTRACTS.md (reads NEXT_PUBLIC_EPOCH_API_URL, unwraps the API's { ok, data } envelope, a
-   per-resource USE_API map, all false except feeIndex behind a check) and
+   handover/fixtures/*.json to src/fixtures/. Add a QueryClient provider, src/lib/data/api.ts (reads
+   NEXT_PUBLIC_EPOCH_API_URL, a per-resource USE_API map, all false except feeIndex behind a check) and
    one hook per resource exactly as in 07-DATA-CONTRACTS.md, including the Fee Index adapter and the
    "while on fixtures" behaviour. Add src/lib/format.ts (SOL, %, compact, signs with a true minus, "—" for
    missing), src/lib/explorers.ts (the tested link formats) and src/lib/health.ts (the health rules from
-   01-PRODUCT-AND-USERS.md). Add .env.example with NEXT_PUBLIC_EPOCH_API_URL=,
-   NEXT_PUBLIC_SOLANA_RPC_URL= (mainnet) and NEXT_PUBLIC_EPOCH_RPC_URL= (the devnet program) (names only, no values).
+   01-PRODUCT-AND-USERS.md). Add .env.example with NEXT_PUBLIC_EPOCH_API_URL= and
+   NEXT_PUBLIC_SOLANA_RPC_URL= (names only, no values).
 6. App shell with the shadcn primitives you need (pull, re-skin to tokens, log in handover/PROVENANCE.md):
    header (EpochRing, nav, ⌘K search with cmdk, EpochPill with live dot and countdown from useNetwork,
    SOL price, Connect), footer strip (slot, TPS, sources, NetworkBadge, lightweight-charts attribution),
@@ -45,7 +44,7 @@ Goal of this session: Phase 0 (foundation) from handover/09-BUILD-ORDER.md, then
    Backpack first). The shell replicates Mercury's app shell (sidebar + top bar) as described in
    handover/12-REPLICA-BLUEPRINTS.md § App shell (pull the Mercury Insights screen 18cf9c6a with the Refero MCP
    first; start from the shadcn sidebar-07 block) and behaves exactly as rows SH1–SH13 say. Placeholder routes for /terminal, /validators,
-   /validators/[vote], /me, /predict, /vault, /launch and /launch/[mint] that render the shell and the page title only.
+   /validators/[vote], /me, /vault that render the shell and the page title only.
 7. package.json scripts: "shots": "node scripts/ui/screenshot.mjs", "lint:ui": "impeccable detect src/".
 8. Verify: `pnpm --filter app typecheck` and `pnpm --filter app build` pass (the first build adds a few
    Next defaults to tsconfig.json — keep them); start the production build (`pnpm --filter app start`),
@@ -63,6 +62,5 @@ Goal of this session: Phase 0 (foundation) from handover/09-BUILD-ORDER.md, then
 ## After the foundation
 
 - One page per session: `/refs <page>` (references, no code) → review → `/screen <page>`.
-- Order: terminal → validators → validator → sign-in → vault → my-stake → landing → predict (points) → fee-market →
-  launch (`09-BUILD-ORDER.md`).
+- Order: terminal → validators → validator → sign-in → vault → my-stake → landing → predict (flagged).
 - Push and open a PR when a page reaches design-cop all-PASS: see `08-GIT-WORKFLOW.md`.

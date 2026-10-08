@@ -1,6 +1,6 @@
 # 12 · Replica blueprints: build the Refero screens
 
-As of 1 Oct 2026 (IST; the Fee Market and Launch sections were added on 1 Oct). **The look of every page is its Refero screen.** Rebuild each screen's structure
+As of 30 Sep 2026 (IST). **The look of every page is its Refero screen.** Rebuild each screen's structure
 1:1 (shell, grid, region order and size, spacing, type steps, component anatomy, states, flows, motion)
 and fill it with Epoch's content. Identity stays Epoch's: colours (`--ep-*`), fonts (Geist, Geist Mono),
 logo, icons (lucide), words and data. Method: the `refero-replica` skill; check: `scripts/ui/ref-compare.mjs`.
@@ -11,7 +11,7 @@ controls and states exist. Where a board and its Refero screen disagree on layou
 Geometry below is read from Refero's 800 px images and scaled to a 1440 px viewport (× 1.8). Treat it as the
 starting point; measure the full images precisely (skill step 2) before building.
 
-## App shell for every app page (Terminal and its Fee Market tab, Validators, Validator, My Stake, Predict, Vault, Launch)
+## App shell for every app page (Terminal, Validators, Validator, My Stake, Predict, Vault)
 
 Target: the Mercury shell, which three of the app screens share ([Insights](https://refero.design/pages/18cf9c6a-e713-4e47-a3e2-db729d647cc3),
 [Home](https://refero.design/pages/859b1114-d9af-4c87-ab18-4b26fa4f8896), [Treasury](https://refero.design/pages/26e9c3a5-c493-4ab4-a7f9-216dc95b85c6));
@@ -20,7 +20,7 @@ rebuilt inside this shell so the app has one shell.
 
 | Region | Geometry (1440) | Epoch content | Library |
 | --- | --- | --- | --- |
-| Sidebar | ≈ 240 px wide, full height, hairline on the right | Top: workspace-switcher row → Epoch ring + "Epoch" + network chip "Mainnet ▾". Nav rows (16 px icon + label, 36 px tall, selected row filled), in SH2's order: Terminal · Validators · Vault · Launch · My Stake (alert count badge) · Predict. Group label like Mercury's "Workflows" → "Tools": Alerts · Export for taxes · Docs. Bottom: epoch progress (SH6) and "Mainnet · slot · TPS" (SH10) | shadcn `sidebar` (start from the `sidebar-07` block), lucide icons, `badge` |
+| Sidebar | ≈ 240 px wide, full height, hairline on the right | Top: workspace-switcher row → Epoch ring + "Epoch" + network chip "Mainnet ▾". Nav rows (16 px icon + label, 36 px tall, selected row filled): Terminal · Validators · My Stake (alert count badge) · Vault · Predict. Group label like Mercury's "Workflows" → "Tools": Alerts · Export for taxes · Docs. Bottom: epoch progress (SH6) and "Mainnet · slot · TPS" (SH10) | shadcn `sidebar` (start from the `sidebar-07` block), lucide icons, `badge` |
 | Top bar | ≈ 64 px, search field ≈ 680 px wide starting at the content edge | Search with ⌘K hint (SH3–SH5); right: epoch pill (SH6) and SOL price (SH7), then the primary action button with a caret like "Move money ▾" → "Stake ▾" (Stake more · Move stake · Deposit to the Vault), icon buttons (eye = hide balances, bell = alerts), avatar = wallet chip or Connect (SH8, SH9) | shadcn `command`, `dropdown-menu`, `button`, `avatar`, `tooltip`; `@number-flow/react` for the countdown |
 | Footer | none (Mercury has none) | The TradingView attribution link sits under each lightweight-charts chart (licence); Sample and network badges live in the sidebar bottom | — |
 
@@ -66,26 +66,6 @@ Screens: **[Mercury Insights](https://refero.design/pages/18cf9c6a-e713-4e47-a3e
 | 10 | Two-column card rows (Mercury Home card anatomy: header, big number, small chart) | 2 or 3 cards per row | Fee Index (TE14–TE15) · Live activity (TE16) · Who holds the stake · Where retail stakes · Validator health · What SOL earns · Vault pulse · Validators over time (TE17–TE23) · network tiles (TE24) | shadcn `card`, `chart` (Recharts), Magic UI `animated-list` (activity) |
 | 11 | Docked tabbed tables (Kraken Pro bottom tabs) | full width, 44 px tab row | Loan book · Epochs · Top validators · Biggest delegators · Withdrawal queue (TE25–TE30) | TanStack Table via ReUI `data-grid` or openstatus data-table |
 | 12 | Explainer dialog (Stocktwits) | ≈ 440 px dialog | What is the Fee Index? (TE14) | shadcn `dialog` |
-
-## Fee Market `/terminal?tab=market` · rows FM1–FM30
-
-Screens: **[Kraken Pro BTC-USD trade screen](https://refero.design/pages/cd4884df-7bf5-4c8e-9814-c604e1e9f6f0)** (primary: order form, order book, chart) ·
-[Kraken Pro dashboard](https://refero.design/pages/69751349-05f1-4fee-abac-c5452f01bc17) (KPI strip, docked tables) ·
-[Reown transaction preview](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6) (review) ·
-[Stocktwits index explainer](https://refero.design/pages/9ede2f3b-2a72-41c5-8e09-19d21483cfdb) (dialog). A Terminal tab: the shell, title row
-and KPI strip stay the Terminal's; the trading area below them is Kraken's. Kraken's screen is busier than ours: keep
-its three columns and its density, drop its purple and its tools.
-
-| # | Region (Kraken Pro BTC-USD) | Geometry (1440, content ≈ 1140 px beside the sidebar) | Epoch content | Library |
-| --- | --- | --- | --- | --- |
-| 1 | Pair header with the last price and a stats strip | ≈ 56 px | The Terminal title row with the tabs Economy · Fee Market (FM1), the Devnet badge (FM3), then the market KPI strip (FM4–FM6) | shadcn `tabs`, `badge` |
-| 2 | Left: the order form (Buy / Sell tabs, order-type tabs, quantity field with unit, total rows, one large button) | ≈ 300 px wide | Ticket: Receive fixed / Pay fixed (FM7), maker line (FM8), epoch select (FM9), notional and chips (FM10–FM11), estimate rows and the payoff line (FM12), the button (FM13), Hedge my next 5 epochs (FM17) | shadcn `tabs`, `select`, `input`, `toggle-group`, `button`; shadcn `chart` (Recharts line) for the payoff line |
-| 3 | Middle: the order book (header Price · Qty · Total, asks above, the spread line, bids below, depth bars) | ≈ 320 px | Quotes by epoch: header Epoch · Fixed · vs final · Room · Closes; open quotes above a "now" line, then live, settling and settled; a room bar where Kraken draws depth (FM18–FM19) | plain list or TanStack table, CSS bars |
-| 4 | Right: the chart with a slim toolbar and the last value on the right axis | the rest, ≈ 520 × 520 px | Fee Index bars, the dashed 8-epoch average, the five quotes as a dotted forward line; toolbar 16 · 32 epochs (FM20–FM21) | lightweight-charts (histogram + line series) |
-| 5 | Bottom panel with tabs (open orders, trade history) | full width, 44 px tab row + ≈ 260 px | Your swaps · Recent swaps · Settlements (FM22–FM26) | TanStack table via ReUI `data-grid` |
-| 6 | Status line at the bottom | ≈ 28 px | The wallet line: short address, devnet balance (FM27) | plain |
-| 7 | Review modal (Reown Preview swap) | ≈ 400 px | Review swap (FM14) → progress → success (FM15–FM16), the Vault's TxPreview component | shadcn `dialog` or `sheet` |
-| 8 | Explainer dialog (Stocktwits) | ≈ 440 px | How a fee swap works (FM29) | shadcn `dialog` |
 
 ## Validators `/validators` · rows VE1–VE41
 
@@ -173,13 +153,13 @@ Predict needs a page of its own to match its screen: `/predict`, behind the Pred
 | # | Region (Stocktwits) | Geometry (1440) | Epoch content | Library |
 | --- | --- | --- | --- | --- |
 | 1 | Ticker tape under the top bar | ≈ 30 px | Epoch · Fee Index · median APY · open markets, scrolling | Magic UI `marquee` |
-| 2 | Breadcrumb, symbol header (logo, name, rank chip, watchers, Watching / Alerts / primary action buttons), price + change line, stats row of 5 | ≈ 200 px | Market header for the featured market: question, pool in points, players, closes with epoch N; rule pills points only · no cash value · 100 points an epoch · 18+ · where allowed · settles from the final Fee Index (MS42) | shadcn `breadcrumb`, `badge`, `button` |
+| 2 | Breadcrumb, symbol header (logo, name, rank chip, watchers, Watching / Alerts / primary action buttons), price + change line, stats row of 5 | ≈ 200 px | Market header for the featured market: question, pool SOL, players, closes with epoch N; rule pills 18+ · where allowed · cap 5 SOL · settles by Panta (MS42) | shadcn `breadcrumb`, `badge`, `button` |
 | 3 | Tabs row (About / Feed / News / Sentiment / Earnings / Fundamentals) | ≈ 44 px | Markets · Your calls · Leaderboard · Rules | shadcn `tabs` |
 | 4 | Poll card: header + collapse, question, one bar per outcome with its share, footer with votes and time left, share and comments buttons | main column | YES / NO bars with pool share, players, closes in (MS43–MS44) | shadcn `card`, `progress` |
 | 5 | Right column: news list with thumbnails | ≈ 1/3 | Other markets (MS44) and live calls | shadcn `card` |
-| 6 | Ticket (Kraken Pro order form): two-way toggle, amount with preset chips, estimate line, one full-width button | in the right column | YES / NO, call sizes 10 · 25 · 50 · 100 points with the points left this epoch, estimated payout in points, Preview call (MS47–MS50) | shadcn `toggle-group`, `input`, `button` |
+| 6 | Ticket (Kraken Pro order form): two-way toggle, amount with preset chips, estimate line, one full-width button | in the right column | YES / NO, amount chips 0.1–5 SOL, estimated payout, Preview call (MS47–MS50) | shadcn `toggle-group`, `input`, `button` |
 | 7 | Gate (Coinbase): the ticket replaced by a calm blocking state with one button | same slot | I'm 18 or older · calls are allowed where I live (MS45–MS46) | shadcn `checkbox`, `button` |
-| 8 | Review (Reown preview): rows of what will be signed, "Review carefully", Cancel / Confirm | dialog | Call review (nothing is signed: a call uses points) → Confirm call → done (MS51–MS53) | shadcn `dialog` |
+| 8 | Review (Reown preview): rows of what will be signed, "Review carefully", Cancel / Confirm | dialog | Call review → Confirm in Phantom → done (MS51–MS53) | shadcn `dialog` |
 | 9 | Tables below | full width | Your calls · Leaderboard (MS54–MS55) | TanStack table |
 
 ## Vault `/vault` · rows VA1–VA37
@@ -193,44 +173,13 @@ Screens: **[Mercury Treasury](https://refero.design/pages/26e9c3a5-c493-4ab4-a7f
 | --- | --- | --- | --- | --- |
 | 1 | Title + right: "Documents" link + split button "Transfer funds ▾" | ≈ 28 px title | "Vault" · Rules and risks (VA2) · split button Deposit ▾ (Deposit · Withdraw) opens the deposit sheet | shadcn `button` + `dropdown-menu` |
 | 2 | Two cards. Balance card: label with info icon, big amount with small decimals, a second label/value, a link with › | ≈ 1/2 width | In the vault 1,633.00 SOL · Lent out now 189.52 SOL · How a validator borrows › (VA1, VA3) | shadcn `card`, `tooltip` |
-| 3 | Allocation card: ring + two legend lines with ticker pills + edit icon; below two figures (Net yield in green, All-time earnings) | ≈ 1/2 width | Senior 69% / Junior 31% with share prices; Senior target ≈8.1% · Paid to lenders (VA5, VA7) | Recharts `pie` via shadcn `chart` or Magic UI `animated-circular-progress-bar` |
+| 3 | Allocation card: ring + two legend lines with ticker pills + edit icon; below two figures (Net yield in green, All-time earnings) | ≈ 1/2 width | Senior 69% / Junior 31% with share prices; Senior target ≈10.9% · Paid to lenders (VA5, VA7) | Recharts `pie` via shadcn `chart` or Magic UI `animated-circular-progress-bar` |
 | 4 | Underline tabs: Activity / Portfolio | ≈ 44 px | Tranches · Protection · Loan book · Withdrawal queue · Lenders · Parameters (VA29) | shadcn `tabs` |
 | 5 | Portfolio rows: ring %, fund name, description, "Fund data as of … Prospectus ↗", right column of key/values (Ticker, Net yield, Shares, Fund type, Risk rating) | full width, ≈ 160 px per row | One row per tranche: Senior (paid first, target, withdraw any epoch) and Junior (first loss, 10-epoch lock); key/values: share price, target or since-launch yield, your shares, lock, loss order; Deposit in Senior / Junior (VA6) | shadcn `card`, `separator` |
 | 6 | Footnote box | ≈ 1/3 width, right | "*Targets are not promises. Vault SOL is not staked; unlent SOL earns nothing." (VA24) | shadcn `alert` |
 | 7 | Deposit sheet (Copperx): amount on top with a live "you get" estimate, one toggle, one button → review (Reown rows) → vertical progress list → success with amount and See details | right sheet ≈ 440 px | Tranche toggle, amount + chips, risk checkbox, review, progress (signed → confirmed → shares minted), success (VA8–VA18); Withdraw tab (VA19–VA23) | shadcn `sheet`, `input`, `toggle-group`; ReUI `stepper`; `canvas-confetti` on the first deposit only |
 | 8 | Tables (Column): KPI row over a filterable table with status badges | full width | Loan book, Withdrawal queue, Lenders, Parameters (VA30–VA37) | TanStack table via ReUI `data-grid` |
 | 9 | Protection tab | full width | Loss order Bond → Junior → Senior and the stress test (VA27–VA28) | visx or Recharts stacked bar, shadcn `button` |
-
-## Launch `/launch` and `/launch/[mint]` · rows LP1–LP28
-
-Screens: **[OpenSea Drops](https://refero.design/pages/869184ab-10dc-4787-927f-7a90f388f24f)** (primary for the list) ·
-**[Wealthsimple NVDA page](https://refero.design/pages/47b50f40-2189-480a-8279-8d1796ddf5eb)** (primary for the token page, the same
-north star as the validator profile) · [Reown transaction preview](https://refero.design/pages/7d84a622-9f0f-459a-82a6-5ec05e3dc1a6) (review) ·
-[Coinbase gated ticket](https://refero.design/pages/c2dbc562-373b-4790-b6dd-fa8ac6cf2c59) (gate). OpenSea's page is light and image-led;
-Epoch keeps its dark tokens and draws no artwork.
-
-The list (OpenSea Drops):
-
-| # | Region (OpenSea Drops) | Geometry (1440) | Epoch content | Library |
-| --- | --- | --- | --- | --- |
-| 1 | Bold page title, tabs "Active & upcoming" / "Past" under it | title ≈ 40 px, underline tabs | "Launch", Devnet badge and the not-an-offer line (LP3); tabs Live & upcoming / Graduated & ended (LP4) | shadcn `tabs`, `badge` |
-| 2 | Date group headings between cards | ≈ 24 px bold | On the curve now · Opens in epoch 1046 · Graduated · Ended (LP5) | plain |
-| 3 | Wide drop card with a banner: status badge top left, name and creator, a stats line, a countdown and a small "View drop" button on the right | full width × ≈ 280 px, radius ≈ 16 px | Launch card: badge, avatar, symbol and name, share and term, raise bar, price · market cap · buyback · backing, countdown or progress, View token (LP6–LP9). The banner is a dark gradient with the Epoch ring motif and the validator's initials, no images | shadcn `card`, `badge`, `progress`, `button` |
-
-The token page (Wealthsimple NVDA, as on the validator profile):
-
-| # | Region (Wealthsimple) | Geometry (1440) | Epoch content | Library |
-| --- | --- | --- | --- | --- |
-| 1 | Two columns: main ≈ 2/3, sticky card ≈ 1/3 | main ≈ 900 px, card ≈ 420 px | — | CSS grid |
-| 2 | Identity row: logo, ticker + star, company name; right buttons | ≈ 60 px | Avatar, rKEST + watch star (LP12), "Kestrel Nodes revenue token", status and Devnet badges; View on ▾ (LP13) | shadcn `avatar`, `badge`, `dropdown-menu` |
-| 3 | Big price + change line | price ≈ 40 px | 0.000846 SOL · ≈ $0.10 · +35.6% since the curve opened; market cap 83.4 SOL fully diluted (LP14) | `@number-flow/react` |
-| 4 | Line chart with crosshair; dashed reference line labelled at the right edge; range pills under it | ≈ 900 × 300 px | Price over time, buyback markers, dashed lines for the curve's top and the share's value; 1 epoch · 4 epochs · All (LP15–LP16) | lightweight-charts |
-| 5 | Promo card | full main width, ≈ 160 px | Curve card: raise progress and what graduation does (LP17) | shadcn `card`, `progress` |
-| 6 | "Market details" 4-column pairs | 4 columns | What backs it (LP18) | plain grid |
-| 7 | "Dividends" 3-column pairs | 3 columns | Buybacks: last epoch, next, escrow (static, no row; the feed below is LP19) | plain grid |
-| 8 | "News" stacked cards + "View all" | full main width | Buyback feed, one row per slice (LP19) | shadcn `card`, Magic UI `animated-list` |
-| 9 | "About" paragraph | full main width | About the validator and the risk lines, always open | plain |
-| 10 | Right: the "Buy" card (order type, inputs, estimated cost, full-width button) | ≈ 420 px, sticky | Trade card: Buy · Sell (LP20), amount and chips with the quote rows (LP21), review (LP22–LP24), the gate (LP25), Watch for upcoming (LP26), a Redeem tab beside Buy · Sell in fallback mode (LP27) | shadcn `toggle-group`, `input`, `button`; Coinbase-style gate |
 
 ## After each page
 

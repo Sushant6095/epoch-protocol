@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "sample",
+  "asOf": null,
+  "source": "Epoch program ValidatorPosition and Advance accounts (sample until the program is live)",
+  "note": "Two operator views for the Manage tab. NTT DOCOMO GLOBAL before onboarding (limit from its real swept-revenue estimate) and a fictional validator with an open advance. Numbers obey limit = min(25% or 40% of 10 epochs' swept revenue, 4 x bond, cap), a 2% flat fee and a 50% remit; Northwind matches vault.sample.json.",
+  "positions": [
+    {
+      "vote": "FzUNgBRnVxawDytN9GM7BFwxFfekuMs7BcAGybn4AmMk",
+      "name": "NTT DOCOMO GLOBAL",
+      "state": "not_onboarded",
+      "score": 100,
+      "sweptEpochs": 0,
+      "bondSol": 0,
+      "limit": {
+        "unhedgedSol": 4.7,
+        "hedgedSol": 7.6,
+        "bondForFullUnhedgedSol": 1.18,
+        "bondForFullHedgedSol": 1.9,
+        "sweepablePerEpochSol": 1.89
+      },
+      "onboardingSteps": [
+        {
+          "key": "withdraw_authority",
+          "title": "Hand the vote account's withdraw authority to Epoch's escrow",
+          "detail": "Rewards keep flowing to you; the escrow only takes the remit while money is owed."
+        },
+        {
+          "key": "collectors",
+          "title": "Point block-fee and tip collectors at the escrow",
+          "detail": "So repayment is taken at the source every epoch."
+        },
+        {
+          "key": "bond",
+          "title": "Post a bond",
+          "detail": "Your limit is at most 4 × bond; it covers the first loss if you stop paying."
+        }
+      ],
+      "creditStartsAfterEpochs": 3,
+      "advance": null,
+      "covenants": [
+        "Commission is locked while money is owed",
+        "Identity is locked while money is owed",
+        "The bond is locked while money is owed",
+        "A defaulted validator remits 100% of new revenue until the advance is recovered"
+      ]
+    },
+    {
+      "vote": null,
+      "name": "Northwind Staking",
+      "state": "advance_open",
+      "score": 84,
+      "sweptEpochs": 14,
+      "bondSol": 30,
+      "limit": {
+        "unhedgedSol": 120,
+        "hedgedSol": 120,
+        "bondForFullUnhedgedSol": 30,
+        "bondForFullHedgedSol": 30,
+        "sweepablePerEpochSol": 48
+      },
+      "onboardingSteps": [],
+      "creditStartsAfterEpochs": 3,
+      "advance": {
+        "openedEpoch": 1042,
+        "hedged": false,
+        "limitRatePct": 25,
+        "borrowedSol": 120,
+        "feeSol": 2.4,
+        "owesSol": 122.4,
+        "repaidSol": 48,
+        "remainingSol": 74.4,
+        "remitPct": 50,
+        "status": "active",
+        "epochsLeft": 4,
+        "schedule": [
+          {
+            "epoch": 1044,
+            "remitSol": 24,
+            "endingSol": 50.4,
+            "status": "due"
+          },
+          {
+            "epoch": 1045,
+            "remitSol": 24,
+            "endingSol": 26.4,
+            "status": "upcoming"
+          },
+          {
+            "epoch": 1046,
+            "remitSol": 24,
+            "endingSol": 2.4,
+            "status": "upcoming"
+          },
+          {
+            "epoch": 1047,
+            "remitSol": 2.4,
+            "endingSol": 0,
+            "status": "upcoming"
+          }
+        ],
+        "activity": [
+          {
+            "epoch": 1042,
+            "kind": "advance",
+            "text": "Drew 120 SOL (2.4 SOL fee)",
+            "amountSol": 120,
+            "signature": null
+          },
+          {
+            "epoch": 1042,
+            "kind": "sweep",
+            "text": "Remitted at the source (50% of 48 SOL)",
+            "amountSol": 24,
+            "signature": null
+          },
+          {
+            "epoch": 1043,
+            "kind": "sweep",
+            "text": "Remitted at the source (50% of 48 SOL)",
+            "amountSol": 24,
+            "signature": null
+          }
+        ]
+      },
+      "covenants": [
+        "Commission is locked while money is owed",
+        "Identity is locked while money is owed",
+        "The bond is locked while money is owed",
+        "A defaulted validator remits 100% of new revenue until the advance is recovered"
+      ]
+    }
+  ]
+}

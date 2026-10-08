@@ -116,7 +116,7 @@ export const meteora: Integration = {
     },
     {
       title: "The whole loop through the Launch API",
-      when: "5 Oct 2026, 22:45–22:52 IST",
+      when: "5 Oct 2026, 22:45-22:52 IST",
       result: "46 / 46 checks",
       detail: "rR2E: trades through /quote and /build (every fill equalled its quote), graduation, a sweep, four buyback slices and three treasury claims; every endpoint, the activity feed and the WS frames compared with the chain to the lamport.",
       link: { label: "meteora-e2e-2026-10-05.json", path: "docs/runbooks/meteora-e2e-2026-10-05.json" },

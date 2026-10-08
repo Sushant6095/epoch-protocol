@@ -1,7 +1,7 @@
 ---
 description: Build or refine one Epoch page inside the verification loop
 ---
-Page: $ARGUMENTS   (one of: landing, sign-in, terminal, fee-market, validators, validator, my-stake, predict, vault, launch)
+Page: $ARGUMENTS   (one of: landing, sign-in, terminal, validators, validator, my-stake, predict, vault)
 
 Invoke the epoch-ui-craft router first, then:
 1. Read `handover/pages/$ARGUMENTS.md`, this page's section of `handover/12-REPLICA-BLUEPRINTS.md` (the look),
@@ -11,8 +11,7 @@ Invoke the epoch-ui-craft router first, then:
    `design/screens/$ARGUMENTS/ref-*.png`, then write `design/screens/$ARGUMENTS.replica.md` (measurements,
    region → library component → Epoch content).
 3. Plan (plan mode): the library components to pull for each region (router §2 and §4; nothing hand-built that a
-   registry has) and the exact hooks, types and fixtures (`handover/07-DATA-CONTRACTS.md`; the page's row and
-   instructions in `handover/13-BACKEND-AND-PROGRAM-MAP.md`). Pull and re-skin the
+   registry has) and the exact hooks, types and fixtures (`handover/07-DATA-CONTRACTS.md`). Pull and re-skin the
    components first.
 4. Build ONE component or state at a time, tokens only, wired to the typed hooks.
 5. After each: `pnpm --filter app build && pnpm --filter app start` (production), then

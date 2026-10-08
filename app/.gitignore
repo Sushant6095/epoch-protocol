@@ -1,0 +1,7 @@
+# Local third-party design references and runtime products.
+design/screens/**/ref-*
+.next/
+node_modules/
+*.tsbuildinfo
+.env
+.env.local
