@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useMemo, useRef } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 /**
@@ -18,11 +18,14 @@ export type SceneProps = {
 };
 
 const R = 10;
+// longitude facing the camera at load (Europe, Africa and India swing into view first)
+const LON0 = 1.3;
 const CENTER = new THREE.Vector3(0, -11.75, 0);
 
 const planetVert = `
-varying vec3 vN; varying vec3 vP; varying vec3 vView; varying vec3 vWN;
+varying vec3 vN; varying vec3 vP; varying vec3 vView; varying vec3 vWN; varying vec2 vUv;
 void main(){
+  vUv=uv;
   vN=normalize(normalMatrix*normal);
   vWN=normalize(mat3(modelMatrix)*normal);
   vec4 wp=modelMatrix*vec4(position,1.);
@@ -31,42 +34,27 @@ void main(){
   gl_Position=projectionMatrix*viewMatrix*wp;
 }`;
 const planetFrag = `
-/* Earth at night from orbit: procedural continents, clouds, city lights on the night side and a thin
-   lit crescent where the sun (behind the planet) grazes the limb. */
+/* Earth from orbit, from NASA imagery: Blue Marble by day, Black Marble city lights by night, real cloud
+   cover drifting over both. The sun sits behind the planet, so we see the night side with a thin lit
+   crescent and an orange twilight band along the top limb. */
+uniform sampler2D uDay; uniform sampler2D uNight; uniform sampler2D uClouds;
 uniform float uTime; uniform vec3 uSunDir; uniform float uRise;
-varying vec3 vN; varying vec3 vP; varying vec3 vView; varying vec3 vWN;
-float h3(vec3 p){ p=fract(p*.3183099+.1); p*=17.; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
-float n3(vec3 x){ vec3 i=floor(x), f=fract(x); f=f*f*(3.-2.*f);
-  return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
-             mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
-float fbm3(vec3 p){ float v=0., a=.5; for(int i=0;i<5;i++){ v+=a*n3(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return v; }
+varying vec3 vN; varying vec3 vP; varying vec3 vView; varying vec3 vWN; varying vec2 vUv;
 void main(){
-  vec3 n=normalize(vP);
-  float c=fbm3(n*2.3+vec3(4.1));
-  float land=smoothstep(.5,.535,c);
-  float shelf=smoothstep(.44,.5,c)*(1.-land);
-  float relief=fbm3(n*11.);
-  // lighting from the sun behind the planet
   float sd=dot(normalize(vWN),uSunDir);
-  float day=smoothstep(-.06,.32,sd);
-  float twilight=exp(-pow((sd+.02)/.09,2.));
-  vec3 oceanN=vec3(.008,.017,.045), landN=vec3(.03,.033,.045)+relief*.02;
-  vec3 oceanD=vec3(.04,.11,.26)+shelf*vec3(.03,.1,.12), landD=vec3(.2,.21,.17)*(.7+.5*relief);
-  vec3 col=mix(mix(oceanN,landN,land), mix(oceanD,landD,land), day*uRise);
-  // clouds drift slower than the ground turns
-  float cl=smoothstep(.55,.82,fbm3(n*3.4+vec3(uTime*.012,0.,uTime*.008)));
-  col=mix(col, vec3(.85,.88,.95)*day*uRise+vec3(.025,.028,.04), cl*.55);
-  // city lights: clustered dots where land is dense, only on the night side
-  float dens=smoothstep(.4,.68,fbm3(n*4.6+vec3(9.)))*land;
-  vec3 q=n*120.; float r=h3(floor(q)); float d=smoothstep(.36,0.,length(fract(q)-.5));
-  vec3 q2=n*300.; float r2=h3(floor(q2)+7.); float d2=smoothstep(.4,0.,length(fract(q2)-.5));
-  float lights=step(1.-dens*.85,r)*d*(.6+.4*r)+step(1.-dens*.7,r2)*d2*.6;
-  float night=1.-day;
-  col+=vec3(1.,.7,.36)*(lights*1.8+dens*.07)*night*(1.-cl*.6);
-  // twilight band and scattered blue at the limb
-  col+=vec3(1.,.55,.25)*twilight*.35*uRise*(.4+.6*land);
-  float fres=pow(1.-max(dot(normalize(vN),vec3(0.,0.,1.)),0.),3.);
-  col+=vec3(.3,.5,1.)*fres*(.06+.55*day*uRise);
+  float day=smoothstep(-.08,.28,sd)*uRise;
+  float twilight=exp(-pow((sd+.03)/.1,2.))*uRise;
+  vec3 dayCol=texture2D(uDay,vUv).rgb;
+  vec3 nightCol=texture2D(uNight,vUv).rgb;
+  float cl=texture2D(uClouds,vUv+vec2(uTime*.0015,0.)).r;
+  // night: lights only, slightly warmed; the ground keeps a faint moonlit tone
+  vec3 lights=pow(nightCol,vec3(1.4))*vec3(1.2,1.02,.82)*1.25+dayCol*vec3(.08,.095,.14);
+  vec3 col=mix(lights,dayCol*1.05,day);
+  // clouds: white in daylight, dark veils that dim city lights at night
+  col=mix(col, mix(vec3(.015,.018,.03),vec3(.95),day), smoothstep(.15,.85,cl)*.85);
+  col+=vec3(1.,.48,.18)*twilight*.22;
+  float fres=pow(1.-max(dot(normalize(vN),vec3(0.,0.,1.)),0.),2.6);
+  col+=vec3(.28,.5,1.)*fres*(.05+.5*day+.25*twilight);
   gl_FragColor=vec4(col,1.);
 }`;
 const atmoFrag = `
@@ -196,15 +184,26 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
   const blue = useMemo(() => new THREE.Color('#6d7ff0'), []);
   const silver = useMemo(() => new THREE.Color('#ededf3'), []);
 
-  const planetMat = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader: planetVert,
-        fragmentShader: planetFrag,
-        uniforms: { uTime: { value: 0 }, uRise: { value: 0 }, uSunDir: { value: new THREE.Vector3(0, 0.6, -0.8).normalize() } },
-      }),
-    [],
-  );
+  const [dayTex, nightTex, cloudTex] = useLoader(THREE.TextureLoader, ['/earth/day.jpg', '/earth/night.jpg', '/earth/clouds.jpg']);
+  const planetMat = useMemo(() => {
+    for (const t of [dayTex, nightTex]) t.colorSpace = THREE.SRGBColorSpace;
+    for (const t of [dayTex, nightTex, cloudTex]) {
+      t.anisotropy = 8;
+      t.wrapS = THREE.RepeatWrapping;
+    }
+    return new THREE.ShaderMaterial({
+      vertexShader: planetVert,
+      fragmentShader: planetFrag,
+      uniforms: {
+        uDay: { value: dayTex },
+        uNight: { value: nightTex },
+        uClouds: { value: cloudTex },
+        uTime: { value: 0 },
+        uRise: { value: 0 },
+        uSunDir: { value: new THREE.Vector3(0, 0.6, -0.8).normalize() },
+      },
+    });
+  }, [dayTex, nightTex, cloudTex]);
   const atmoMat = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -342,7 +341,7 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
     const baseZ = aspect < 1 ? 9.5 : 6.4;
     camera.position.set(state.pointer.x * 0.25, 0.25 - p * 1.1 + state.pointer.y * 0.12, baseZ - p * 3.4);
     camera.lookAt(0, -0.6 - p * 0.9, 0);
-    if (group.current) group.current.rotation.y = time * 0.035;
+    if (group.current) group.current.rotation.y = LON0 + time * 0.03;
     dawn.current += (dawnTarget.current - dawn.current) * Math.min(dt * 0.9, 1);
     const rise = dawn.current * (0.85 + p * 0.5);
     // the sun sits on the silhouette's top point, a touch below the limb, and crests as you scroll
@@ -380,7 +379,7 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
     <mesh material={skyMat} frustumCulled={false} renderOrder={-1}>
       <planeGeometry args={[2, 2]} />
     </mesh>
-    <group position={CENTER}>
+    <group position={CENTER} rotation={[0.96, 0, 0]}>
       <mesh material={atmoMat} scale={1.035}>
         <sphereGeometry args={[R, 96, 96]} />
       </mesh>
@@ -388,7 +387,6 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
         <mesh material={planetMat}>
           <sphereGeometry args={[R, 128, 128]} />
         </mesh>
-        <points geometry={points.geo} material={points.mat} />
         {arcs.map((a, i) => (
           <primitive key={i} object={a.line} />
         ))}
@@ -408,7 +406,9 @@ export default function HorizonScene(props: SceneProps) {
       frameloop={props.paused ? 'demand' : 'always'}
       aria-hidden="true"
     >
-      <Planet {...props} />
+      <Suspense fallback={null}>
+        <Planet {...props} />
+      </Suspense>
     </Canvas>
   );
 }

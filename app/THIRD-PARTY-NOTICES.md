@@ -48,3 +48,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ## TradingView Lightweight Charts
 
 - `lightweight-charts` is Apache-2.0. Its attribution logo stays on every chart, and the footer links TradingView.
+
+## Earth imagery (`public/earth/*`)
+Day, night-lights and cloud maps from NASA Visible Earth (Blue Marble, Black Marble), public domain, as
+distributed in the three.js examples (`examples/textures/planets`, MIT). Re-encoded; the cloud map is the
+blue channel of `earth_bump_roughness_clouds_4096.jpg`.
