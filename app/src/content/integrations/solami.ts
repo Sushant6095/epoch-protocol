@@ -95,7 +95,7 @@ export const solami: Integration = {
     },
     {
       title: "No lost slots",
-      when: "4 Oct 2026, 09:09–09:12 IST",
+      when: "4 Oct 2026, 09:09-09:12 IST",
       result: "68 blocks, none lost",
       detail: "Every block of the window was indexed in order on public mainnet RPC.",
       link: { label: "GO_LIVE_SIDE_TRACKS.md §2", path: "docs/GO_LIVE_SIDE_TRACKS.md" },

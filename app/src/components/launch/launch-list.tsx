@@ -230,7 +230,7 @@ export function LaunchList() {
               <DataStatus
                 source={isSampleKind(data?.kind) ? "sample" : list.data.source}
                 asOf={data?.asOf}
-                sampleNote={list.data.source === "sample" ? "Tokens recorded on the local stand-in that runs Meteora's mainnet programs (3–5 Oct 2026)." : data?.note || undefined}
+                sampleNote={list.data.source === "sample" ? "Tokens recorded on the local stand-in that runs Meteora's mainnet programs (3-5 Oct 2026)." : data?.note || undefined}
               />
             ) : null}
           </span>

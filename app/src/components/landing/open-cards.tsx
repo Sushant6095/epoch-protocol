@@ -46,18 +46,18 @@ const IX = [
   'request_withdrawal',
 ];
 function CodeVisual() {
-  const [lines, setLines] = useState<string[]>(IX.slice(0, 3));
+  const [lines, setLines] = useState<string[]>(IX.slice(0, 7));
   const [typed, setTyped] = useState('');
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let i = 3,
+    let i = 7,
       c = 0;
     const id = setInterval(() => {
       const word = IX[i % IX.length];
       c++;
       setTyped(word.slice(0, c));
       if (c >= word.length + 6) {
-        setLines((l) => [...l.slice(-3), word]);
+        setLines((l) => [...l.slice(-8), word]);
         setTyped('');
         c = 0;
         i++;

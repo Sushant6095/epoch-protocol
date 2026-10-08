@@ -21,27 +21,52 @@ const R = 10;
 const CENTER = new THREE.Vector3(0, -11.75, 0);
 
 const planetVert = `
-varying vec3 vN; varying vec3 vP; varying vec3 vView;
+varying vec3 vN; varying vec3 vP; varying vec3 vView; varying vec3 vWN;
 void main(){
   vN=normalize(normalMatrix*normal);
+  vWN=normalize(mat3(modelMatrix)*normal);
   vec4 wp=modelMatrix*vec4(position,1.);
   vP=position;
   vView=normalize(cameraPosition-wp.xyz);
   gl_Position=projectionMatrix*viewMatrix*wp;
 }`;
 const planetFrag = `
-uniform float uTime;
-varying vec3 vN; varying vec3 vP; varying vec3 vView;
+/* Earth at night from orbit: procedural continents, clouds, city lights on the night side and a thin
+   lit crescent where the sun (behind the planet) grazes the limb. */
+uniform float uTime; uniform vec3 uSunDir; uniform float uRise;
+varying vec3 vN; varying vec3 vP; varying vec3 vView; varying vec3 vWN;
+float h3(vec3 p){ p=fract(p*.3183099+.1); p*=17.; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+float n3(vec3 x){ vec3 i=floor(x), f=fract(x); f=f*f*(3.-2.*f);
+  return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
+float fbm3(vec3 p){ float v=0., a=.5; for(int i=0;i<5;i++){ v+=a*n3(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return v; }
 void main(){
   vec3 n=normalize(vP);
-  float lat=asin(clamp(n.y,-1.,1.));
-  float lon=atan(n.z,n.x);
-  float gl=abs(fract(lat*22.)-.5); float go=abs(fract(lon*14.)-.5);
-  float grid=smoothstep(.03,0.,gl)*.8+smoothstep(.02,0.,go)*.55;
+  float c=fbm3(n*2.3+vec3(4.1));
+  float land=smoothstep(.5,.535,c);
+  float shelf=smoothstep(.44,.5,c)*(1.-land);
+  float relief=fbm3(n*11.);
+  // lighting from the sun behind the planet
+  float sd=dot(normalize(vWN),uSunDir);
+  float day=smoothstep(-.06,.32,sd);
+  float twilight=exp(-pow((sd+.02)/.09,2.));
+  vec3 oceanN=vec3(.008,.017,.045), landN=vec3(.03,.033,.045)+relief*.02;
+  vec3 oceanD=vec3(.04,.11,.26)+shelf*vec3(.03,.1,.12), landD=vec3(.2,.21,.17)*(.7+.5*relief);
+  vec3 col=mix(mix(oceanN,landN,land), mix(oceanD,landD,land), day*uRise);
+  // clouds drift slower than the ground turns
+  float cl=smoothstep(.55,.82,fbm3(n*3.4+vec3(uTime*.012,0.,uTime*.008)));
+  col=mix(col, vec3(.85,.88,.95)*day*uRise+vec3(.025,.028,.04), cl*.55);
+  // city lights: clustered dots where land is dense, only on the night side
+  float dens=smoothstep(.4,.68,fbm3(n*4.6+vec3(9.)))*land;
+  vec3 q=n*120.; float r=h3(floor(q)); float d=smoothstep(.36,0.,length(fract(q)-.5));
+  vec3 q2=n*300.; float r2=h3(floor(q2)+7.); float d2=smoothstep(.4,0.,length(fract(q2)-.5));
+  float lights=step(1.-dens*.85,r)*d*(.6+.4*r)+step(1.-dens*.7,r2)*d2*.6;
+  float night=1.-day;
+  col+=vec3(1.,.7,.36)*(lights*1.8+dens*.07)*night*(1.-cl*.6);
+  // twilight band and scattered blue at the limb
+  col+=vec3(1.,.55,.25)*twilight*.35*uRise*(.4+.6*land);
   float fres=pow(1.-max(dot(normalize(vN),vec3(0.,0.,1.)),0.),3.);
-  vec3 base=vec3(.028,.028,.045);
-  vec3 blue=vec3(.36,.42,.93);
-  vec3 col=base+blue*grid*.05+blue*fres*.22;
+  col+=vec3(.3,.5,1.)*fres*(.06+.55*day*uRise);
   gl_FragColor=vec4(col,1.);
 }`;
 const atmoFrag = `
@@ -49,9 +74,9 @@ uniform vec3 uAmber; uniform vec3 uBlue; uniform float uPulse; uniform float uRi
 varying vec3 vN; varying vec3 vP; varying vec3 vView;
 void main(){
   float f=1.-abs(dot(normalize(vN),vec3(0.,0.,1.)));
-  float rim=pow(f,5.);
+  float rim=pow(f,7.);
   float sun=exp(-pow(vP.x/5.5,2.));
-  vec3 c=mix(uBlue,uAmber,sun*.85);
+  vec3 c=mix(vec3(.35,.6,1.),mix(uAmber,vec3(1.),.35),sun*.7);
   float a=rim*(.55+(.35+.9*uRise)*sun)*uPulse;
   gl_FragColor=vec4(c*a*1.15,a*.9);
 }`;
@@ -112,14 +137,17 @@ void main(){
   float d=length(p);
   float above=uv.y-uSun.y;
   // night to first light
-  vec3 col=mix(vec3(.022,.022,.04), vec3(.075,.07,.17), pow(clamp(1.-above*1.5,0.,1.),2.2));
-  col+=uBlue*exp(-d*1.25)*.2*uRise;
-  col+=uViolet*exp(-d*2.2)*.22*uRise;
-  col+=uAmber*exp(-d*3.4)*.6*uRise;
+  vec3 col=mix(vec3(.008,.008,.016), vec3(.04,.04,.09), pow(clamp(1.-above*1.6,0.,1.),2.6));
+  // a faint galactic band across deep space
+  float band=exp(-pow((uv.y-.78+.18*uv.x)/.16,2.));
+  col+=vec3(.12,.11,.2)*band*fbm(vec2(uv.x*uAspect*3.,uv.y*6.))*.35;
+  col+=uBlue*exp(-d*1.6)*.1*uRise;
+  col+=uViolet*exp(-d*3.)*.06*uRise;
+  col+=uAmber*exp(-d*4.2)*.45*uRise;
   // stars, fading out where the light is
   vec2 g=vec2(uv.x*uAspect,uv.y)*110.;
   vec2 id=floor(g); float r=hash(id);
-  if(r>.986){
+  if(r>.978){
     vec2 c=fract(g)-.5-(vec2(hash(id+3.),hash(id+7.))-.5)*.6;
     float tw=.55+.45*sin(uTime*(1.+r*3.)+r*90.);
     col+=vec3(.85,.88,1.)*smoothstep(.09,0.,length(c))*tw*smoothstep(.0,.25,above)*(1.-.8*exp(-d*2.));
@@ -134,14 +162,14 @@ void main(){
     float rays=step(0.,uv.y-y0)*exp(-max(uv.y-y0,0.)*9.);
     float curtain=pow(fbm(vec2(ax*16.+uTime*.1+fi*9.,uv.y*1.2+fi)),2.2)*2.6*smoothstep(.0,.35,fbm(vec2(ax*1.3-uTime*.04,fi*4.)));
     vec3 ac=i==0?uTeal:(i==1?uBlue:uViolet);
-    col+=ac*(band*.7+rays*.55)*curtain*(.45+.55*uRise)*.38;
+    col+=ac*(band*.7+rays*.55)*curtain*(.45+.55*uRise)*.07;
   }
   // god rays fanning up from the sun
   float ang=atan(p.y,p.x);
-  float rays=pow(.5+.5*sin(ang*22.+fbm(vec2(ang*4.,uTime*.08))*7.),5.);
-  col+=mix(uAmber,vec3(1.),.3)*rays*exp(-d*2.6)*.15*uRise*smoothstep(-.02,.05,above);
+  float rays=pow(.5+.5*sin(ang*14.+fbm(vec2(ang*3.,uTime*.05))*4.),28.)+.35*pow(.5+.5*sin(ang*37.+1.3),40.);
+  col+=mix(uAmber,vec3(1.),.3)*rays*exp(-d*3.4)*.28*uRise*smoothstep(-.02,.05,above);
   // corona + anamorphic lens streak along the horizon
-  col+=vec3(1.,.86,.7)*exp(-d*22.)*1.4*uRise;
+  col+=vec3(1.,.9,.78)*(exp(-d*30.)*1.6+exp(-d*9.)*.35)*uRise;
   col+=mix(uAmber,vec3(1.),.5)*exp(-abs(p.y)*70.)*exp(-abs(p.x)*1.6)*.75*uRise;
   col+=uBlue*exp(-abs(p.y)*26.)*exp(-abs(p.x)*.9)*.18*uRise;
   // film grain
@@ -169,7 +197,12 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
   const silver = useMemo(() => new THREE.Color('#ededf3'), []);
 
   const planetMat = useMemo(
-    () => new THREE.ShaderMaterial({ vertexShader: planetVert, fragmentShader: planetFrag, uniforms: { uTime: { value: 0 } } }),
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: planetVert,
+        fragmentShader: planetFrag,
+        uniforms: { uTime: { value: 0 }, uRise: { value: 0 }, uSunDir: { value: new THREE.Vector3(0, 0.6, -0.8).normalize() } },
+      }),
     [],
   );
   const atmoMat = useMemo(
@@ -309,7 +342,7 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
     const baseZ = aspect < 1 ? 9.5 : 6.4;
     camera.position.set(state.pointer.x * 0.25, 0.25 - p * 1.1 + state.pointer.y * 0.12, baseZ - p * 3.4);
     camera.lookAt(0, -0.6 - p * 0.9, 0);
-    if (group.current) group.current.rotation.y = time * 0.018;
+    if (group.current) group.current.rotation.y = time * 0.035;
     dawn.current += (dawnTarget.current - dawn.current) * Math.min(dt * 0.9, 1);
     const rise = dawn.current * (0.85 + p * 0.5);
     // the sun sits on the silhouette's top point, a touch below the limb, and crests as you scroll
@@ -324,6 +357,9 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
       .copy(CENTER)
       .addScaledVector(tmp.c, R * cosT)
       .addScaledVector(tmp.up, R * sinT * (0.985 + p * 0.03));
+    // sun behind the planet: the side facing us is night, with a thin lit crescent along the top limb
+    planetMat.uniforms.uSunDir.value.copy(tmp.up).multiplyScalar(sinT).addScaledVector(tmp.c, -cosT * 0.82).normalize();
+    planetMat.uniforms.uRise.value = rise;
     sunWorld.project(camera);
     skyMat.uniforms.uSun.value.set(sunWorld.x * 0.5 + 0.5, sunWorld.y * 0.5 + 0.5);
     skyMat.uniforms.uAspect.value = aspect;
