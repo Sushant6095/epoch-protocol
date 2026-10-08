@@ -2792,61 +2792,28 @@ html:not([data-intro='on']) .it {
   }
 }
 
-/* ── Hero footage (NASA ISS, public domain) with market lines ── */
+/* ── Hero footage (NASA ISS, public domain) ── */
 .ev {
   position: absolute;
   inset: 0;
   overflow: hidden;
 }
-.ev-video,
-.ev-lines {
+.ev-video {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 14%;
   width: 100%;
   height: 100%;
-}
-.ev-video {
   object-fit: cover;
   object-position: 50% 0%;
-  /* drop the horizon to the lower third so the sky stays dark behind the headline */
-  top: 22%;
-  height: 100%;
+  transform-origin: 50% 70%;
 }
-.ev-lines path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.ev-core {
-  stroke-width: 1.1;
-  opacity: 0.9;
-}
-.ev-glow {
-  stroke-width: 4;
-  opacity: 0.14;
-}
-.ev [data-tone='blue'] path,
-.ev-tip[data-tone='blue'] {
-  stroke: var(--ep-lx-blue);
-  fill: var(--ep-lx-blue);
-}
-.ev [data-tone='violet'] path,
-.ev-tip[data-tone='violet'] {
-  stroke: var(--ep-lx-action);
-  fill: var(--ep-lx-action);
-}
-.ev [data-tone='amber'] path,
-.ev-tip[data-tone='amber'] {
-  stroke: var(--ep-lx-amber);
-  fill: var(--ep-lx-amber);
-}
-.ev-lines path {
-  fill: none !important;
-}
-/* keeps the headline readable over bright footage */
+/* dark sky behind the type, soft edges left and right, the lit land fading into the page below */
 .ev-scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, var(--ep-lx-bg) 0%, var(--ep-lx-bg) 26%, color-mix(in oklab, var(--ep-lx-bg) 45%, transparent) 40%, transparent 58%);
   pointer-events: none;
+  background:
+    linear-gradient(to bottom, var(--ep-lx-bg) 0%, var(--ep-lx-bg) 31%, color-mix(in oklab, var(--ep-lx-bg) 35%, transparent) 42%, transparent 54%),
+    radial-gradient(140% 100% at 50% 80%, transparent 60%, color-mix(in oklab, var(--ep-lx-bg) 80%, transparent) 100%);
 }
