@@ -2,12 +2,12 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { MarketCharts } from '@/components/landing/earth-charts';
 
 /**
- * Three.js hero: the Solana validator set as a planet at dawn.
- * - 683 nodes on the surface (one per active validator in the snapshot); amber = earns below vote fees.
- * - Great-circle arcs carry stake between operators.
- * - An atmosphere rim lit from behind, like first light of a new epoch.
+ * Three.js hero: Earth from orbit at first light (NASA day, night-lights and cloud maps).
+ * - Market lines rise from the cities where Solana stake sits (see earth-charts.tsx).
+ * - The sun crests the limb when the intro hands over; an atmosphere rim lit from behind.
  * Scroll drives a camera dolly through `scroll.current` (0..1), set by the page's ScrollTrigger.
  */
 export type SceneProps = {
@@ -21,6 +21,8 @@ const R = 10;
 // longitude facing the camera at load (Europe, Africa and India swing into view first)
 const LON0 = 1.3;
 const CENTER = new THREE.Vector3(0, -11.75, 0);
+// tilts the globe so the mid-northern latitudes (Europe's data-centre belt) face the camera
+const TILT = 0.8;
 
 const planetVert = `
 varying vec3 vN; varying vec3 vP; varying vec3 vView; varying vec3 vWN; varying vec2 vUv;
@@ -89,20 +91,6 @@ void main(){
   float a=smoothstep(.5,.1,r)*vFade;
   vec3 c=mix(uSilver,uAmber,vWarn);
   gl_FragColor=vec4(c*a,a);
-}`;
-const arcVert = `
-attribute float aT;
-varying float vT;
-void main(){ vT=aT; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`;
-const arcFrag = `
-uniform float uHead; uniform vec3 uColor;
-varying float vT;
-void main(){
-  float d=uHead-vT;
-  float tail=smoothstep(.45,0.,d)*step(0.,d);
-  float base=.07;
-  float a=max(tail,base);
-  gl_FragColor=vec4(uColor*a,a);
 }`;
 
 
@@ -270,42 +258,6 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
     return { geo, mat, dirs };
   }, [total, belowBreakEven, amber, silver]);
 
-  const arcs = useMemo(() => {
-    const { dirs } = points;
-    // pick node pairs on the visible (front-top) cap
-    const front = dirs
-      .map((d, i) => ({ d, i }))
-      .filter(({ d }) => d.z > 0.55 && d.y > 0.55);
-    let s = 3;
-    const rnd = () => ((s = (s * 48271) % 2147483647) / 2147483647);
-    return Array.from({ length: 14 }, (_, k) => {
-      const a = front[Math.floor(rnd() * front.length)].d;
-      const b = front[Math.floor(rnd() * front.length)].d;
-      const n = 64;
-      const pos = new Float32Array(n * 3);
-      const t = new Float32Array(n);
-      const ang = a.angleTo(b);
-      for (let j = 0; j < n; j++) {
-        const u = j / (n - 1);
-        const p = new THREE.Vector3().copy(a).lerp(b, u).normalize();
-        const lift = 1 + Math.sin(u * Math.PI) * (0.04 + ang * 0.12);
-        pos.set([p.x * R * lift, p.y * R * lift, p.z * R * lift], j * 3);
-        t[j] = u;
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      geo.setAttribute('aT', new THREE.BufferAttribute(t, 1));
-      const mat = new THREE.ShaderMaterial({
-        vertexShader: arcVert,
-        fragmentShader: arcFrag,
-        uniforms: { uHead: { value: 0 }, uColor: { value: k % 3 === 0 ? amber : blue.clone().lerp(silver, 0.4) } },
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      });
-      return { geo, mat, line: new THREE.Line(geo, mat), speed: 0.12 + rnd() * 0.12, offset: rnd() * 2 };
-    });
-  }, [points, amber, blue, silver]);
 
   const t = useRef(6);
   const smooth = useRef(0);
@@ -341,7 +293,7 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
     const baseZ = aspect < 1 ? 9.5 : 6.4;
     camera.position.set(state.pointer.x * 0.25, 0.25 - p * 1.1 + state.pointer.y * 0.12, baseZ - p * 3.4);
     camera.lookAt(0, -0.6 - p * 0.9, 0);
-    if (group.current) group.current.rotation.y = LON0 + time * 0.03;
+    if (group.current) group.current.rotation.y = LON0 + time * 0.006;
     dawn.current += (dawnTarget.current - dawn.current) * Math.min(dt * 0.9, 1);
     const rise = dawn.current * (0.85 + p * 0.5);
     // the sun sits on the silhouette's top point, a touch below the limb, and crests as you scroll
@@ -369,9 +321,6 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
     points.mat.uniforms.uTime.value = time;
     points.mat.uniforms.uPx.value = Math.min(state.viewport.dpr, 1.5);
     atmoMat.uniforms.uPulse.value = 0.94 + 0.06 * Math.sin(time * 0.6) + p * 0.35;
-    arcs.forEach((a) => {
-      a.mat.uniforms.uHead.value = ((time * a.speed + a.offset) % 1.6) - 0.1;
-    });
   });
 
   return (
@@ -379,7 +328,7 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
     <mesh material={skyMat} frustumCulled={false} renderOrder={-1}>
       <planeGeometry args={[2, 2]} />
     </mesh>
-    <group position={CENTER} rotation={[0.96, 0, 0]}>
+    <group position={CENTER} rotation={[TILT, 0, 0]}>
       <mesh material={atmoMat} scale={1.035}>
         <sphereGeometry args={[R, 96, 96]} />
       </mesh>
@@ -387,9 +336,7 @@ function Planet({ scroll, paused, total = 683, belowBreakEven = 136 }: SceneProp
         <mesh material={planetMat}>
           <sphereGeometry args={[R, 128, 128]} />
         </mesh>
-        {arcs.map((a, i) => (
-          <primitive key={i} object={a.line} />
-        ))}
+        <MarketCharts radius={R} />
       </group>
     </group>
     </>
