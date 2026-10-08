@@ -2807,7 +2807,10 @@ html:not([data-intro='on']) .it {
 }
 .ev-video {
   object-fit: cover;
-  object-position: 50% 100%;
+  object-position: 50% 0%;
+  /* drop the horizon to the lower third so the sky stays dark behind the headline */
+  top: 22%;
+  height: 100%;
 }
 .ev-lines path {
   fill: none;
@@ -2815,11 +2818,12 @@ html:not([data-intro='on']) .it {
   stroke-linejoin: round;
 }
 .ev-core {
-  stroke-width: 1.4;
+  stroke-width: 1.1;
+  opacity: 0.9;
 }
 .ev-glow {
-  stroke-width: 6;
-  opacity: 0.22;
+  stroke-width: 4;
+  opacity: 0.14;
 }
 .ev [data-tone='blue'] path,
 .ev-tip[data-tone='blue'] {
@@ -2843,6 +2847,6 @@ html:not([data-intro='on']) .it {
 .ev-scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, var(--ep-lx-bg) 0%, color-mix(in oklab, var(--ep-lx-bg) 55%, transparent) 30%, transparent 60%);
+  background: linear-gradient(to bottom, var(--ep-lx-bg) 0%, var(--ep-lx-bg) 26%, color-mix(in oklab, var(--ep-lx-bg) 45%, transparent) 40%, transparent 58%);
   pointer-events: none;
 }

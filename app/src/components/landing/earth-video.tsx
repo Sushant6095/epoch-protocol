@@ -5,7 +5,9 @@ import history from '@/fixtures/stake-history-64.real.json';
 import fee from '@/fixtures/fee-index.sample.json';
 
 /**
- * Hero backdrop from real footage: NASA ISS footage of Earth at night (public domain) looping behind the
+ * Hero backdrop from real footage: NASA ISS footage of Earth at night (public domain; "Earth from Space in 4K,
+ * Expedition 65 Edition", jsc2022m000172, 33:00-33:15, Iberia and western Europe at night with sunrise on the
+ * limb; rotated 180 degrees, crossfade-looped) looping behind the
  * hero, with market lines rising out of the night side. Each line is a real series (64 epochs of stake
  * history or the Fee Index), drawn up with DrawSVG once the intro hands over. `onFail` lets the page fall
  * back to the live 3D Earth when the clip is missing or cannot play.
@@ -21,10 +23,10 @@ const SERIES = [
 
 // base (x, y) on the 1440x900 frame, rise height and run width; tuned to the clip's night side
 const LINES = [
-  { x: 330, y: 820, h: 150, w: 90, tone: 'violet' },
-  { x: 560, y: 760, h: 230, w: 120, tone: 'blue' },
-  { x: 930, y: 770, h: 190, w: 110, tone: 'amber' },
-  { x: 1150, y: 830, h: 130, w: 80, tone: 'blue' },
+  { x: 250, y: 860, h: 120, w: 70, tone: 'violet' },
+  { x: 520, y: 800, h: 170, w: 90, tone: 'blue' },
+  { x: 960, y: 790, h: 150, w: 90, tone: 'amber' },
+  { x: 1180, y: 860, h: 110, w: 70, tone: 'blue' },
 ];
 
 function path(series: number[], x: number, y: number, h: number, w: number) {
@@ -95,15 +97,16 @@ export function EarthVideo({ onFail, paused }: { onFail: () => void; paused?: bo
       <video
         ref={video}
         className="ev-video"
-        src="/earth/hero.mp4"
         poster="/earth/hero-poster.jpg"
         autoPlay
         muted
         loop
         playsInline
         preload="auto"
-        onError={onFail}
-      />
+      >
+        <source src="/earth/hero.webm" type="video/webm" />
+        <source src="/earth/hero.mp4" type="video/mp4" />
+      </video>
       <svg className="ev-lines" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
         <defs>
           <linearGradient id="ev-fade" x1="0" y1="1" x2="0" y2="0">
