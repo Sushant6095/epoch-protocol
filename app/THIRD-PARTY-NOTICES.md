@@ -56,5 +56,5 @@ blue channel of `earth_bump_roughness_clouds_4096.jpg`.
 
 ## Hero footage (`public/earth/hero.mp4`, `hero.webm`, `hero-poster.jpg`)
 NASA, "Earth from Space in 4K, Expedition 65 Edition" (jsc2022m000172, images.nasa.gov), footage from the
-International Space Station. NASA imagery is not copyrighted (public domain). Excerpt 32:59-33:04, slowed 2.5x, rotated 180
+International Space Station. NASA imagery is not copyrighted (public domain). Excerpt 32:59-33:04 from the 4K original, colour-graded, slowed 2x, rotated 180
 degrees, crossfade-looped and re-encoded. NASA does not endorse Epoch.

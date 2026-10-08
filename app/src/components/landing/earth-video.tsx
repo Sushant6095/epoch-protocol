@@ -4,8 +4,8 @@ import { gsap, useGSAP } from '@/lib/gsap';
 
 /**
  * Hero backdrop from real footage: NASA ISS footage of Earth at night (public domain; "Earth from Space in 4K,
- * Expedition 65 Edition", jsc2022m000172, a night pass over Iberia and western Europe, rotated 180 degrees,
- * slowed and crossfade-looped). Kept quiet on purpose: no overlays, a slow settle-in when the intro hands over,
+ * Expedition 65 Edition", jsc2022m000172, from the 4K original: a night pass over Iberia, rotated 180 degrees,
+ * graded to cool white-gold lights on navy, slowed 2x and crossfade-looped). Kept quiet on purpose: no overlays, a slow settle-in when the intro hands over,
  * and an edge vignette so the type stays the subject. `onFail` falls back to the live 3D Earth.
  */
 export function EarthVideo({ onFail, paused }: { onFail: () => void; paused?: boolean }) {
@@ -68,7 +68,6 @@ export function EarthVideo({ onFail, paused }: { onFail: () => void; paused?: bo
         playsInline
         preload="auto"
       >
-        <source src="/earth/hero.webm" type="video/webm" />
         <source src="/earth/hero.mp4" type="video/mp4" />
       </video>
       <span className="ev-scrim" />
