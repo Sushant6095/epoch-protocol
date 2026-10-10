@@ -43,7 +43,7 @@ jobs:
             programs/epoch/tests/litesvm -> target
       - name: Cache the Agave CLI and platform-tools
         id: agave-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.local/share/solana/install
