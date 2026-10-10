@@ -32,7 +32,7 @@
     "test": "jest --config ../../jest.config.base.js --rootDir . --passWithNoTests"
   },
   "dependencies": {
-    "dotenv": "^16.6.1",
+    "dotenv": "^18.0.6",
     "zod": "^4.6.5"
   },
   "devDependencies": {
